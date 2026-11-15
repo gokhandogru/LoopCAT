@@ -326,6 +326,25 @@ export function createReliabilityControls({
       }
       refresh();
     });
+    function noteExternalGeneration(generation) {
+      if (!Number.isSafeInteger(generation) || generation <= committedGeneration) return;
+      committedGeneration = generation;
+      dirtySinceCheckpoint = true;
+      scheduleCheckpoint();
+      // Another window's successful save does not resolve this window's errors.
+      refresh();
+    }
+    window.addEventListener("loopcat-resources-changed", (event) => {
+      if (event.detail?.external) noteExternalGeneration(event.detail.generation);
+    });
+    window.addEventListener("focus", () => {
+      if (typeof storage.getCommittedGeneration === "function") {
+        void storage
+          .getCommittedGeneration()
+          .then(noteExternalGeneration)
+          .catch(() => {});
+      }
+    });
     window.addEventListener("loopcat-storage-status", (event) => {
       const detail = event.detail;
       const message = typeof detail === "string" ? detail : detail?.message || "Local storage needs attention.";

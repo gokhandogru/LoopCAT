@@ -69,7 +69,14 @@ export function createResourceCatalogRefreshController(options) {
       );
       return {
         ...resource,
-        linkedProjects: links.map(({ projectId, projectName }) => ({ id: projectId, name: projectName })),
+        linkedProjects: links.map(({ projectId, projectName, role, lookup, qa, contribute }) => ({
+          id: projectId,
+          name: projectName,
+          role,
+          lookup,
+          qa,
+          contribute
+        })),
         usage: {
           main: links.some((link) => link.type === "tm" && link.role === "main"),
           reference: links.some((link) => link.type === "tm" && link.role === "reference"),

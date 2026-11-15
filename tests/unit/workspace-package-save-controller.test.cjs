@@ -274,6 +274,40 @@ test("WorkspacePackageSaveController preserves unsupported and connected folder-
   ]);
 });
 
+test("resource package generation is captured before build and newer resource edits remain dirty", async () => {
+  const { createWorkspacePackageSaveController } = await loadFactory();
+  const harness = createHarness(createWorkspacePackageSaveController);
+  let storedGeneration = 4;
+  harness.options.workspace.resourceGeneration = (id) => {
+    harness.calls.push(["resourceGeneration", id, storedGeneration]);
+    return Promise.resolve(storedGeneration);
+  };
+  harness.options.workspace.acknowledgeResourceGeneration = (id, captured) => {
+    harness.calls.push(["acknowledgeResourceGeneration", id, captured]);
+    return Promise.resolve(captured === storedGeneration);
+  };
+  const build = harness.options.build.buildProjectPackage;
+  harness.options.build.buildProjectPackage = (...args) => {
+    storedGeneration++;
+    return build(...args);
+  };
+  const changed = await harness.controller.saveById("project-1");
+  assert.equal(changed.resourceDirty, true);
+  assert.equal(
+    harness.calls.some(([name]) => name === "clearDirty"),
+    false
+  );
+  assert.deepEqual(harness.calls.at(-1), ["markDirty", "project-1"]);
+  assert.ok(
+    harness.calls.findIndex(([name]) => name === "resourceGeneration") <
+      harness.calls.findIndex(([name]) => name === "buildProjectPackage")
+  );
+  harness.options.build.buildProjectPackage = build;
+  const stable = await harness.controller.saveById("project-1");
+  assert.equal(stable.resourceDirty, undefined);
+  assert.deepEqual(harness.calls.at(-1), ["clearDirty", "project-1"]);
+});
+
 test("R1 delayed folder saves leave later generations dirty and serialize manual/background writes", async () => {
   const { createWorkspacePackageSaveController } = await loadFactory();
   const harness = createHarness(createWorkspacePackageSaveController);

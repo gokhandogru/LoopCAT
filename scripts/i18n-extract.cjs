@@ -732,6 +732,9 @@ function main() {
   extractScript(messagesByText, reportExportControllerPath, "src/reports/report-export-controller.js");
 
   const existing = existingMessages();
+  for (const [message, locations] of require("./resource-i18n-messages.cjs").collectResourceMessages(root)) {
+    for (const location of locations) add(messagesByText, message, "Resource library and dedicated TM/TB editor.", location);
+  }
   const existingByMessage = new Map(
     Object.entries(existing).map(([key, entry]) => [String(entry.message || entry), key])
   );

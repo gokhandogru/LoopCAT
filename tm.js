@@ -616,19 +616,31 @@ async function importTmEntries(entries, options = {}) {
   return uniqueEntries.length;
 }
 
-async function updateTmEntry(entry = {}) {
+async function prepareTmEntryMutation(entry = {}, { isNew = false } = {}) {
   const previous = entry?.id ? await get("tmEntries", entry.id) : null;
+  if (!isNew && !previous) throw new Error("TM entry no longer exists. Your draft was preserved.");
   const previousLanguagePair = languagePairOf(previous || entry);
-  const updated = tmEntryRecord(entry, { requireId: true });
+  const updated = tmEntryRecord(entry, { requireId: !isNew });
+  // An explicit version belongs to the user's draft, never the fresh read above.
+  updated.storageVersion = Object.hasOwn(entry, "storageVersion") ? entry.storageVersion : previous?.storageVersion || 0;
   const languagePairsToEnsure = new Set([previousLanguagePair, updated.languagePair].filter(Boolean));
   for (const languagePair of languagePairsToEnsure) await ensureTmIndex(languagePair);
-  await deleteWhere("tmTokenIndex", (record) => record.tmEntryId === updated.id);
-  Object.assign(updated, await put("tmEntries", updated));
-  await putTmIndexRecords([updated]);
-  if (updated.resourceId) {
-    const resource = await get("resources", updated.resourceId);
-    if (resource) await put("resources", { ...resource, updatedAt: updated.updatedAt });
+  const resource = updated.resourceId ? await get("resources", updated.resourceId) : null;
+  if (updated.resourceId && (!resource || resource.archived || resource.type !== "tm")) {
+    throw new Error("The translation memory was removed or archived. Your draft was preserved.");
   }
+  return { record: updated, changes: [
+    { store: "tmEntries", value: updated, ...(isNew ? { insertOnly: true } : {}) },
+    { store: "tmTokenIndex", where: { tmEntryId: updated.id } },
+    ...indexRecordsForEntry(updated).map((value) => ({ store: "tmTokenIndex", value })),
+    ...(resource ? [{ store: "resources", value: { ...resource, updatedAt: updated.updatedAt } }] : [])
+  ], previousLanguagePair };
+}
+
+async function updateTmEntry(entry = {}) {
+  const { record: updated, changes, previousLanguagePair } = await prepareTmEntryMutation(entry);
+  const result = await commitMutation(null, null, { changes });
+  Object.assign(updated, result.values[0] || updated);
   if (previousLanguagePair && previousLanguagePair !== updated.languagePair) await writeIndexMetaClean(previousLanguagePair);
   await writeIndexMetaClean(updated.languagePair);
   return updated;
@@ -843,6 +855,7 @@ async function listTmEntries(options = {}) {
   importTmEntries,
   listTmEntries,
   updateTmEntry,
+  prepareTmEntryMutation,
   deleteTmEntry,
   deleteTmEntries,
   findTmMatches,

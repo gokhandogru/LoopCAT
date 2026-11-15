@@ -7,6 +7,7 @@ function captureDataDependencies(options) {
     portable: options?.portable,
     reporting: options?.reporting,
     worker: options?.worker,
+    ...(options?.exchange ? {exchange: options.exchange} : {}),
     tags: options?.tags,
     redactSensitiveText: options?.redactSensitiveText,
     timestamp: options?.timestamp

@@ -173,7 +173,25 @@ async function main() {
     splitting: false,
     minify: true
   });
+  const exchangeWorkerMeta = await buildVariant({
+    entry: "src/features/exchange/qa-worker.js",
+    outdir: productionDir,
+    entryNames: "exchange-worker",
+    format: "iife",
+    splitting: false,
+    minify: true
+  });
+  const resourceQueryWorkerMeta = await buildVariant({
+    entry: "src/features/resources/resource-query-worker-runtime.js",
+    outdir: productionDir,
+    entryNames: "resource-query-worker",
+    format: "iife",
+    splitting: false,
+    minify: true
+  });
   const fileWorkerSources = {
+    "./resource-query-worker.js": fs.readFileSync(path.join(productionDir, "resource-query-worker.js"), "utf8"),
+    "./exchange-worker.js": fs.readFileSync(path.join(productionDir, "exchange-worker.js"), "utf8"),
     "./cat-worker.js":
       fs.readFileSync(path.join(root, "linguistic-core.js"), "utf8") +
       "\n" +
@@ -234,7 +252,9 @@ async function main() {
         ...(productionMeta.outputs || {}),
         ...(fileProductionMeta.outputs || {}),
         ...(bootstrapMeta.outputs || {}),
-        ...(archiveWorkerMeta.outputs || {})
+        ...(archiveWorkerMeta.outputs || {}),
+        ...(exchangeWorkerMeta.outputs || {}),
+        ...(resourceQueryWorkerMeta.outputs || {})
       }
     },
     productionDir

@@ -135,6 +135,7 @@ export function createQuickTermCaptureController(options) {
     sourceInput.value = selectedSource;
     targetInput.value = targetText;
     form.reset?.();
+    if (captureOptions.termStatus && elements.status) elements.status.value = captureOptions.termStatus;
     sourceInput.value = selectedSource;
     targetInput.value = targetText;
     if (elements.message) elements.message.textContent = `Active termbase: ${active.cachedName || active.name}`;

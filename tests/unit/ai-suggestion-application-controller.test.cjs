@@ -176,6 +176,23 @@ test("AI suggestion application preserves project, segment, suggestion, confirme
   }
 });
 
+test("a one-time Exchange candidate rechecks its scope after flushing and never pollutes stored suggestions", async () => {
+  const { createAiSuggestionApplicationController } = await loadFactory();
+  const h = createHarness(createAiSuggestionApplicationController, { noSuggestion: true });
+  const options = { transientSuggestion: h.suggestion, stillCurrent: () => false };
+  assert.equal(await h.controller.apply(h.suggestion.id, options), false);
+  assert.deepEqual(
+    h.calls.map((c) => c[0]),
+    ["flush"]
+  );
+  assert.equal(h.segment.target, "Original target");
+  options.stillCurrent = () => true;
+  assert.equal(await h.controller.apply(h.suggestion.id, options), true);
+  assert.equal(h.segment.target, h.suggestion.suggestedTarget);
+  assert.deepEqual(h.segment.aiSuggestions, []);
+  assert.deepEqual(h.createdOptions().beforeSnapshot.aiSuggestions, []);
+});
+
 test("AI suggestion application flush failure leaves the active target unchanged", async () => {
   const { createAiSuggestionApplicationController } = await loadFactory();
   const harness = createHarness(createAiSuggestionApplicationController, {

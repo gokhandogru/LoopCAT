@@ -583,7 +583,11 @@ async function renameResource(resourceId, name) {
     resources: [updatedResource],
     projects: updatedProjects,
     tmEntries: tmEntries.map((entry) => ({ ...entry, tmName: cleanName, updatedAt: now })),
-    terms: terms.map((term) => ({ ...term, termBaseName: cleanName, updatedAt: now }))
+    terms: terms.map((term) => ({ ...term, termBaseName: cleanName, updatedAt: now })),
+    appMeta: [
+      ...[...new Set(tmEntries.map((entry) => entry.languagePair))].filter(Boolean).map((languagePair) => ({ key: `tm-token-index:${languagePair}`, languagePair, dirty: true, updatedAt: now })),
+      ...[...new Set(terms.map((term) => term.languagePair))].filter(Boolean).map((languagePair) => ({ key: `term-token-index:${languagePair}`, languagePair, dirty: true, updatedAt: now }))
+    ]
   });
   return updatedResource;
 }
@@ -596,35 +600,44 @@ async function duplicateResource(resourceId, name = "") {
     const entries = (await getAllByIndex("tmEntries", "resourceId", source.id)).map((entry) => ({
       ...entry,
       id: makeId("tm"),
+      storageVersion: 0,
       resourceId: copy.id,
       tmName: copy.name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }));
-    if (entries.length) await writeStoresAtomically({ tmEntries: entries });
+    if (entries.length) await writeStoresAtomically({ tmEntries: entries,
+      appMeta: [...new Set(entries.map((entry) => entry.languagePair))].filter(Boolean).map((languagePair) => ({ key: `tm-token-index:${languagePair}`, languagePair, dirty: true, updatedAt: new Date().toISOString() })) });
   } else {
     const sourceConcepts = await getAllByIndex("termConcepts", "resourceId", source.id);
     const concepts = sourceConcepts.map((concept) => ({
-      ...concept, id: makeId("term-concept"), resourceId: copy.id
+      ...concept, id: makeId("term-concept"), resourceId: copy.id, storageVersion: 0
     }));
     const conceptIds = new Map(concepts.map((concept, index) => [sourceConcepts[index]?.id, concept.id]));
-    const designations = (await getAllByIndex("termDesignations", "resourceId", source.id)).map((designation) => ({
+    const sourceDesignations = await getAllByIndex("termDesignations", "resourceId", source.id);
+    const designations = sourceDesignations.map((designation) => ({
       ...designation,
       id: makeId("term-designation"),
+      storageVersion: 0,
       resourceId: copy.id,
       conceptId: conceptIds.get(designation.conceptId) || designation.conceptId
     }));
+    const designationIds = new Map(designations.map((designation, index) => [sourceDesignations[index].id, designation.id]));
     const terms = (await getAllByIndex("terms", "resourceId", source.id)).map((term) => ({
       ...term,
       id: makeId("term"),
+      storageVersion: 0,
       resourceId: copy.id,
       conceptId: conceptIds.get(term.conceptId) || makeId("term-concept"),
+      sourceDesignationId: designationIds.get(term.sourceDesignationId) || "",
+      targetDesignationId: designationIds.get(term.targetDesignationId) || "",
       termBaseName: copy.name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }));
     if (concepts.length || designations.length || terms.length) {
-      await writeStoresAtomically({ terms, termConcepts: concepts, termDesignations: designations });
+      await writeStoresAtomically({ terms, termConcepts: concepts, termDesignations: designations,
+        appMeta: [...new Set(terms.map((term) => term.languagePair))].filter(Boolean).map((languagePair) => ({ key: `term-token-index:${languagePair}`, languagePair, dirty: true, updatedAt: new Date().toISOString() })) });
     }
   }
   return copy;

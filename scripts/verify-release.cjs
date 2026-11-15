@@ -2829,8 +2829,8 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 42, 6],
-  ["markProjects", 2, 0],
+  ["mark", 43, 6],
+  ["markProjects", 3, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
   ["readStored", 0, 2],
@@ -3453,9 +3453,9 @@ for (const boundary of [
 }
 for (const [method, appCount, workflowCount] of [
   ["links", 4, 0],
-  ["mainTm", 4, 12],
+  ["mainTm", 4, 11],
   ["tmNames", 10, 0],
-  ["termBaseNames", 12, 2],
+  ["termBaseNames", 13, 2],
   ["primaryTermBase", 6, 15],
   ["summary", 4, 1]
 ]) {
@@ -4220,7 +4220,7 @@ for (const snippet of [
   'check?.fixHint ? localization.source(check.fixHint, check.fixHintValues || {}) : ""',
   "const qaChecks = session.getQaChecks();",
   "const checks = filter ? qaChecks.filter((check) => check.type === filter) : qaChecks;",
-  'root.textContent = localization.source("No QA issues found.");',
+  'qaIsIncomplete(qaChecks) ? "Required Exchange checks: Not evaluated." : "No QA issues found."',
   'root.classList.add("muted");',
   'summaryWrap.className = "qa-summary";',
   'allButton.className = filter ? "" : "active";',
@@ -4272,9 +4272,9 @@ for (const consumer of [
 }
 assert(
   (appJs.match(/\bqaResultsController\.clear\b/g) || []).length === 3 &&
-    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 4 &&
+    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 6 &&
     (appWorkflowDriverJs.match(/\bqaResultsController\.render\b/g) || []).length === 1,
-  "all report, delivery, ProjectQaController composition, locale-refresh, and workflow consumers must call QaResultsController directly."
+  "all report, delivery, ProjectQaController, locale-refresh, external resource-change, and workflow consumers must call QaResultsController directly."
 );
 for (const removedHelper of ["qaSummary", "qaCheckMessage", "qaCheckFixHint", "renderQaResults"]) {
   const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
@@ -5248,9 +5248,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createResourceCatalogRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 12 &&
+    (appJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 15 &&
     (appWorkflowDriverJs.match(/\bresourceCatalogRefreshController\.refresh\b/g) || []).length === 4,
-  "app.js must compose one resource-catalog refresh controller and retain its twelve application references and four workflow references."
+  "app.js must compose one resource-catalog refresh controller and retain its fifteen application references and four workflow references, including external resource changes and library routing."
 );
 assert(
   !/async\s+function\s+refreshResources\b/.test(appJs) && !/\brefreshResources\s*\(/.test(appWorkflowDriverJs),
@@ -5323,9 +5323,9 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectTermRefreshController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 9 &&
+    (appJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 10 &&
     (appWorkflowDriverJs.match(/\bprojectTermRefreshController\.refresh\b/g) || []).length === 1,
-  "app.js must compose one project-term refresh controller and all nine application and one workflow consumers must call it directly."
+  "app.js must compose one project-term refresh controller and all ten application and one workflow consumers, including external resource changes, must call it directly."
 );
 assert(
   !/async\s+function\s+refreshProjectTerms\b/.test(appJs) && !/\brefreshProjectTerms\s*\(/.test(appWorkflowDriverJs),
@@ -6387,9 +6387,17 @@ for (const boundary of [
 }
 assertIncludes(
   appJs,
-  "render: resourcesPresentationService.render",
-  "ResourcesController must call ResourcesPresentationService.render directly."
+  "render: resourceLibraryWorkspace.render",
+  "ResourcesController must delegate the compact catalog to ResourceLibraryController.render directly."
 );
+for (const boundary of [
+  "const resourceLibraryWorkspace = createResourceLibraryController({",
+  "openEditor: (descriptor) => appRuntime.platform.openResourceEditor(descriptor)",
+  "window.addEventListener(\"loopcat-resources-changed\", scheduleResourceRefresh)",
+  "const dirty = await storageApi.listResourceDirtyProjects();"
+]) {
+  assertIncludes(appJs, boundary, `the Resources library must preserve its dedicated-editor and shared-change boundary: ${boundary}.`);
+}
 for (const removedHelper of [
   "renderResourcesContent",
   "renderResourceDashboard",
@@ -7577,8 +7585,8 @@ assert(
 
 assertIncludes(
   storageJs,
-  "const DB_VERSION = 9;",
-  "storage.js local database schema must be version 9 after the additive recovery and stable-resource migrations."
+  "const DB_VERSION = 10;",
+  "storage.js local database schema must be version 10 after adding resource drafts and operation recovery."
 );
 assertIncludes(
   validationJs,
@@ -7587,12 +7595,12 @@ assertIncludes(
 );
 assertIncludes(
   validationJs,
-  "const MAX_PACKAGE_SCHEMA_VERSION = 7;",
+  "const MAX_PACKAGE_SCHEMA_VERSION = 8;",
   "validation.js must identify package schema version 7 as the current maximum."
 );
 assertIncludes(
   validationJs,
-  "const MAX_BACKUP_SCHEMA_VERSION = 8;",
+  "const MAX_BACKUP_SCHEMA_VERSION = 9;",
   "validation.js must accept schema-8 history backups while preserving legacy Trash data."
 );
 assertIncludes(
@@ -7604,10 +7612,10 @@ assert(
   !appJs.includes("storageConstants?.SCHEMA_VERSION ||"),
   "app.js must not use a stale numeric schema fallback when writing packages or backups."
 );
-assertIncludes(packageFormatDocs, "Current version: `7`", "Project-package documentation must name schema version 7.");
+assertIncludes(packageFormatDocs, "Current version: `8`", "Project-package documentation must name schema version 7.");
 assertIncludes(
   packageFormatDocs,
-  "`3` through `7`",
+  "`3` through `8`",
   "Project-package documentation must describe the accepted schema range 3 through 7."
 );
 assert(
@@ -7697,6 +7705,28 @@ assert(
 assert(
   packageJson.scripts?.["verify:browser-runner"] === "node scripts/verify-browser-runner.cjs",
   "package.json verify:browser-runner script must execute the browser test runner."
+);
+assert(
+  packageJson.scripts?.["verify:resources"] === "node scripts/build-renderer.cjs && node scripts/verify-resource-workspace.cjs" &&
+    packageJson.scripts?.["verify:resource-browsers"] === "node scripts/build-renderer.cjs && node scripts/verify-resource-browsers.cjs" &&
+    packageJson.scripts?.["verify:resource-native"] === "node scripts/verify-resource-native.cjs",
+  "Resources desktop and Firefox/WebKit verification must exercise the built production renderer."
+);
+assert(
+  desktopWorkflow.includes("xvfb-run -a pnpm run verify:resources") &&
+    desktopWorkflow.includes("run: pnpm run verify:resources") &&
+    desktopWorkflow.includes("xvfb-run -a pnpm run verify:resource-native") &&
+    desktopWorkflow.includes("run: pnpm run verify:resource-native") &&
+    desktopWorkflow.includes("pnpm exec playwright install --with-deps firefox webkit") &&
+    desktopWorkflow.includes("run: pnpm run verify:resource-browsers"),
+  "release CI must retain Resources verification on native desktop runners and pinned Firefox/WebKit browsers."
+);
+const playwrightLock = pnpmImporterDevDependency(pnpmLock, "playwright");
+assert(
+  /^\d+\.\d+\.\d+$/.test(packageJson.devDependencies?.playwright || "") &&
+    playwrightLock?.specifier === packageJson.devDependencies.playwright &&
+    playwrightLock?.version === packageJson.devDependencies.playwright,
+  "the Resources browser verifier must pin Playwright to the same exact version in package.json and pnpm-lock.yaml."
 );
 assert(
   packageJson.scripts?.["verify:ai-sidebar-ux"] === "node scripts/verify-ai-sidebar-ux.cjs",
@@ -8244,7 +8274,7 @@ assert(
     !appJs.includes('els.localAiOpusCatHelpBtn?.addEventListener("click"') &&
     !appJs.includes('els.closeOpusCatHelpBtn?.addEventListener("click"') &&
     !appJs.includes('els.retryOpusCatConnectionBtn?.addEventListener("click"') &&
-    !appJs.includes('addEventListener("close"'),
+    !/els\.(?:tmPretranslateDialog|opusCatHelpDialog)\??\.addEventListener\("close"/.test(appJs),
   "migrated TM and OPUS-CAT dialogs must not retain superseded app.js lifecycle listeners."
 );
 assertIncludes(
@@ -8428,13 +8458,18 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus",
-  "the app workflow must characterize the checked Resources controller in the real application."
+  "compact resource library launches the stable resource ID in a dedicated editor while preserving library navigation",
+  "the app workflow must characterize stable-ID dedicated-editor navigation from the checked Resources library."
 );
 assertIncludes(
   appJs,
-  "Resources detail close restores focus to the originating resource card action",
-  "the app workflow must characterize visible focus return after closing resource detail."
+  "Resources tabs expose one keyboard-operated tab state and matching panel",
+  "the app workflow must characterize Resources keyboard navigation and visible tab focus."
+);
+assertIncludes(
+  readText("tests/unit/resource-editor-platform.test.cjs"),
+  "Back to Resources focuses a same-origin opener and local-file/direct editors use the current tab",
+  "dedicated-editor return navigation must retain same-origin focus and direct-route fallback characterization."
 );
 assertIncludes(
   qualityReviewControllerJs,
@@ -10500,10 +10535,10 @@ assert(
   "application view orchestration and primary navigation listeners must not return to app.js or the workflow driver."
 );
 assert(
-  (appJs.match(/\bapplicationViewController\.show\b/g) || []).length === 2 &&
+  (appJs.match(/\bapplicationViewController\.show\b/g) || []).length === 3 &&
     (applicationEventWiringControllerJs.match(/\blifecycles\.applicationView\.mount\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bapplicationViewController\.show\b/g) || []).length === 1,
-  "all two application and one workflow view consumers must call ApplicationViewController directly with one lifecycle mount."
+  "all three application and one workflow view consumers, including return-to-library routing, must call ApplicationViewController directly with one lifecycle mount."
 );
 for (const forbiddenOwner of [
   "applicationNavigation",
@@ -12761,8 +12796,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `TM-matches composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btmMatchesController\.refresh\b/g) || []).length === 4,
-  "editor context, direct segment-TM save, current-project TM import, and Quick Insert must call TmMatchesController directly."
+  (appJs.match(/\btmMatchesController\.refresh\b/g) || []).length === 5,
+  "editor context, direct segment-TM save, current-project TM import, Quick Insert, and external resource changes must call TmMatchesController directly."
 );
 assert(
   !/async\s+function\s+refreshTmMatches\b/.test(appJs) &&
@@ -12853,12 +12888,13 @@ for (const boundary of [
   "getProject: editorSessionStore.getProject",
   "getActiveSegment: applicationActiveSegmentService.get",
   "getNames: projectResourceContextService.termBaseNames",
-  "find: findTerms",
+  "await findTerms(query)", "await exchange.terms(query)",
   "localization: uiLocalizationService",
   "text: { escapeHtml: applicationTextSafetyService.escapeHtml }",
   "safeHtml: { replace: replaceSafeHtml }",
   "deleteTerm: (...args) => resourceMutationController.deleteTerm(...args)",
-  "editTerm: (term) => termFormController.edit(term)",
+  'appRuntime.platform.openResourceEditor({ type: "tb", resourceId: term.resourceId, entryId: term.id })',
+  ": termFormController.edit(term)",
   "contextMenu: matchContextMenu",
   "target: { insert: (...args) => targetProducerController.insertTermTarget(...args) }",
   "createElement: (tagName) => document.createElement(tagName)",
@@ -12867,9 +12903,9 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `term-suggestions composition must inject the checked ${boundary} boundary.`);
 }
 assert(
-  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 7 &&
+  (appJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 9 &&
     (appWorkflowDriverJs.match(/\btermSuggestionsController\.refresh\b/g) || []).length === 1,
-  "project transfer, AI extraction, editor context, Trash, term save, Quick Insert, and workflow consumers must call TermSuggestionsController directly."
+  "project transfer, AI extraction, editor context, Trash, term save, Quick Insert, external resource changes, and workflow consumers must call TermSuggestionsController directly."
 );
 assert(
   !/async\s+function\s+refreshTerms\b/.test(appJs) && !/async\s+function\s+refreshTerms\b/.test(appWorkflowDriverJs),
@@ -13042,7 +13078,7 @@ for (const snippet of [
   'logger.warn("QA activity log failed.", activityError)',
   '`QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}`',
   '"QA found no issues"',
-  'checks.length ? "dirty" : "saved"',
+  'checks.length || packRun?.incomplete ? "dirty" : "saved"',
   'status.set(error.message || "QA checks failed", "dirty")',
   'elements.runButton.addEventListener("click", run)',
   'elements.runButton.removeEventListener("click", run)',
@@ -13492,7 +13528,7 @@ for (const removedHelper of [
   );
 }
 assert(
-  (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 4 &&
+  (appJs.match(/\bfileImportService\.assertSize\b/g) || []).length === 5 &&
     (appJs.match(/\bfileImportService\.readText\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.progressDetail\b/g) || []).length === 2 &&
     (appJs.match(/\bfileImportService\.errorReport\b/g) || []).length === 2 &&
@@ -17678,8 +17714,8 @@ assert(
   "package.json dist:win script must use the desktop build wrapper."
 );
 assert(
-  packageJson.scripts?.["dist:mac"] === "node scripts/build-desktop.cjs --mac dmg zip",
-  "package.json dist:mac script must use the desktop build wrapper."
+  packageJson.scripts?.["dist:mac"] === "node scripts/build-desktop.cjs --mac dmg zip --universal",
+  "package.json dist:mac script must build a universal app using the desktop build wrapper."
 );
 assert(
   packageJson.scripts?.["dist:linux"] === "node scripts/build-desktop.cjs --linux AppImage deb",
@@ -17691,7 +17727,7 @@ assert(packageJson.engines?.node === ">=24 <25", "package.json must require the 
 assert(nodeVersionFile === "24", ".node-version must select Node 24 LTS.");
 const releaseWorkflowNodeVersions = [...desktopWorkflow.matchAll(/node-version:\s*([0-9]+)/g)].map((match) => match[1]);
 assert(
-  releaseWorkflowNodeVersions.length === 3 && releaseWorkflowNodeVersions.every((version) => version === "24"),
+  releaseWorkflowNodeVersions.length === 4 && releaseWorkflowNodeVersions.every((version) => version === "24"),
   "Every desktop release workflow job must run on Node 24 LTS."
 );
 assert(
@@ -19293,7 +19329,7 @@ for (const snippet of [
   assertIncludes(lazyLocalizationModuleJs, snippet, `lazy localization must retain first-use policy: ${snippet}`);
 }
 for (const testName of [
-  "lazy localization installs the mutable two-method compatibility facade",
+  "lazy localization installs the mutable compatibility facade",
   "lazy localization shares one concurrent load and preserves delegate receivers, arguments, and results",
   "lazy localization propagates load failure identity and retries the next first use",
   "lazy localization rejects incomplete installation and permits a repaired retry",
@@ -22129,8 +22165,8 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 32,
-  "all 32 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 35,
+  "all 35 application active-segment consumers must call ApplicationActiveSegmentService directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,
@@ -22213,7 +22249,7 @@ for (const [method, count] of [
   ["displaySafeHtml", 6],
   ["escapeRegExp", 1],
   ["fileSafeName", 5],
-  ["redactSensitiveText", 18]
+  ["redactSensitiveText", 20]
 ]) {
   assert(
     (appJs.match(new RegExp(`\\bapplicationTextSafetyService\\.${method}\\b`, "g")) || []).length === count,
@@ -23269,17 +23305,25 @@ for (const boundary of [
 }
 const startupTail = appJs.slice(appJs.indexOf("/* LOOPCAT_TEST_WORKFLOW_DRIVER */"));
 assert(
-  !startupTail.includes("(async () => {") &&
+  !/(?:^|[;=]\s*)\(\s*async\s*\(\)\s*=>/m.test(startupTail) &&
     !startupTail.includes("appRuntime.localeLoader.initialize()") &&
     !startupTail.includes("workspacePackageSaveController.startAutosave()") &&
     !startupTail.includes("restoreWorkspaceDirtyIds()") &&
     !startupTail.includes("refreshStorageDurability()") &&
     !startupTail.includes("workspaceStorage.reconnectSavedWorkspace()") &&
     !startupTail.includes("loadProjects(false)") &&
-    !startupTail.includes("Promise.all([") &&
     !startupTail.includes("registerOfflineAppShell()") &&
     startupTail.includes("applicationStartupController.start()"),
   "top-level startup sequencing must remain owned only by ApplicationStartupController."
+);
+const resourceStartupBridge = functionBody(appJs, "function startApplicationWithResources() {", "if (window.LoopCATDesktop?.consumeRecoveryRequest)");
+assert(
+  resourceStartupBridge.includes("const started = applicationStartupController.start();") &&
+    resourceStartupBridge.includes("await refreshSharedResources();") &&
+    resourceStartupBridge.includes('if (window.location.hash === "#resources") await openResourceLibrary();') &&
+    resourceStartupBridge.includes("return started;") &&
+    (resourceStartupBridge.match(/applicationStartupController\.start\(/g) || []).length === 1,
+  "the resource startup bridge must preserve the checked startup promise and refresh shared resources only after it resolves."
 );
 for (const forbiddenOwner of [
   "appRuntime",
@@ -24818,7 +24862,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "schema 9 preserves shared resources and file history while portable schemas remain versioned independently",
+  "schema 10 preserves shared resources, resource drafts, and file history while portable schemas remain versioned independently",
   "app workflow test must verify the split storage/package schema contract."
 );
 assertIncludes(
@@ -25290,8 +25334,17 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "LOOPCAT_LANGUAGE_CATALOG_ENTRIES",
-  "app.js must bundle supported language/locales for offline dropdown use."
+  'import { LANGUAGE_ENTRIES, LANGUAGE_CODES, LANGUAGE_ALIAS_CODES } from "../i18n/language-catalog.js";',
+  "the application must bundle the shared language catalog for offline dropdown use."
+);
+const sharedLanguageCatalogJs = readText("src/i18n/language-catalog.js");
+for (const entry of ['["ace-ID", "Acehnese"]', '["cav-ES", "Catalan (Valencia)"]', '["es-419", "Spanish (Latin America)"]', '["ur-Latn-PK", "Urdu (Latin script)"]']) {
+  assertIncludes(sharedLanguageCatalogJs, entry, `the shared offline language catalog must retain ${entry}.`);
+}
+assertIncludes(
+  readText("src/features/resources/resource-ui.js"),
+  'import { LANGUAGE_ENTRIES, LANGUAGE_ALIAS_CODES } from "../../i18n/language-catalog.js";',
+  "standalone Resources language fields must use the same offline catalog and aliases as the project editor."
 );
 assertIncludes(appJs, "Acehnese (ace-ID)", "app.js language catalog must include locale ace-ID.");
 assertIncludes(appJs, "Catalan (Valencia) (cav-ES)", "app.js language catalog must include locale cav-ES.");
@@ -26707,7 +26760,7 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  'relativePath === "index.html"',
+  'if (!["", "/", "/index.html"].includes(parsed.pathname)) return false;',
   "desktop/main.cjs must allow only index.html as a top-level app navigation target."
 );
 assertIncludes(
@@ -26831,8 +26884,8 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  "mainWindow.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html`)",
-  "desktop/main.cjs must load the bundled local app shell."
+  "mainWindow.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html${resourceHash || initialHash}`)",
+  "desktop/main.cjs must load the bundled local app shell with the validated Resources or library fragment."
 );
 assertIncludes(
   desktopMain,
@@ -28495,7 +28548,7 @@ assertIncludes(
 );
 assertIncludes(
   desktopWorkflow,
-  "needs: [build, web]",
+  "needs: [build, web, macos-native-smoke]",
   "Desktop release bundle job must run only after all platform builds and the static HTML build finish."
 );
 assertIncludes(
@@ -28802,7 +28855,7 @@ assert(
   "Desktop release workflow must generate checksums after artifact build."
 );
 assert(
-  desktopWorkflow.indexOf("pnpm run checksums") < desktopWorkflow.indexOf("actions/upload-artifact@v4"),
+  desktopWorkflow.indexOf("pnpm run checksums") < desktopWorkflow.indexOf("- name: Upload desktop artifact"),
   "Desktop release workflow must generate checksums before artifact upload."
 );
 assert(
@@ -28810,7 +28863,7 @@ assert(
   "Desktop release workflow must verify checksums after checksum generation."
 );
 assert(
-  desktopWorkflow.indexOf("pnpm run verify:checksums") < desktopWorkflow.indexOf("actions/upload-artifact@v4"),
+  desktopWorkflow.indexOf("pnpm run verify:checksums") < desktopWorkflow.indexOf("- name: Upload desktop artifact"),
   "Desktop release workflow must verify checksums before artifact upload."
 );
 

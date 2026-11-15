@@ -1679,6 +1679,9 @@ const aiProviderRegistry = (() => {
     get(id) {
       return providers.get(id || "ollama") || providers.get("ollama");
     },
+    getExact(id) {
+      return providers.get(id) || null;
+    },
     list() {
       return Array.from(providers.values()).filter(Boolean);
     }

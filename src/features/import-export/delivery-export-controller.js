@@ -18,6 +18,7 @@ import {
  *   autosave: { flush: () => Promise<any> },
  *   documents: { list: () => any[], type: (documentInfo: any) => string },
  *   terms: { listForValidation: () => Promise<any[]> },
+ *   exchange?: any,
  *   delivery: {
  *     plan: (options: any) => any,
  *     validate: (options: any) => any,
@@ -143,7 +144,10 @@ export function createDeliveryExportController(options) {
     return documentInfo?.name ? displaySafeText(documentInfo.name) : fallbackLabel;
   }
 
-  function confirmIncomplete(plan, documentInfo, fallbackLabel) {
+  async function confirmIncomplete(plan, documentInfo, fallbackLabel, segments) {
+    const run = await options.exchange?.qa(segments);
+    if (run?.incomplete && !confirm(localization.source("Required Exchange checks: Not evaluated. Export anyway?")))
+      return false;
     if (!plan.requiresConfirmation) return true;
     const lines = [
       localization.source("The export scope {value1} contains incomplete translation work.", {
@@ -216,7 +220,7 @@ export function createDeliveryExportController(options) {
       addScopeNote(report, documentInfo, "Target TXT");
       presentation.renderValidationReport(report);
       if (!canRun(report)) return;
-      if (!confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project")) {
+      if (!(await confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project", segments))) {
         cancelIncomplete();
         return;
       }
@@ -263,7 +267,7 @@ export function createDeliveryExportController(options) {
       });
       presentation.renderValidationReport(report);
       if (!canRun(report)) return;
-      if (!confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project")) {
+      if (!(await confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project", segments))) {
         cancelIncomplete();
         return;
       }
@@ -315,6 +319,8 @@ export function createDeliveryExportController(options) {
       const qaChecks = qa.worker?.runQaChecks
         ? await qa.worker.runQaChecks({ segments: qaSegments, terms: validationTerms, fallback })
         : await fallback();
+      const packRun = await options.exchange?.qa(qaSegments);
+      if (packRun) for (const finding of packRun.findings) qaChecks.push(finding);
       session.replaceQaChecks(qaChecks);
       application.clearQaFilter();
       presentation.renderQaResults();
@@ -383,7 +389,9 @@ export function createDeliveryExportController(options) {
       });
       presentation.renderValidationReport(report);
       if (!canRun(report)) return;
-      if (!confirmIncomplete(exportPlan, exportDocumentInfo, session.getProject().name || "project")) {
+      if (
+        !(await confirmIncomplete(exportPlan, exportDocumentInfo, session.getProject().name || "project", segments))
+      ) {
         cancelIncomplete();
         return;
       }
@@ -426,7 +434,7 @@ export function createDeliveryExportController(options) {
       addScopeNote(report, documentInfo, "XLIFF");
       presentation.renderValidationReport(report);
       if (!canRun(report)) return;
-      if (!confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project")) {
+      if (!(await confirmIncomplete(exportPlan, documentInfo, session.getProject().name || "project", segments))) {
         cancelIncomplete();
         return;
       }

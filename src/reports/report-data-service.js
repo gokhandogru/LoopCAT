@@ -1,3 +1,4 @@
+import { markQaIncomplete } from '../features/quality/qa-completeness.js';
 /**
  * Owns the asynchronous data-collection and aggregation pipeline shared by
  * Project Report and Quality Passport exports. Report document composition,
@@ -5,6 +6,7 @@
  * outside this service.
  *
  * @param {{
+ *   exchange?: any,
  *   session: { getProject: () => any, getSegments: () => any[] },
  *   autosave: { flush: () => Promise<any> },
  *   resources: { getTmNames: () => string[], getTermBaseNames: () => string[], summarize: (project: any) => any },
@@ -103,6 +105,12 @@ export function createReportDataService(options) {
     const qaChecks = worker?.runQaChecks
       ? await worker.runQaChecks({ segments: qaSegments, terms, fallback })
       : await fallback();
+    const packRun = await options.exchange?.qa(qaSegments);
+    if (packRun) {
+      for (const finding of packRun.findings) qaChecks.push(finding);
+      markQaIncomplete(qaChecks, packRun.incomplete);
+      if (packRun.incomplete) validation.warnings.push("Required Exchange checks: Not evaluated.");
+    }
     const qualityPassport = reporting.buildQualityPassportData({
       project: session.getProject(),
       segments: session.getSegments(),
@@ -122,7 +130,7 @@ export function createReportDataService(options) {
       resources: resources.summarize(session.getProject()),
       analysis,
       validation,
-      qualityPassport,
+      qualityPassport: packRun?.runs?.length ? {...qualityPassport, exchangeRuns: packRun.runs, exchangeIncomplete: packRun.incomplete} : qualityPassport,
       qaChecks,
       qaBySeverity: countBy(qaChecks, (check) => check.severity),
       qaByType: countBy(qaChecks, (check) => check.type),

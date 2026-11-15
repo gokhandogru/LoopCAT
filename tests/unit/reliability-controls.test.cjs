@@ -7,6 +7,8 @@ async function harness(t) {
   const listeners = new Map();
   const notices = [];
   let durability;
+  let storedGeneration = 0;
+  let checkpoints = 0;
   const buttons = new Map();
   buttons.set("retryLocalSaveBtn", { addEventListener: (_, callback) => buttons.set("retry", callback) });
   const controls = createReliabilityControls({
@@ -15,7 +17,16 @@ async function harness(t) {
       addEventListener: (name, callback) => listeners.set(name, callback)
     },
     document: { getElementById: (id) => buttons.get(id) },
-    storage: { get: () => Promise.resolve(null), flushMutations: async () => {} },
+    storage: {
+      get: () => Promise.resolve(null),
+      flushMutations: async () => {},
+      getCommittedGeneration: () => Promise.resolve(storedGeneration),
+      createCheckpoint: () => {
+        checkpoints++;
+        return Promise.resolve({ id: "checkpoint", generation: storedGeneration });
+      },
+      migrateCheckpointAssets: () => Promise.resolve(null)
+    },
     session: { getProject: () => ({ id: "p" }) },
     autosave: { getState: () => ({ pending: 0, inFlight: 0 }), size: () => 0, flush: async () => {} },
     status: { setPersistence: (...args) => notices.push(args), set: () => {} },
@@ -32,6 +43,10 @@ async function harness(t) {
   return {
     notices,
     durability: () => durability,
+    generation: (value) => {
+      storedGeneration = value;
+    },
+    checkpoints: () => checkpoints,
     emit: (name, detail) => listeners.get(name)({ detail }),
     retry: () => buttons.get("retry")()
   };
@@ -68,4 +83,21 @@ test("Retry cannot clear conflicts when there were no pending saves to commit", 
   await h.retry();
   assert.deepEqual(h.durability().durableErrors, ["Unsaved conflict"]);
   assert.notDeepEqual(h.notices.at(-1), ["Saved", "saved"]);
+});
+
+test("external resource saves schedule recovery without acknowledging local conflicts", async (t) => {
+  const h = await harness(t);
+  h.emit("loopcat-storage-status", { message: "Unsaved conflict", code: "conflict", recordKeys: ["s1"] });
+  h.generation(9);
+  h.emit("loopcat-resources-changed", { generation: 9, external: true });
+  assert.equal(h.durability().committedGeneration, 9);
+  assert.deepEqual(h.durability().durableErrors, ["Unsaved conflict"]);
+  t.mock.timers.tick(60000);
+  for (let index = 0; index < 10; index++) await Promise.resolve();
+  assert.equal(h.checkpoints(), 1);
+  assert.deepEqual(h.durability().durableErrors, ["Unsaved conflict"]);
+  h.generation(10);
+  h.emit("focus");
+  for (let index = 0; index < 4; index++) await Promise.resolve();
+  assert.equal(h.durability().committedGeneration, 10);
 });

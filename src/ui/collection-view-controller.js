@@ -1,7 +1,7 @@
 const DEFAULT_VIEWS = Object.freeze({
   projects: "card",
   files: "card",
-  resources: "card",
+  resources: "list",
   "resource-entries": "list",
   "resource-selection": "list",
   trash: "list"

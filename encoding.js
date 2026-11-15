@@ -140,6 +140,7 @@ function declaredEncoding(bytes, file = {}) {
   return joined.match(/<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']/i)?.[1] ||
     joined.match(/<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9._:-]+)/i)?.[1] ||
     joined.match(/@charset\s+["']([^"']+)["']/i)?.[1] ||
+    (/\.(?:po|pot)$/i.test(file.name || "") ? ascii.match(/Content-Type:[^\r\n]*?charset\s*=\s*([A-Za-z0-9._-]+)/i)?.[1] : "") ||
     "";
 }
 

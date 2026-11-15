@@ -110,11 +110,10 @@ function decodeXmlEntities(value) {
 }
 
 function xmlTextContent(value) {
-  return decodeXmlEntities(String(value || "")
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<\?[\s\S]*?\?>/g, "")
-    .replace(/<[^>]+>/g, ""));
+  return String(value || "").split(/(<!\[CDATA\[[\s\S]*?\]\]>)/g).map((part) => {
+    if (part.startsWith("<![CDATA[")) return part.slice(9, -3);
+    return decodeXmlEntities(part.replace(/<!--[\s\S]*?-->/g, "").replace(/<\?[\s\S]*?\?>/g, "").replace(/<[^>]+>/g, ""));
+  }).join("");
 }
 
 function createElementBlockRegex(tagName) {
@@ -134,27 +133,40 @@ function getAttribute(attrs, name) {
 
 function validateTmxEnvelope(text) {
   const value = String(text || "");
-  if (!/<(?:[A-Za-z_][\w.-]*:)?tmx\b/i.test(value) || !/<\/(?:[A-Za-z_][\w.-]*:)?tmx>/i.test(value)) {
+  if (typeof DOMParser !== "undefined") {
+    const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(value) || value;
+    const xml = new DOMParser().parseFromString(parserInput, "application/xml");
+    if (xml.getElementsByTagName("parsererror").length || !["tmx"].includes(xml.documentElement?.localName)) {
+      throw new Error("The TMX file could not be parsed.");
+    }
+  } else if (!/<(?:[A-Za-z_][\w.-]*:)?tmx\b/i.test(value) || !/<\/(?:[A-Za-z_][\w.-]*:)?tmx>/i.test(value)) {
     throw new Error("The TMX file could not be parsed.");
   }
+  // Protect literal CDATA markup from the streaming matcher and ignore comments.
+  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->/g, (match, cdata) => cdata === undefined ? "" : esc(cdata));
 }
 
 function bestVariantIndex(variants, rawExpected, portableExpected, excluded = new Set()) {
   let bestIndex = -1;
   let bestScore = 0;
+  let tied = false;
   variants.forEach((variant, index) => {
     if (excluded.has(index) || !variant.text) return;
     const score = languageMatchScore(variant.lang, rawExpected, portableExpected);
     if (score > bestScore) {
       bestScore = score;
       bestIndex = index;
+      tied = false;
+    } else if (score > 0 && score === bestScore) {
+      tied = true;
     }
   });
+  if (tied) throw new Error(`TMX language ${cleanText(rawExpected)} has ambiguous variants. Choose an exact locale.`);
   return bestIndex;
 }
 
 function firstTextVariantIndex(variants, excluded = new Set()) {
-  return variants.findIndex((variant, index) => !excluded.has(index) && Boolean(variant.text));
+  return variants.findIndex((variant, index) => !excluded.has(index) && !canonicalLanguageCode(variant.lang) && Boolean(variant.text));
 }
 
 function pairedVariantIndexes(variants, options, defaults) {
@@ -178,7 +190,7 @@ function tmxEntryFromTu(tuInner, tuAttrs, defaults, options, now) {
   let tuvMatch;
   while ((tuvMatch = tuvPattern.exec(tuInner))) {
     const segInner = firstElementInner(tuvMatch[3], "seg");
-    const text = cleanText(xmlTextContent(segInner || tuvMatch[3]));
+    const text = cleanText(xmlTextContent(segInner));
     variants.push({
       lang: getAttribute(tuvMatch[2], "lang") || tuSourceLang,
       text
@@ -204,7 +216,7 @@ function tmxEntryFromTu(tuInner, tuAttrs, defaults, options, now) {
 
 function parseTmx(text, options = {}) {
   const { sourceLang, targetLang, tmName, projectName } = tmxResourceOptions(options, { requireTmName: true });
-  validateTmxEnvelope(text);
+  text = validateTmxEnvelope(text);
   const now = new Date().toISOString();
   const entries = [];
   const defaults = { sourceLang, targetLang, tmName, projectName };
@@ -223,7 +235,7 @@ function defaultYield() {
 
 async function parseTmxAsync(text, options = {}, progress = {}) {
   const { sourceLang, targetLang, tmName, projectName } = tmxResourceOptions(options, { requireTmName: true });
-  validateTmxEnvelope(text);
+  text = validateTmxEnvelope(text);
   const value = String(text || "");
   const now = new Date().toISOString();
   const entries = [];
@@ -265,44 +277,14 @@ async function parseTmxAsync(text, options = {}, progress = {}) {
 }
 
 function parseTmxDom(text, options = {}) {
-  const { sourceLang, targetLang, tmName, projectName } = tmxResourceOptions(options, { requireTmName: true });
-  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
-  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
-  if (xml.querySelector("parsererror")) throw new Error("The TMX file could not be parsed.");
-  const now = new Date().toISOString();
-  const entries = [];
-  Array.from(xml.getElementsByTagNameNS("*", "tu")).forEach((tu) => {
-    let source = "";
-    let target = "";
-    Array.from(tu.getElementsByTagNameNS("*", "tuv")).forEach((tuv) => {
-      const lang = getLang(tuv);
-      const seg = cleanText(tuv.getElementsByTagNameNS("*", "seg")[0]?.textContent || "");
-      if (languageMatches(lang, options.sourceLang, sourceLang)) source = seg;
-      if (languageMatches(lang, options.targetLang, targetLang)) target = seg;
-    });
-    if (source && target) {
-      entries.push({
-        id: makeId("tm"),
-        source,
-        target,
-        sourceLang,
-        targetLang,
-        languagePair: `${sourceLang}::${targetLang}`,
-        projectName,
-        tmName,
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-  });
-  return entries;
+  return parseTmx(text, options);
 }
 
 function buildTmx(entries, optionsInput = {}) {
   const options = tmxResourceOptions(optionsInput);
   const body = (entries || [])
     .map((entry) => tmxEntryRecord(entry, options))
-    .map((entry) => `    <tu creationdate="${esc(entry.createdAt || "")}" changedate="${esc(entry.updatedAt || "")}">
+    .map((entry) => `    <tu${tmxDateAttribute("creationdate", entry.createdAt)}${tmxDateAttribute("changedate", entry.updatedAt)}>
       <prop type="origin">${esc(redactSensitiveText(entry.projectName || "").trim())}</prop>
       <tuv xml:lang="${esc(entry.sourceLang)}"><seg>${esc(entry.source)}</seg></tuv>
       <tuv xml:lang="${esc(entry.targetLang)}"><seg>${esc(entry.target)}</seg></tuv>
@@ -315,6 +297,16 @@ function buildTmx(entries, optionsInput = {}) {
 ${body}
   </body>
 </tmx>`;
+}
+
+function tmxDateAttribute(name, value) {
+  if (!value) return "";
+  const raw = String(value);
+  const date = /^\d{8}T\d{6}Z$/.test(raw)
+    ? new Date(`${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}T${raw.slice(9, 11)}:${raw.slice(11, 13)}:${raw.slice(13, 15)}Z`)
+    : new Date(raw);
+  if (!Number.isFinite(date.getTime())) return "";
+  return ` ${name}="${date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}"`;
 }
 
 window.CatHan.tmx = { parseTmx, parseTmxAsync, parseTmxDom, buildTmx };

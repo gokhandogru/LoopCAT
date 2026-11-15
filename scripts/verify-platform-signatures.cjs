@@ -21,6 +21,8 @@ const distDir = distFlagIndex >= 0 && args[distFlagIndex + 1]
   ? path.resolve(process.cwd(), args[distFlagIndex + 1])
   : path.join(root, "dist");
 const artifactSelectionOnly = args.includes("--artifact-selection-only");
+const allowAdHoc = args.includes("--allow-adhoc");
+const requireUniversal = args.includes("--require-universal");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const failures = [];
 const productName = packageJson.build?.productName || packageJson.name || "LoopCAT";
@@ -211,10 +213,23 @@ function verifyWindows() {
 function verifyMacApp(appPath, labelPrefix = relative(appPath)) {
   const display = run("codesign", ["--display", "--verbose=4", appPath], `${labelPrefix} code-signing identity`);
   const displayOutput = `${display.stdout || ""}\n${display.stderr || ""}`;
-  if (display.status === 0 && !displayOutput.includes("Developer ID Application")) {
+  const isAdHoc = /Signature=adhoc\b/.test(displayOutput);
+  if (display.status === 0 && !displayOutput.includes("Developer ID Application") && !(allowAdHoc && isAdHoc)) {
     fail(`${labelPrefix} is not signed with a Developer ID Application certificate.`);
   }
   run("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath], `${labelPrefix} code-signature verification`);
+  if (requireUniversal) {
+    // Validate both the launcher and the framework, where Electron runs Chromium.
+    for (const executable of [
+      path.join(appPath, "Contents", "MacOS", productName),
+      path.join(appPath, "Contents", "Frameworks", "Electron Framework.framework", "Versions", "A", "Electron Framework")
+    ]) {
+      run("lipo", [executable, "-verify_arch", "x86_64", "arm64"], `${labelPrefix} universal architecture verification`);
+    }
+  }
+  // Preview builds still need a valid signature. They cannot satisfy Gatekeeper's
+  // Developer ID / notarization policy; production always retains these checks.
+  if (allowAdHoc) return;
   run("xcrun", ["stapler", "validate", appPath], `${labelPrefix} stapled notarization ticket`);
   run("spctl", ["--assess", "--type", "execute", "--verbose=4", appPath], `${labelPrefix} Gatekeeper assessment`);
 }
@@ -224,9 +239,9 @@ function verifyMacZip(zipPath) {
   try {
     const result = run("ditto", ["-x", "-k", zipPath, tmpDir], `${relative(zipPath)} extraction`);
     if (result.status !== 0) return;
-    const apps = walkDirs(tmpDir).filter((dirPath) => dirPath.endsWith(".app"));
-    if (!apps.length) {
-      fail(`${relative(zipPath)} does not contain a macOS .app bundle.`);
+    const apps = walkDirs(tmpDir).filter((dirPath) => path.basename(dirPath) === `${productName}.app`);
+    if (apps.length !== 1) {
+      fail(`${relative(zipPath)} must contain exactly one ${productName}.app bundle.`);
       return;
     }
     for (const appPath of apps) verifyMacApp(appPath, `${relative(zipPath)} embedded ${path.basename(appPath)}`);
@@ -235,11 +250,36 @@ function verifyMacZip(zipPath) {
   }
 }
 
+function verifyMacDmg(dmgPath) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-dmg-verify-"));
+  const mountPath = path.join(tmpDir, "volume");
+  let mounted = false;
+  try {
+    const attached = run("hdiutil", ["attach", "-readonly", "-nobrowse", "-mountpoint", mountPath, dmgPath], `${relative(dmgPath)} mount`);
+    if (attached.status !== 0) return;
+    mounted = true;
+    const appPath = path.join(mountPath, `${productName}.app`);
+    if (!fs.existsSync(appPath)) {
+      fail(`${relative(dmgPath)} does not contain ${productName}.app.`);
+      return;
+    }
+    verifyMacApp(appPath, `${relative(dmgPath)} embedded ${productName}.app`);
+  } finally {
+    if (mounted) {
+      const detached = run("hdiutil", ["detach", mountPath], `${relative(dmgPath)} unmount`);
+      // Never remove a directory containing a still-mounted disk image.
+      if (detached.status === 0) fs.rmSync(tmpDir, { recursive: true, force: true });
+    } else {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }
+}
+
 function verifyMac() {
   if (!artifactSelectionOnly && !ensureHost("darwin", "macOS signature and notarization verification")) return;
   const macArtifacts = expectedPlatformArtifacts("mac");
   if (artifactSelectionOnly) return;
-  const apps = walkDirs(distDir).filter((dirPath) => dirPath.endsWith(".app"));
+  const apps = walkDirs(distDir).filter((dirPath) => path.basename(dirPath) === `${productName}.app`);
   const dmgFiles = macArtifacts.filter((artifact) => artifact.ext === ".dmg");
   const zipFiles = macArtifacts.filter((artifact) => artifact.ext === ".zip");
 
@@ -247,8 +287,11 @@ function verifyMac() {
 
   for (const appPath of apps) verifyMacApp(appPath);
   for (const dmgPath of dmgFiles) {
-    run("xcrun", ["stapler", "validate", dmgPath.filePath], `${relative(dmgPath.filePath)} stapled notarization ticket`);
-    run("spctl", ["--assess", "--type", "open", "--context", "context:primary-signature", "--verbose=4", dmgPath.filePath], `${relative(dmgPath.filePath)} Gatekeeper disk-image assessment`);
+    verifyMacDmg(dmgPath.filePath);
+    if (!allowAdHoc) {
+      run("xcrun", ["stapler", "validate", dmgPath.filePath], `${relative(dmgPath.filePath)} stapled notarization ticket`);
+      run("spctl", ["--assess", "--type", "open", "--context", "context:primary-signature", "--verbose=4", dmgPath.filePath], `${relative(dmgPath.filePath)} Gatekeeper disk-image assessment`);
+    }
   }
   for (const zipPath of zipFiles) verifyMacZip(zipPath.filePath);
 }
@@ -264,7 +307,7 @@ function verifyLinux() {
 }
 
 if (!["win", "mac", "linux"].includes(platform)) {
-  console.error("Usage: node scripts/verify-platform-signatures.cjs <win|mac|linux> [--dist path] [--artifact-selection-only]");
+  console.error("Usage: node scripts/verify-platform-signatures.cjs <win|mac|linux> [--dist path] [--artifact-selection-only] [--allow-adhoc] [--require-universal]");
   process.exit(1);
 }
 

@@ -76,8 +76,16 @@ function withSourceEncoding(structure, decoded) {
 }
 
 function encodeLocalizationTextOutput(text, normalizedFormat, structure) {
-  if (typeof text !== "string" || !TEXT_ENCODING_PRESERVE_FORMATS.has(normalizedFormat) || !structure?.sourceEncoding?.canPreserve || !window.CatHan.encoding) return text;
-  return window.CatHan.encoding.encodeText(text, structure.sourceEncoding, { allowFallback: true }).content;
+  if (typeof text !== "string" || !TEXT_ENCODING_PRESERVE_FORMATS.has(normalizedFormat) || !window.CatHan.encoding) return text;
+  const source = structure?.sourceEncoding?.canPreserve ? structure.sourceEncoding : { encoding: "utf-8" };
+  const encoded = window.CatHan.encoding.encodeText(text, source, { allowFallback: true });
+  if (["po", "pot"].includes(normalizedFormat)) {
+    // Headers must describe actual output bytes, including manual overrides and Unicode fallback.
+    const charset = encoded.encoding === "utf-8" ? "UTF-8" : encoded.encoding;
+    text = text.replace(/(Content-Type:[^\r\n]*?charset\s*=\s*)[\w.-]+/i, (_, prefix) => prefix + charset);
+    return window.CatHan.encoding.encodeText(text, { ...source, encoding: encoded.encoding }).content;
+  }
+  return encoded.content;
 }
 
 const crcTable = (() => {
@@ -311,7 +319,7 @@ function hasOwnValue(value, key) {
 }
 
 function hasStructureNumber(value) {
-  return typeof value === "number" && Number.isFinite(value);
+  return Number.isInteger(value) && value >= 0;
 }
 
 function segmentStructureFormat(segment) {
@@ -766,7 +774,7 @@ function buildPo(segments, structure = null) {
     .join("\n\n");
 }
 
-const SRT_TIMING_PATTERN = /^\d{1,2}:\d{2}:\d{2},\d{3}\s+-->\s+\d{1,2}:\d{2}:\d{2},\d{3}(?:\s+.*)?$/;
+const SRT_TIMING_PATTERN = /^\d+:\d{2}:\d{2},\d{3}\s+-->\s+\d+:\d{2}:\d{2},\d{3}(?:\s+.*)?$/;
 
 function cleanSrtCueText(value) {
   return String(value || "")
@@ -779,14 +787,15 @@ function cleanSrtCueText(value) {
 
 function parseSrt(text) {
   const normalized = text.replace(/^\uFEFF/, "").replace(/\r/g, "").trim();
+  if (!normalized.split("\n").some((line) => SRT_TIMING_PATTERN.test(line.trim()))) throw new Error("No valid SRT cues were found.");
   const segments = normalized
-    ? normalized.split(/\n{2,}/).flatMap((block, blockIndex) => {
+    ? normalized.split(/\n[ \t]*\n(?:[ \t]*\n)*/).flatMap((block, blockIndex) => {
       const lines = block.split("\n").map((line) => line.trimEnd());
       while (lines.length && !lines[0].trim()) lines.shift();
       let cueIndex = "";
       if (/^\d+$/.test(lines[0]?.trim() || "")) cueIndex = lines.shift().trim();
       const timing = lines.shift()?.trim() || "";
-      if (!SRT_TIMING_PATTERN.test(timing)) return [];
+      if (!SRT_TIMING_PATTERN.test(timing)) throw new Error(`SRT cue ${blockIndex + 1} has invalid timing data.`);
       const text = cleanSrtCueText(lines.join("\n"));
       if (!text.trim()) return [];
       const key = cueIndex || String(blockIndex + 1);
@@ -810,6 +819,7 @@ function buildSrt(segments, structure = null) {
     .map((segment, index) => {
       const cueIndex = String(segment.structure?.cueIndex || index + 1).trim() || String(index + 1);
       const timing = String(segment.structure?.timing || "00:00:00,000 --> 00:00:01,000").trim();
+      if (!SRT_TIMING_PATTERN.test(timing)) throw new Error(`SRT cue ${cueIndex} has invalid timing data.`);
       return `${cueIndex}\n${timing}\n${cleanSrtCueText(segment.target || "")}`;
     })
     .join("\n\n");
@@ -854,19 +864,20 @@ function cloneJson(value) {
 
 function setJsonPath(root, path, value) {
   if (!path.length) return value;
-  const nextContainer = (index) => (typeof path[index + 1] === "number" ? [] : {});
-  const base = root && typeof root === "object" ? root : (typeof path[0] === "number" ? [] : {});
-  let cursor = base;
+  let cursor = root;
   path.forEach((part, index) => {
+    if (!cursor || typeof cursor !== "object" || !Object.prototype.hasOwnProperty.call(cursor, part)) {
+      throw new Error("JSON reconstruction path does not exist in the original file.");
+    }
     const last = index === path.length - 1;
     if (last) {
-      cursor[part] = value;
+      if (typeof cursor[part] !== "string") throw new Error("JSON reconstruction path must identify a string.");
+      Object.defineProperty(cursor, part, { value, writable: true, enumerable: true, configurable: true });
       return;
     }
-    if (!cursor[part] || typeof cursor[part] !== "object") cursor[part] = nextContainer(index);
     cursor = cursor[part];
   });
-  return base;
+  return root;
 }
 
 function parseJson(text) {
@@ -904,10 +915,10 @@ function stripYamlComment(value) {
   let quote = "";
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index];
-    const previous = value[index - 1];
-    if ((char === '"' || char === "'") && previous !== "\\") {
-      quote = quote === char ? "" : quote || char;
-    }
+    if (quote === '"' && char === "\\") { index += 1; continue; }
+    if (quote === "'" && char === "'" && value[index + 1] === "'") { index += 1; continue; }
+    if (quote && char === quote) quote = "";
+    else if (!quote && index === value.search(/\S/) && (char === '"' || char === "'")) quote = char;
     if (char === "#" && !quote && (index === 0 || /\s/.test(value[index - 1]))) {
       return { value: value.slice(0, index).trimEnd(), comment: value.slice(index) };
     }
@@ -921,7 +932,7 @@ function unquoteYamlValue(value) {
     try {
       return JSON.parse(clean);
     } catch {
-      return clean.slice(1, -1);
+      throw new Error("This YAML quoted scalar uses unsupported escapes. Use JSON-compatible double quotes or YAML single quotes.");
     }
   }
   if (clean.startsWith("'") && clean.endsWith("'")) return clean.slice(1, -1).replaceAll("''", "'");
@@ -936,7 +947,7 @@ function isTranslatableYamlScalar(value) {
   const clean = value.trim();
   if (!clean || /^[\[{]/.test(clean)) return false;
   if (/^(?:true|false|null|~)$/i.test(clean)) return false;
-  if (/^[+-]?\d+(?:\.\d+)?$/.test(clean)) return false;
+  if (/^[+-]?(?:0x[\da-f]+|0o[0-7]+|(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?|\.inf|\.nan)$/i.test(clean)) return false;
   return /[^\d\s.,:;!?()[\]{}'"`~@#$%^&*_+=|\\/<>-]/u.test(unquoteYamlValue(clean));
 }
 
@@ -964,7 +975,7 @@ function parseYaml(text) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
+    if (!trimmed || trimmed.startsWith("#") || /^(?:---|\.\.\.)(?:\s+#.*)?$/.test(trimmed) || /^%YAML\s/.test(trimmed)) continue;
     const indent = indentOf(line);
     let parentPath = yamlParentPath(stack, indent);
     const listMatch = line.match(/^(\s*)-\s+(.*)$/);
@@ -987,27 +998,43 @@ function parseYaml(text) {
     const rawValue = keyMatch ? keyMatch.rawValue : body;
     const path = key ? [parentPath, key].filter(Boolean).join(".") : parentPath;
     const { value, comment } = stripYamlComment(rawValue);
+    if (!keyMatch && !listMatch) throw new Error(`Unsupported YAML scalar layout on line ${index + 1}. Use single-line scalars or literal/folded blocks.`);
+    if (/^[\[{&*!]/.test(value.trim())) throw new Error(`YAML flow collections, anchors, aliases and tags are not supported (line ${index + 1}). Expand them before importing.`);
+    if ((value.trim().startsWith('"') && !value.trim().endsWith('"')) || (value.trim().startsWith("'") && !value.trim().endsWith("'"))) throw new Error(`Multiline YAML quoted scalars are not supported (line ${index + 1}). Use a block scalar.`);
     if (key && !value) {
       stack.push({ indent, key: path });
       continue;
     }
     const blockMarker = value.trim();
-    if (key && /^[>|][+-]?$/.test(blockMarker)) {
-      const blockIndent = indent + 2;
+    if (/^[>|](?:[1-9][+-]?|[+-][1-9]?|)?$/.test(blockMarker)) {
+      const explicitIndent = Number(blockMarker.match(/[1-9]/)?.[0] || 0);
+      const blockBaseIndent = indent + (listMatch && keyMatch ? 2 : 0);
+      const firstContent = lines.slice(index + 1).find((line) => line.trim());
+      const blockIndent = explicitIndent ? blockBaseIndent + explicitIndent : Math.max(blockBaseIndent + 1, firstContent ? indentOf(firstContent) : blockBaseIndent + 2);
       const blockLines = [];
       let end = index;
       for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-        if (lines[cursor].trim() && indentOf(lines[cursor]) <= indent) break;
+        if (lines[cursor].trim() && indentOf(lines[cursor]) <= blockBaseIndent) break;
+        if (lines[cursor].trim() && indentOf(lines[cursor]) < blockIndent) throw new Error(`Invalid YAML block indentation on line ${cursor + 1}.`);
         end = cursor;
         blockLines.push(lines[cursor].slice(Math.min(blockIndent, indentOf(lines[cursor]))));
       }
-      const folded = blockMarker.startsWith(">");
-      const blockText = folded ? blockLines.join(" ").replace(/\s+/g, " ").trim() : blockLines.join("\n").trimEnd();
+      let blockText = "";
+      blockLines.forEach((line, lineIndex) => {
+        blockText += line;
+        if (lineIndex === blockLines.length - 1) { if (end < lines.length - 1) blockText += "\n"; return; }
+        const next = blockLines[lineIndex + 1];
+        if (!blockMarker.startsWith(">") || /^\s/.test(line) || /^\s/.test(next)) blockText += "\n";
+        else if (line && next) blockText += " ";
+        else if (!line) blockText += "\n";
+      });
+      if (blockMarker.includes("-")) blockText = blockText.replace(/\n+$/, "");
+      else if (!blockMarker.includes("+")) blockText = blockText.replace(/\n+$/, "") + (blockLines.length && (end < lines.length - 1 || blockLines.at(-1) === "") ? "\n" : "");
       if (blockText.trim()) {
         segments.push({
           text: blockText,
           key: path,
-          structure: { format: "yaml", key: path, lineStart: index, lineEnd: end, valuePrefix, blockStyle: blockMarker, blockIndent }
+          structure: { format: "yaml", key: path, lineStart: index, lineEnd: end, valuePrefix, blockStyle: blockMarker, blockIndent, blockBaseIndent, comment, originalText: blockText }
         });
       }
       index = end;
@@ -1039,9 +1066,20 @@ function buildYaml(segments, structure = null) {
       const item = segment.structure;
       const value = segment.target || "";
       if (item.blockStyle) {
+        if (item.originalText !== undefined && value === item.originalText) return;
         const indent = " ".repeat(item.blockIndent || 2);
-        const blockLines = String(value).split(/\r?\n/).map((line) => `${indent}${line}`);
-        lines.splice(item.lineStart, item.lineEnd - item.lineStart + 1, `${item.valuePrefix}${item.blockStyle}`, ...blockLines);
+        const normalized = String(value).replace(/\r\n/g, "\n");
+        if (/^[ \t]/.test(normalized)) {
+          // Quoted scalars preserve leading content spaces without ambiguous indentation.
+          lines.splice(item.lineStart, item.lineEnd - item.lineStart + 1, `${item.valuePrefix}${quoteYamlValue(normalized)}${item.comment ? ` ${item.comment}` : ""}`);
+          return;
+        }
+        const ending = normalized.match(/\n+$/)?.[0].length || 0;
+        const blockStyle = ending === 0 ? "|-" : ending === 1 ? "|" : "|+";
+        const content = ending ? normalized.slice(0, -1) : normalized;
+        const blockLines = content.split("\n").map((line) => `${indent}${line}`);
+        if (item.lineEnd === lines.length - 1 && ending) blockLines.push("");
+        lines.splice(item.lineStart, item.lineEnd - item.lineStart + 1, `${item.valuePrefix}${blockStyle}${item.comment ? ` ${item.comment}` : ""}`, ...blockLines);
         return;
       }
       const comment = item.comment ? ` ${item.comment}` : "";
@@ -1095,20 +1133,59 @@ function translatableHtmlElements(doc) {
   });
 }
 
+const GENERIC_XML_TRANSLATABLE_ATTRS = new Set([
+  "alt", "aria-description", "aria-label", "caption", "description", "label", "placeholder", "prompt", "summary", "text", "title", "tooltip"
+]);
+const WIX_TRANSLATABLE_ATTRS = new Set(["description", "manufacturer", "name", "title"]);
+
+function translatedAttributeElement(doc, item) {
+  if (doc.documentElement.contains(item.element)) return item.element;
+  const attributes = Array.from(item.element.attributes).filter((attr) => !attr.name.startsWith("xmlns"));
+  const mutable = new Set([...GENERIC_XML_TRANSLATABLE_ATTRS, ...WIX_TRANSLATABLE_ATTRS]);
+  const stable = attributes.filter((attr) => !mutable.has(attr.name.toLowerCase()));
+  let candidates = Array.from(doc.getElementsByTagNameNS(item.element.namespaceURI || "*", item.element.localName))
+    .filter((element) => stable.every((attr) => element.getAttribute(attr.name) === attr.value));
+  if (candidates.length > 1) candidates = candidates.filter((element) => attributes.every((attr) => element.getAttribute(attr.name) === attr.value));
+  if (candidates.length !== 1) throw new Error("Translated inline attributes are ambiguous after markup changes. Preserve each original inline element identity before exporting.");
+  return candidates[0];
+}
+
+function htmlLocalizationItems(doc) {
+  const excluded = (element) => element.closest('script, style, noscript, template, svg, canvas, [translate="no"], [translatable="false"]');
+  const blocks = translatableHtmlElements(doc).filter((element) => !excluded(element) && !element.querySelector('[translate="no"], [translatable="false"]'));
+  const covered = (element) => blocks.some((block) => block === element || block.contains(element));
+  /** @type {Array<{element: Element, kind: string, value?: string, node?: Node, attrName?: string}>} */
+  const items = blocks.map((element) => ({ element, kind: "element", value: cleanHtmlSegment(element.innerHTML) }));
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!node.nodeValue.trim() || excluded(node.parentElement) || covered(node.parentElement)) continue;
+    items.push({ element: node.parentElement, node, kind: "text", value: node.nodeValue });
+  }
+  for (const element of doc.querySelectorAll("*")) {
+    if (excluded(element)) continue;
+    for (const name of ["alt", "title", "placeholder", "aria-label", "aria-description"]) {
+      const value = element.getAttribute(name);
+      if (value?.trim()) items.push({ element, kind: "attribute", attrName: name, value });
+    }
+  }
+  return items;
+}
+
 function parseHtml(text) {
   const parser = new DOMParser();
   const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
   const doc = parser.parseFromString(parserInput, "text/html");
-  const elements = translatableHtmlElements(doc);
+  const items = htmlLocalizationItems(doc);
   return {
-    structure: { format: "html", source: text },
-    segments: elements.map((element, index) => {
-      const value = cleanHtmlSegment(element.innerHTML);
+    structure: { format: "html", source: text, htmlMappingVersion: 2 },
+    segments: items.map((item, index) => {
+      const { element, value } = item;
       return {
         text: value,
         key: `html-block-${index + 1}`,
-        tags: detectTags(value),
-        structure: { format: "html", elementIndex: index, selector: element.tagName.toLowerCase() }
+        tags: item.kind === "element" ? detectTags(value) : [],
+        structure: { format: "html", elementIndex: index, kind: item.kind, selector: element.tagName.toLowerCase() }
       };
     })
   };
@@ -1122,20 +1199,33 @@ function buildHtml(segments, structure = null) {
   const parser = new DOMParser();
   const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(source) || source;
   const doc = parser.parseFromString(parserInput, "text/html");
-  const elements = translatableHtmlElements(doc);
-  segments.forEach((segment) => {
+  /** @type {Array<{element: Element, kind: string, node?: Node, attrName?: string}>} */
+  const items = structure?.htmlMappingVersion === 2 ? htmlLocalizationItems(doc) : translatableHtmlElements(doc).map((element) => ({ element, kind: "element" }));
+  const ordered = [...segments].sort((a, b) => Number(items[a.structure.elementIndex]?.kind === "attribute") - Number(items[b.structure.elementIndex]?.kind === "attribute"));
+  let attributeElements;
+  ordered.forEach((segment) => {
     const elementIndex = segment.structure?.elementIndex;
-    if (typeof elementIndex !== "number" || !elements[elementIndex]) return;
+    const item = items[elementIndex];
+    if (!item) throw new Error("HTML reconstruction element is missing.");
     const value = targetText(segment);
+    if (item.kind === "attribute") {
+      attributeElements ||= new Map(items.filter((entry) => entry.kind === "attribute").map((entry) => [entry, translatedAttributeElement(doc, entry)]));
+      const element = attributeElements.get(item);
+      element.setAttribute(item.attrName, value);
+      return;
+    }
+    if (item.kind === "text") { item.node.nodeValue = value; return; }
     const safeFragment = window.CatHan?.appRuntime?.safeHtml?.fragment?.(value, doc);
     if (safeFragment) {
-      elements[elementIndex].replaceChildren(safeFragment);
+      item.element.replaceChildren(safeFragment);
       return;
     }
     const fragmentInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(`<body>${value}</body>`) || `<body>${value}</body>`;
     const fragmentDocument = parser.parseFromString(fragmentInput, "text/html");
-    elements[elementIndex].replaceChildren(...Array.from(fragmentDocument.body.childNodes));
+    item.element.replaceChildren(...Array.from(fragmentDocument.body.childNodes));
   });
+  for (const meta of doc.querySelectorAll("meta[charset]")) meta.setAttribute("charset", "utf-8");
+  for (const meta of doc.querySelectorAll('meta[http-equiv="Content-Type" i]')) meta.setAttribute("content", "text/html; charset=utf-8");
   return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
 
@@ -1144,8 +1234,8 @@ function isTranslatableMarkdownText(value) {
 }
 
 function isMarkdownFence(line) {
-  const match = String(line || "").match(/^\s*(`{3,}|~{3,})/);
-  return match ? match[1][0] : "";
+  const match = String(line || "").match(/^ {0,3}(`{3,}|~{3,})/);
+  return match ? match[1] : "";
 }
 
 function isMarkdownTableLine(line) {
@@ -1230,12 +1320,17 @@ function parseMarkdown(text) {
   while (index < lines.length) {
     const line = lines[index];
     const fenceMarker = isMarkdownFence(line);
-    if (fenceMarker) {
-      fence = fence ? "" : fenceMarker;
+    if (fence) {
+      if (fenceMarker && fenceMarker[0] === fence[0] && fenceMarker.length >= fence.length && line.trim() === fenceMarker) fence = "";
       index += 1;
       continue;
     }
-    if (fence || !line.trim()) {
+    if (fenceMarker) {
+      fence = fenceMarker;
+      index += 1;
+      continue;
+    }
+    if (!line.trim() || /^(?: {4}|\t)/.test(line)) {
       index += 1;
       continue;
     }
@@ -1371,6 +1466,7 @@ function parseDelimitedRows(text, delimiter) {
       cell += char;
     }
   }
+  if (quoted) throw new Error("The delimited localization file has an unterminated quoted field.");
   row.push(cell);
   if (row.length > 1 || row.some((item) => String(item || "").trim())) rows.push(row);
   return rows;
@@ -1478,12 +1574,14 @@ function escapeXml(value) {
     .replace(/>/g, "&gt;");
 }
 
-function serializedXmlChildren(element) {
+function serializedXmlChildren(element, preserveWhitespace = false) {
   const serializer = new XMLSerializer();
-  return Array.from(element.childNodes || []).map((node) => {
-    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) return node.nodeValue || "";
+  const mixedContent = element.children.length > 0;
+  const value = Array.from(element.childNodes || []).map((node) => {
+    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) return mixedContent ? escapeXml(node.nodeValue || "") : node.nodeValue || "";
     return serializer.serializeToString(node);
-  }).join("").trim();
+  }).join("");
+  return preserveWhitespace ? value : value.trim();
 }
 
 function translatableAndroidElements(doc) {
@@ -1494,6 +1592,7 @@ function translatableAndroidElements(doc) {
     const tag = element.localName;
     const name = element.getAttribute("name") || "";
     if (element.getAttribute("translatable") === "false") return;
+    if (!element.children.length && /^\s*[@?](?:[\w.]+:)?[\w.]+\/[\w.]+\s*$/.test(element.textContent)) return;
     if (tag === "string" && name) {
       items.push({ element, key: name, kind: "string" });
       return;
@@ -1501,6 +1600,7 @@ function translatableAndroidElements(doc) {
     if ((tag === "string-array" || tag === "plurals") && name) {
       Array.from(element.children || []).forEach((child, index) => {
         if (child.localName !== "item" || child.getAttribute("translatable") === "false") return;
+        if (!child.children.length && /^\s*[@?](?:[\w.]+:)?[\w.]+\/[\w.]+\s*$/.test(child.textContent)) return;
         const quantity = child.getAttribute("quantity") || "";
         const key = tag === "plurals" && quantity ? `${name}.${quantity}` : `${name}[${index}]`;
         items.push({ element: child, key, kind: tag === "plurals" ? "plural" : "array-item", parentName: name, quantity, itemIndex: index });
@@ -1539,15 +1639,25 @@ function parseAndroidXml(text) {
 }
 
 function replaceXmlChildren(doc, element, value) {
-  while (element.firstChild) element.removeChild(element.firstChild);
   const text = String(value || "");
-  const wrappedText = `<wrapper>${text}</wrapper>`;
-  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(wrappedText) || wrappedText;
-  const wrapped = new DOMParser().parseFromString(parserInput, "application/xml");
-  if (xmlParseError(wrapped)) {
+  if (!element.children.length) {
     element.textContent = text;
     return;
   }
+  const namespaces = new Map();
+  for (let ancestor = element; ancestor?.nodeType === Node.ELEMENT_NODE; ancestor = ancestor.parentNode) {
+    for (const attr of ancestor.attributes) {
+      if ((attr.name === "xmlns" || attr.prefix === "xmlns") && !namespaces.has(attr.name)) namespaces.set(attr.name, attr.value);
+    }
+  }
+  const declarations = Array.from(namespaces, ([name, uri]) => ` ${name}="${escapeXml(uri).replaceAll('"', "&quot;")}"`).join("");
+  const wrappedText = `<wrapper${declarations}>${text.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/g, "&amp;")}</wrapper>`;
+  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(wrappedText) || wrappedText;
+  const wrapped = new DOMParser().parseFromString(parserInput, "application/xml");
+  if (xmlParseError(wrapped)) {
+    throw new Error("Translated inline XML is not well formed. Check its tags and entities before exporting.");
+  }
+  while (element.firstChild) element.removeChild(element.firstChild);
   Array.from(wrapped.documentElement.childNodes).forEach((child) => {
     element.appendChild(doc.importNode(child, true));
   });
@@ -1563,19 +1673,26 @@ function buildAndroidXml(segments, structure = null) {
   const items = translatableAndroidElements(doc);
   segments.forEach((segment) => {
     const elementIndex = segment.structure?.elementIndex;
-    if (!Number.isFinite(elementIndex) || !items[elementIndex]) return;
-    replaceXmlChildren(doc, items[elementIndex].element, targetText(segment));
+    const item = segment.structure?.key ? items.find((candidate) => candidate.key === segment.structure.key) : items[elementIndex];
+    if (!item) throw new Error("Android resource mapping is missing or no longer translatable. Reimport the original file.");
+    const keepQuotedWrapper = !item.element.children.length && /^"[\s\S]*"$/.test(item.element.textContent.trim()) && /^"[\s\S]*"$/.test(targetText(segment).trim());
+    replaceXmlChildren(doc, item.element, targetText(segment));
+    const walker = doc.createTreeWalker(item.element, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const value = walker.currentNode.nodeValue;
+      const first = value.search(/\S/), last = value.trimEnd().length - 1;
+      walker.currentNode.nodeValue = value.replace(/\\[\s\S]|['"]/g, (token, index) => token.startsWith("\\") || (keepQuotedWrapper && token === '"' && (index === first || index === last)) ? token : `\\${token}`);
+    }
   });
   return new XMLSerializer().serializeToString(doc);
 }
 
 function unescapeAppleString(value) {
-  return String(value || "")
-    .replace(/\\n/g, "\n")
-    .replace(/\\r/g, "\r")
-    .replace(/\\t/g, "\t")
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, "\\");
+  return String(value || "").replace(/\\[uU]([0-9a-fA-F]{4})|\\([0-7]{1,3})|\\([\s\S])/g, (_match, hex, octal, escaped) => {
+    if (hex) return String.fromCharCode(Number.parseInt(hex, 16));
+    if (octal) return String.fromCharCode(Number.parseInt(octal, 8));
+    return ({ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" })[escaped] ?? escaped;
+  });
 }
 
 function escapeAppleString(value) {
@@ -1588,37 +1705,43 @@ function escapeAppleString(value) {
 }
 
 function parseAppleStrings(text) {
-  const lines = text.replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
-  const pattern = /^(\s*)"((?:\\.|[^"\\])*)"(\s*=\s*)"((?:\\.|[^"\\])*)"(\s*;\s*(?:(?:(?:\/\/).*)|(?:\/\*.*\*\/))?\s*)$/;
+  const source = text.replace(/^\uFEFF/, "");
+  const lines = source.split(/\r?\n/);
+  const pattern = /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"((?:\\[\s\S]|[^"\\])*)"\s*=\s*"((?:\\[\s\S]|[^"\\])*)"\s*;/g;
   const segments = [];
-  lines.forEach((line, lineIndex) => {
-    const match = line.match(pattern);
-    if (!match) return;
-    const key = unescapeAppleString(match[2]);
-    const value = unescapeAppleString(match[4]);
-    if (!value.trim()) return;
+  for (const match of source.matchAll(pattern)) {
+    if (match[1] === undefined) continue;
+    const key = unescapeAppleString(match[1]);
+    const value = unescapeAppleString(match[2]);
+    if (!value.trim()) continue;
+    const valueStart = match.index + match[0].indexOf('"', match[1].length + 2) + 1;
     segments.push({
       text: value,
       key,
       structure: {
         format: "apple-strings",
         key,
-        lineIndex,
-        prefix: match[1],
-        rawKey: match[2],
-        separator: match[3],
-        suffix: match[5]
+        lineIndex: source.slice(0, match.index).split("\n").length - 1,
+        start: valueStart,
+        end: valueStart + match[2].length
       }
     });
-  });
+  }
   if (!segments.length) throw new Error("No translatable iOS strings were found.");
   return {
-    structure: { format: "apple-strings", sourceLines: lines },
+    structure: { format: "apple-strings", source, sourceLines: lines },
     segments
   };
 }
 
 function buildAppleStrings(segments, structure = null) {
+  if (typeof structure?.source === "string" && segments.every((segment) => Number.isInteger(segment.structure?.start))) {
+    let output = structure.source;
+    [...segments].sort((a, b) => b.structure.start - a.structure.start).forEach((segment) => {
+      output = `${output.slice(0, segment.structure.start)}${escapeAppleString(targetText(segment))}${output.slice(segment.structure.end)}`;
+    });
+    return output;
+  }
   const sourceLines = structure?.sourceLines;
   if (!sourceLines) {
     return segments.map((segment) => `"${escapeAppleString(segment.structure?.key || segment.key || segment.id || "")}" = "${escapeAppleString(targetText(segment))}";`).join("\n");
@@ -1655,7 +1778,7 @@ function idmlCharacterStyleRanges(paragraph) {
 }
 
 function idmlStyleTag(range) {
-  const style = String(range?.getAttribute("AppliedCharacterStyle") || range?.getAttribute("CharacterStyle") || "").toLowerCase();
+  const style = [range?.getAttribute("AppliedCharacterStyle"), range?.getAttribute("CharacterStyle"), range?.getAttribute("FontStyle")].filter(Boolean).join(" ").toLowerCase();
   if (/(?:^|[/._ -])(?:bold|strong|semibold|demibold)(?:$|[/._ -])/i.test(style)) return "b";
   if (/(?:^|[/._ -])(?:italic|oblique|emphasis)(?:$|[/._ -])/i.test(style)) return "i";
   if (/(?:^|[/._ -])(?:underline|underlined)(?:$|[/._ -])/i.test(style)) return "u";
@@ -1669,6 +1792,21 @@ function semanticWrap(tag, value) {
 function idmlStyledParagraphText(paragraph) {
   const ranges = idmlCharacterStyleRanges(paragraph);
   if (ranges.length < 2) return "";
+  // Semantic tags cannot represent repeated distinct styles, embedded objects,
+  // line breaks, or multiple Content nodes without losing their identities.
+  // Keep those paragraphs as individual Content segments instead.
+  const tags = ranges.map(idmlStyleTag);
+  const signatures = new Map();
+  const distinctStyles = ranges.some((range, index) => {
+    const signature = JSON.stringify(Array.from(range.attributes).map((attribute) => [attribute.name, attribute.value]).sort()) +
+      directChildElementsByName(range, "Properties").map((node) => new XMLSerializer().serializeToString(node)).join("");
+    const previous = signatures.get(tags[index]);
+    signatures.set(tags[index], signature);
+    return previous !== undefined && previous !== signature;
+  });
+  if (distinctStyles || ranges.some((range) =>
+    directChildElementsByName(range, "Content").length !== 1 ||
+    Array.from(range.children).some((child) => !["Content", "Properties"].includes(child.localName)))) return "";
   return ranges
     .map((range) => {
       const content = directChildElementsByName(range, "Content")[0];
@@ -1747,6 +1885,87 @@ function replaceIdmlParagraphStyleRanges(doc, paragraph, value) {
   return true;
 }
 
+function idmlSimpleParagraphRanges(paragraph) {
+  const ranges = idmlCharacterStyleRanges(paragraph);
+  if (ranges.length < 2 || Array.from(paragraph.children).some((child) => !["CharacterStyleRange", "Properties"].includes(child.localName))) return [];
+  if (ranges.some((range) => {
+    const contents = directChildElementsByName(range, "Content");
+    return contents.length !== 1 || Array.from(range.children).some((child) => !["Content", "Properties"].includes(child.localName)) ||
+      Array.from(contents[0].childNodes).some((child) => ![Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(child.nodeType));
+  })) return [];
+  return ranges;
+}
+
+function idmlInlineRangeMap(paragraph, contents) {
+  return idmlSimpleParagraphRanges(paragraph).map((range, rangeIndex) => {
+    const contentIndex = contents.indexOf(directChildElementsByName(range, "Content")[0]);
+    return { id: `idml-c${contentIndex}`, tag: idmlStyleTag(range) || "g", contentIndex, rangeIndex };
+  });
+}
+
+function idmlInlineRangeText(mapping, contents) {
+  return mapping.map((item) => `<${item.tag} id="${item.id}">${escapeXml(contents[item.contentIndex].textContent)}</${item.tag}>`).join("");
+}
+
+function idmlTextPieces(element) {
+  const children = Array.from(element.childNodes);
+  if (children.every((node) => [Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(node.nodeType))) return [{ value: element.textContent }];
+  return children.flatMap((node, textNodeIndex) => [Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(node.nodeType) ? [{ value: node.nodeValue, textNodeIndex }] : []);
+}
+
+function setIdmlLiteralText(element, value, textNodeIndex) {
+  const text = String(value || "");
+  for (const character of text) {
+    const code = character.codePointAt(0);
+    if ((code < 32 && ![9, 10, 13].includes(code)) || (code >= 0xd800 && code <= 0xdfff) || code === 0xfffe || code === 0xffff) throw new Error("IDML translation contains an XML-invalid character.");
+  }
+  if (textNodeIndex !== undefined) {
+    const node = element.childNodes[textNodeIndex];
+    if (!Number.isInteger(textNodeIndex) || !node || ![Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(node.nodeType)) throw new Error("IDML Content text-node mapping is invalid. Reimport the original file.");
+    if (node.nodeValue === text) return false;
+    if (node.nodeType === Node.CDATA_SECTION_NODE && text.includes("]]>")) node.parentNode.replaceChild(element.ownerDocument.createTextNode(text), node);
+    else node.nodeValue = text;
+    return true;
+  }
+  if (Array.from(element.childNodes).some((node) => ![Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(node.nodeType))) throw new Error("IDML Content contains structural nodes. Reimport it to preserve those nodes.");
+  if (element.textContent === text) return false;
+  if (element.childNodes.length === 1 && !(element.firstChild.nodeType === Node.CDATA_SECTION_NODE && text.includes("]]>"))) element.firstChild.nodeValue = text;
+  else element.textContent = text;
+  return true;
+}
+
+function replaceIdmlMappedRanges(doc, paragraph, contents, segment) {
+  const expected = idmlInlineRangeMap(paragraph, contents);
+  if (!expected.length || JSON.stringify(expected) !== JSON.stringify(segment.structure.inlineRanges)) throw new Error("IDML style mapping no longer matches the original paragraph. Reimport the original file.");
+  const value = targetText(segment);
+  if (value === idmlInlineRangeText(expected, contents)) return false;
+  const safeValue = value.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/g, "&amp;");
+  const parsed = parseXmlDocument(`<idml-target>${safeValue}</idml-target>`, "IDML translated style tags");
+  const byId = new Map(expected.map((item) => [item.id, item]));
+  const used = new Set();
+  const ordered = Array.from(parsed.documentElement.childNodes).map((node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) throw new Error("Keep all IDML translated text inside its original style tags.");
+    const element = /** @type {Element} */ (node);
+    const id = element.getAttribute("id");
+    const item = byId.get(id);
+    if (!item || used.has(id) || element.localName !== item.tag || element.attributes.length !== 1 || element.children.length || Array.from(element.childNodes).some((child) => child.nodeType !== Node.TEXT_NODE && child.nodeType !== Node.CDATA_SECTION_NODE)) throw new Error("IDML translation has missing, duplicate or changed style tags.");
+    used.add(id);
+    return { item, value: element.textContent };
+  });
+  if (used.size !== expected.length) throw new Error("IDML translation is missing original style tags.");
+  const ranges = idmlSimpleParagraphRanges(paragraph);
+  ordered.forEach(({ item, value: translated }) => setIdmlLiteralText(contents[item.contentIndex], translated));
+  if (ordered.some(({ item }, index) => item.rangeIndex !== index)) {
+    const positions = ranges.map((range) => {
+      const marker = doc.createComment("loopcat-idml-position");
+      range.parentNode.replaceChild(marker, range);
+      return marker;
+    });
+    positions.forEach((marker, index) => marker.parentNode.replaceChild(ranges[ordered[index].item.rangeIndex], marker));
+  }
+  return true;
+}
+
 async function parseIdmlFile(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const entries = await unzipPackageEntries(bytes);
@@ -1759,15 +1978,10 @@ async function parseIdmlFile(file) {
     const usedContentIndexes = new Set();
     const contents = idmlContentElements(xml);
     idmlParagraphStyleRanges(xml).forEach((paragraph, paragraphIndex) => {
-      const value = idmlStyledParagraphText(paragraph);
-      if (!value.trim()) return;
-      const rangeContents = idmlCharacterStyleRanges(paragraph)
-        .map((range) => directChildElementsByName(range, "Content")[0])
-        .filter(Boolean);
-      if (rangeContents.length < 2) return;
-      const contentIndexes = rangeContents
-        .map((element) => contents.indexOf(element))
-        .filter((index) => index >= 0);
+      const inlineRanges = idmlInlineRangeMap(paragraph, contents);
+      if (!inlineRanges.length || !inlineRanges.some((item) => contents[item.contentIndex].textContent.trim())) return;
+      const value = idmlInlineRangeText(inlineRanges, contents);
+      const contentIndexes = inlineRanges.map((item) => item.contentIndex);
       contentIndexes.forEach((index) => usedContentIndexes.add(index));
       const key = `${path}#paragraph-${paragraphIndex + 1}`;
       segments.push({
@@ -1780,25 +1994,23 @@ async function parseIdmlFile(file) {
           path,
           paragraphIndex,
           contentIndex: contentIndexes[0],
-          contentIndexes
+          contentIndexes,
+          idmlVersion: 2,
+          inlineRanges
         }
       });
     });
     contents.forEach((element, contentIndex) => {
       if (usedContentIndexes.has(contentIndex)) return;
-      const value = serializedXmlChildren(element);
-      if (!value.trim()) return;
-      const key = `${path}#content-${contentIndex + 1}`;
-      segments.push({
-        text: value,
-        key,
-        tags: detectTags(value),
-        structure: {
-          format: "idml",
+      idmlTextPieces(element).forEach(({ value, textNodeIndex }) => {
+        if (!value.trim()) return;
+        const key = `${path}#content-${contentIndex + 1}${textNodeIndex === undefined ? "" : `-text-${textNodeIndex}`}`;
+        segments.push({
+          text: value,
           key,
-          path,
-          contentIndex
-        }
+          tags: detectTags(value).filter((tag) => tag.type !== "tag"),
+          structure: { format: "idml", key, path, contentIndex, idmlVersion: 2, ...(textNodeIndex === undefined ? {} : { textNodeIndex }) }
+        });
       });
     });
   });
@@ -1810,6 +2022,7 @@ async function parseIdmlFile(file) {
     segments,
     structure: {
       format: "idml",
+      idmlVersion: 2,
       packageBase64: bytesToBase64(bytes),
       storyPaths
     }
@@ -1819,36 +2032,63 @@ async function parseIdmlFile(file) {
 async function buildIdmlFile(segments, structure = null) {
   if (!structure?.packageBase64) throw new Error("IDML reconstruction data is missing.");
   const entries = await unzipPackageEntries(base64ToBytes(structure.packageBase64));
+  const allowedPaths = new Set(idmlStoryPaths(entries));
   const segmentsByPath = new Map();
   segments.forEach((segment) => {
     const path = segment.structure?.path;
-    if (!path) return;
+    if (!allowedPaths.has(path)) throw new Error("IDML story mapping is missing or invalid. Reimport the original file.");
     if (!segmentsByPath.has(path)) segmentsByPath.set(path, []);
     segmentsByPath.get(path).push(segment);
   });
 
+  let changed = false;
   for (const [path, pathSegments] of segmentsByPath.entries()) {
-    if (!entries.has(path)) continue;
     const xml = parseXmlDocument(readPackageText(entries, path), `IDML story ${path}`);
     const contents = idmlContentElements(xml);
     const paragraphs = idmlParagraphStyleRanges(xml);
+    const occupied = new Set();
+    const occupy = (contentIndex, nodeIndex) => {
+      if (!Number.isInteger(contentIndex) || contentIndex < 0 || !contents[contentIndex]) throw new Error("IDML Content mapping is invalid. Reimport the original file.");
+      const key = `${contentIndex}:${nodeIndex === undefined ? "all" : nodeIndex}`;
+      if (occupied.has(key) || occupied.has(`${contentIndex}:all`) || (nodeIndex === undefined && [...occupied].some((value) => value.startsWith(`${contentIndex}:`)))) throw new Error("IDML contains duplicate or overlapping Content mappings.");
+      occupied.add(key);
+    };
+    pathSegments.forEach((segment) => {
+      if (hasOwnValue(segment.structure, "paragraphIndex") && (!Number.isInteger(segment.structure.paragraphIndex) || segment.structure.paragraphIndex < 0)) throw new Error("IDML paragraph mapping is invalid.");
+      if (segment.structure?.idmlVersion === 2 && hasOwnValue(segment.structure, "paragraphIndex") && !Array.isArray(segment.structure.inlineRanges)) throw new Error("IDML style mapping is missing. Reimport the original file.");
+      if (segment.structure?.inlineRanges) segment.structure.inlineRanges.forEach((item) => occupy(item.contentIndex));
+      else if (Number.isInteger(segment.structure?.paragraphIndex)) {
+        const paragraph = paragraphs[segment.structure.paragraphIndex];
+        if (!paragraph) throw new Error("IDML paragraph mapping is invalid.");
+        idmlCharacterStyleRanges(paragraph).flatMap((range) => directChildElementsByName(range, "Content")).forEach((content) => occupy(contents.indexOf(content)));
+      } else occupy(segment.structure?.contentIndex, segment.structure?.textNodeIndex);
+    });
+    let storyChanged = false;
     pathSegments.forEach((segment) => {
       const paragraphIndex = segment.structure?.paragraphIndex;
+      if (segment.structure?.inlineRanges) {
+        if (!Number.isInteger(paragraphIndex) || !paragraphs[paragraphIndex]) throw new Error("IDML paragraph mapping is invalid.");
+        storyChanged = replaceIdmlMappedRanges(xml, paragraphs[paragraphIndex], contents, segment) || storyChanged;
+        return;
+      }
       if (Number.isFinite(paragraphIndex) && paragraphs[paragraphIndex]) {
+        if (targetText(segment) === idmlStyledParagraphText(paragraphs[paragraphIndex])) return;
         replaceIdmlParagraphStyleRanges(xml, paragraphs[paragraphIndex], targetText(segment));
+        storyChanged = true;
         return;
       }
       const contentIndex = segment.structure?.contentIndex;
-      if (!Number.isFinite(contentIndex) || !contents[contentIndex]) return;
-      replaceXmlChildren(xml, contents[contentIndex], targetText(segment));
+      storyChanged = setIdmlLiteralText(contents[contentIndex], targetText(segment), segment.structure?.textNodeIndex) || storyChanged;
     });
+    if (!storyChanged) continue;
+    changed = true;
     entries.set(path, {
       name: path,
       data: localizationTextEncoder.encode(new XMLSerializer().serializeToString(xml))
     });
   }
 
-  return zipPackageEntries(entries);
+  return changed ? zipPackageEntries(entries) : base64ToBytes(structure.packageBase64);
 }
 
 function localNameLower(element) {
@@ -1897,21 +2137,6 @@ function xmlElementKey(element, fallback) {
 }
 
 const GENERIC_XML_SKIP_ELEMENTS = new Set(["script", "style", "meta", "link", "base"]);
-const GENERIC_XML_TRANSLATABLE_ATTRS = new Set([
-  "alt",
-  "aria-description",
-  "aria-label",
-  "caption",
-  "description",
-  "label",
-  "placeholder",
-  "prompt",
-  "summary",
-  "text",
-  "title",
-  "tooltip"
-]);
-const WIX_TRANSLATABLE_ATTRS = new Set(["description", "manufacturer", "name", "title"]);
 
 function isGenericXmlAttributeTranslatable(element, attr, documentFormat) {
   const name = String(attr?.name || "").toLowerCase();
@@ -1933,7 +2158,8 @@ function collectGenericXmlItems(doc, documentFormat = "xml", options = {}) {
     const value = serializedXmlChildren(element);
     return hasMeaningfulText(value);
   });
-  const candidateSet = new Set(elementCandidates);
+  const textOnly = new Set(options.protectNestedOptOut ? elementCandidates.filter((element) => element.querySelector('[translate="no"], [translatable="false"]')) : []);
+  const candidateSet = new Set(elementCandidates.filter((element) => !textOnly.has(element)));
   const items = [];
 
   elementCandidates.forEach((element) => {
@@ -1941,6 +2167,13 @@ function collectGenericXmlItems(doc, documentFormat = "xml", options = {}) {
     while (ancestor && ancestor !== doc.documentElement) {
       if (candidateSet.has(ancestor)) return;
       ancestor = ancestor.parentElement;
+    }
+    if (textOnly.has(element)) {
+      for (const node of element.childNodes) {
+        if (![Node.TEXT_NODE, Node.CDATA_SECTION_NODE].includes(node.nodeType) || !hasMeaningfulText(node.nodeValue)) continue;
+        items.push({ kind: "text", element, node, value: node.nodeValue, key: `${xmlElementKey(element, localNameLower(element))}#text-${items.length}` });
+      }
+      return;
     }
     const value = serializedXmlChildren(element);
     if (!hasMeaningfulText(value)) return;
@@ -1973,7 +2206,7 @@ function collectGenericXmlItems(doc, documentFormat = "xml", options = {}) {
 
 function parseGenericXmlText(text, documentFormat = "xml", label = "XML") {
   const doc = parseXmlDocument(text, label);
-  const items = collectGenericXmlItems(doc, documentFormat);
+  const items = collectGenericXmlItems(doc, documentFormat, { protectNestedOptOut: true });
   const segments = items.map((item, itemIndex) => ({
     text: item.value,
     key: item.key,
@@ -1989,7 +2222,7 @@ function parseGenericXmlText(text, documentFormat = "xml", label = "XML") {
   })).filter((segment) => hasMeaningfulText(segment.text));
   if (!segments.length) throw new Error(`No translatable ${label} content was found.`);
   return {
-    structure: { format: "generic-xml", documentFormat, source: text },
+    structure: { format: "generic-xml", documentFormat, source: text, xmlMappingVersion: 2 },
     segments
   };
 }
@@ -1997,13 +2230,18 @@ function parseGenericXmlText(text, documentFormat = "xml", label = "XML") {
 function buildGenericXml(segments, structure = null) {
   if (!structure?.source) throw new Error("XML reconstruction source data is missing.");
   const doc = parseXmlDocument(structure.source, "XML");
-  const items = collectGenericXmlItems(doc, structure.documentFormat || "xml");
-  segments.forEach((segment) => {
+  const items = collectGenericXmlItems(doc, structure.documentFormat || "xml", { protectNestedOptOut: structure.xmlMappingVersion === 2 });
+  const ordered = [...segments].sort((a, b) => Number(items[a.structure.itemIndex]?.kind === "attribute") - Number(items[b.structure.itemIndex]?.kind === "attribute"));
+  let attributeElements;
+  ordered.forEach((segment) => {
     const itemIndex = segment.structure?.itemIndex;
-    if (!Number.isFinite(itemIndex) || !items[itemIndex]) return;
+    if (!items[itemIndex]) throw new Error("XML reconstruction element is missing.");
     const item = items[itemIndex];
+    if (item.kind === "text") { item.node.nodeValue = targetText(segment); return; }
     if (item.kind === "attribute") {
-      item.element.setAttribute(item.attrName, targetText(segment));
+      attributeElements ||= new Map(items.filter((entry) => entry.kind === "attribute").map((entry) => [entry, translatedAttributeElement(doc, entry)]));
+      const element = attributeElements.get(item);
+      element.setAttribute(item.attrName, targetText(segment));
       return;
     }
     replaceXmlChildren(doc, item.element, targetText(segment));
@@ -2013,13 +2251,17 @@ function buildGenericXml(segments, structure = null) {
 
 function collectResxItems(doc) {
   return Array.from(doc.getElementsByTagNameNS("*", "data"))
+    .filter((dataElement) => {
+      const type = dataElement.getAttribute("type") || "";
+      return !dataElement.hasAttribute("mimetype") && (!type || /^System\.String(?:\s*,|$)/i.test(type));
+    })
     .map((dataElement) => {
       const valueElement = childElementByLocalName(dataElement, "value");
       return valueElement ? {
         dataElement,
         valueElement,
         key: dataElement.getAttribute("name") || dataElement.getAttribute("id") || "data",
-        value: serializedXmlChildren(valueElement)
+        value: valueElement.textContent || ""
       } : null;
     })
     .filter((item) => item && hasMeaningfulText(item.value));
@@ -2046,8 +2288,10 @@ function buildResx(segments, structure = null) {
   const items = collectResxItems(doc);
   segments.forEach((segment) => {
     const itemIndex = segment.structure?.itemIndex;
-    if (!Number.isFinite(itemIndex) || !items[itemIndex]) return;
-    replaceXmlChildren(doc, items[itemIndex].valueElement, targetText(segment));
+    const key = segment.structure?.key;
+    const item = key ? items.find((candidate) => candidate.key === key) : items[itemIndex];
+    if (!item) throw new Error("RESX resource mapping is missing or refers to a non-string resource. Reimport this file before exporting.");
+    item.valueElement.textContent = targetText(segment);
   });
   return new XMLSerializer().serializeToString(doc);
 }
@@ -2057,9 +2301,10 @@ function collectTsMessages(doc) {
     .map((message, messageIndex) => {
       const sourceElement = childElementByLocalName(message, "source");
       if (!sourceElement) return null;
-      let targetElement = childElementByLocalName(message, "translation");
-      const source = serializedXmlChildren(sourceElement);
-      const target = targetElement ? serializedXmlChildren(targetElement) : "";
+      const targetElement = childElementByLocalName(message, "translation");
+      if (["obsolete", "vanished"].includes(targetElement?.getAttribute("type"))) return null;
+      const source = serializedXmlChildren(sourceElement, true);
+      const target = targetElement ? serializedXmlChildren(targetElement, true) : "";
       return hasMeaningfulText(source) ? { message, messageIndex, sourceElement, targetElement, source, target } : null;
     })
     .filter(Boolean);
@@ -2072,13 +2317,27 @@ function parseTsXmlText(text) {
   if (!messages.length) throw new Error("No translatable TS messages were found.");
   return {
     structure: { format: "ts-xml", source: text },
-    segments: messages.map((message, itemIndex) => ({
-      text: message.source,
-      target: message.target,
-      key: `ts-${message.messageIndex + 1}`,
-      tags: detectTags(message.source),
-      structure: { format: "ts-xml", messageIndex: message.messageIndex, itemIndex }
-    }))
+    segments: messages.flatMap((message, itemIndex) => {
+      const plurals = message.targetElement ? directChildElementsByName(message.targetElement, "numerusform") : [];
+      if (message.message.getAttribute("numerus") === "yes" && !plurals.length) {
+        throw new Error("Qt TS plural forms are missing. Initialize target-language plural forms in Qt Linguist before importing.");
+      }
+      const forms = plurals.length ? plurals.map((element, pluralIndex) => ({ element, pluralIndex })) : [{ element: message.targetElement }];
+      return forms.flatMap(({ element, pluralIndex }) => {
+        const variants = element ? directChildElementsByName(element, "lengthvariant") : [];
+        const values = variants.length ? variants.map((node, lengthVariantIndex) => ({ node, lengthVariantIndex })) : [{ node: element }];
+        return values.map(({ node, lengthVariantIndex }) => {
+          const formatFlags = ["qt-format", "qt-plural-format"];
+          return {
+            text: message.source,
+            target: node ? serializedXmlChildren(node, true) : "",
+            key: `ts-${message.messageIndex + 1}${pluralIndex === undefined ? "" : `-plural-${pluralIndex}`}${lengthVariantIndex === undefined ? "" : `-variant-${lengthVariantIndex}`}`,
+            tags: detectTags(message.source, { formatFlags }),
+            structure: { format: "ts-xml", messageIndex: message.messageIndex, itemIndex, pluralIndex, lengthVariantIndex, formatFlags }
+          };
+        });
+      });
+    })
   };
 }
 
@@ -2087,7 +2346,9 @@ function buildTsXml(segments, structure = null) {
   const doc = parseXmlDocument(structure.source, "TS XML");
   const messages = collectTsMessages(doc);
   segments.forEach((segment) => {
-    const message = messages.find((item) => item.messageIndex === segment.structure?.messageIndex) || messages[segment.structure?.itemIndex];
+    const message = Number.isInteger(segment.structure?.messageIndex)
+      ? messages.find((item) => item.messageIndex === segment.structure.messageIndex)
+      : messages[segment.structure?.itemIndex];
     if (!message) return;
     let targetElement = message.targetElement;
     if (!targetElement) {
@@ -2095,27 +2356,40 @@ function buildTsXml(segments, structure = null) {
       if (message.sourceElement.nextSibling) message.message.insertBefore(targetElement, message.sourceElement.nextSibling);
       else message.message.appendChild(targetElement);
     }
-    const target = targetText(segment);
-    if (target.trim()) targetElement.removeAttribute("type");
+    let valueElement = targetElement;
+    if (Number.isInteger(segment.structure?.pluralIndex)) valueElement = directChildElementsByName(valueElement, "numerusform")[segment.structure.pluralIndex];
+    if (Number.isInteger(segment.structure?.lengthVariantIndex)) valueElement = valueElement && directChildElementsByName(valueElement, "lengthvariant")[segment.structure.lengthVariantIndex];
+    if (!valueElement) throw new Error("Qt TS plural or length-variant reconstruction data is invalid.");
+    if (!valueElement.children.length && message.sourceElement.children.length) {
+      valueElement.replaceChildren(...Array.from(message.sourceElement.childNodes, (node) => node.cloneNode(true)));
+    }
+    replaceXmlChildren(doc, valueElement, targetText(segment));
+  });
+  messages.forEach((message) => {
+    const targetElement = childElementByLocalName(message.message, "translation");
+    if (!targetElement) return;
+    const messageSegments = segments.filter((segment) => segment.structure?.messageIndex === message.messageIndex);
+    if (messageSegments.length && messageSegments.every((segment) => targetText(segment).trim())) targetElement.removeAttribute("type");
     else targetElement.setAttribute("type", "unfinished");
-    replaceXmlChildren(doc, targetElement, target);
   });
   return new XMLSerializer().serializeToString(doc);
 }
 
 function collectBilingualXmlPairs(doc, documentFormat) {
-  const usedTargets = new Set();
+  const usedSources = new Set();
   const pairs = [];
-  const addPair = (sourceElement, targetElement, key) => {
-    if (!sourceElement || !targetElement || usedTargets.has(targetElement)) return;
+  const addPair = (sourceElement, targetElement, key, targetName = "target", targetLanguage = "") => {
+    if (!sourceElement || usedSources.has(sourceElement)) return;
     const source = serializedXmlChildren(sourceElement);
     if (!hasMeaningfulText(source)) return;
-    usedTargets.add(targetElement);
+    usedSources.add(sourceElement);
     pairs.push({
       sourceElement,
       targetElement,
       source,
-      target: serializedXmlChildren(targetElement),
+      target: targetElement ? serializedXmlChildren(targetElement) : "",
+      targetName,
+      targetLanguage,
       key: key || xmlElementKey(sourceElement.parentElement, `${documentFormat}-${pairs.length + 1}`)
     });
   };
@@ -2129,6 +2403,17 @@ function collectBilingualXmlPairs(doc, documentFormat) {
   });
 
   Array.from(doc.getElementsByTagNameNS("*", "Tu")).forEach((unit, index) => {
+    const variants = Array.from(unit.children || []).filter((element) => localNameLower(element) === "tuv");
+    if (variants.length) {
+      const settings = doc.querySelector("UserSettings");
+      const sourceLanguage = (settings?.getAttribute("SourceLanguage") || "").toLowerCase();
+      const targetLanguage = settings?.getAttribute("TargetLanguage") || "";
+      const sourceVariant = variants.find((variant) => (variant.getAttribute("Lang") || "").toLowerCase() === sourceLanguage) || variants[0];
+      const targetVariant = variants.find((variant) => targetLanguage && (variant.getAttribute("Lang") || "").toLowerCase() === targetLanguage.toLowerCase()) || variants.find((variant) => variant !== sourceVariant);
+      if (!targetVariant && !targetLanguage) throw new Error("TTX target-language metadata is missing.");
+      addPair(sourceVariant, targetVariant, unit.getAttribute("id") || `tu-${index + 1}`, "Tuv", targetLanguage);
+      return;
+    }
     const segs = descendantsByLocalName(unit, "seg");
     if (segs.length >= 2) addPair(segs[0], segs[1], unit.getAttribute("id") || `tu-${index + 1}`);
   });
@@ -2146,7 +2431,7 @@ function collectBilingualXmlPairs(doc, documentFormat) {
 function parseBilingualXmlText(text, documentFormat) {
   const doc = parseXmlDocument(text, `${documentFormat.toUpperCase()} XML`);
   const pairs = collectBilingualXmlPairs(doc, documentFormat);
-  if (!pairs.length) return parseGenericXmlText(text, documentFormat, `${documentFormat.toUpperCase()} XML`);
+  if (!pairs.length) throw new Error(`No translatable ${documentFormat.toUpperCase()} source units were found.`);
   return {
     structure: { format: "bilingual-xml", documentFormat, source: text },
     segments: pairs.map((pair, pairIndex) => ({
@@ -2166,7 +2451,16 @@ function buildBilingualXml(segments, structure = null) {
   segments.forEach((segment) => {
     const pairIndex = segment.structure?.pairIndex;
     if (!Number.isFinite(pairIndex) || !pairs[pairIndex]) return;
-    replaceXmlChildren(doc, pairs[pairIndex].targetElement, targetText(segment));
+    const pair = pairs[pairIndex];
+    if (!pair.targetElement) {
+      pair.targetElement = doc.createElementNS(pair.sourceElement.namespaceURI, pair.targetName);
+      if (pair.targetLanguage) pair.targetElement.setAttribute("Lang", pair.targetLanguage);
+      pair.sourceElement.parentNode.insertBefore(pair.targetElement, pair.sourceElement.nextSibling);
+    }
+    if (!pair.targetElement.children.length && pair.sourceElement.children.length) {
+      pair.targetElement.replaceChildren(...Array.from(pair.sourceElement.childNodes, (node) => node.cloneNode(true)));
+    }
+    replaceXmlChildren(doc, pair.targetElement, targetText(segment));
   });
   return new XMLSerializer().serializeToString(doc);
 }
@@ -2357,7 +2651,7 @@ function propertiesSeparatorIndex(line) {
       escaped = true;
       continue;
     }
-    if (char === "=" || char === ":") return index;
+    if (char === "=" || char === ":" || /[ \t\f]/.test(char)) return index;
   }
   return -1;
 }
@@ -2378,47 +2672,75 @@ function encodePropertiesValue(value) {
     .replace(/\\/g, "\\\\")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
+    .replace(/\t/g, "\\t")
+    .replace(/\f/g, "\\f")
+    .replace(/^ +/, (spaces) => spaces.replace(/ /g, "\\ "))
+    .replace(/[^\x20-\x7e]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
 }
 
 function parsePropertiesText(text) {
-  const lines = text.replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
+  const lines = text.replace(/^\uFEFF/, "").split(/\r\n|\r|\n/);
   const segments = [];
-  lines.forEach((line, lineIndex) => {
-    if (!line.trim() || /^\s*[#!]/.test(line)) return;
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    if (!lines[lineIndex].trim() || /^[ \t\f]*[#!]/.test(lines[lineIndex])) continue;
+    const firstLine = lineIndex;
+    let line = lines[lineIndex].replace(/^[ \t\f]+/, "");
+    while ((line.match(/\\+$/)?.[0].length || 0) % 2 === 1) {
+      line = line.slice(0, -1);
+      if (++lineIndex >= lines.length) break;
+      line += lines[lineIndex].replace(/^[ \t\f]+/, "");
+    }
     const separator = propertiesSeparatorIndex(line);
-    if (separator < 0) return;
-    const valueStart = separator + 1 + (line.slice(separator + 1).match(/^\s*/) || [""])[0].length;
+    if (separator < 0) continue;
+    let valueStart = separator;
+    while (/[ \t\f]/.test(line[valueStart] || "") && valueStart < line.length) valueStart += 1;
+    if (line[valueStart] === "=" || line[valueStart] === ":") valueStart += 1;
+    while (/[ \t\f]/.test(line[valueStart] || "") && valueStart < line.length) valueStart += 1;
     const rawValue = line.slice(valueStart);
     const value = decodePropertiesValue(rawValue);
-    if (!hasMeaningfulText(value)) return;
-    const key = line.slice(0, separator).trim();
+    if (!hasMeaningfulText(value)) continue;
+    const key = decodePropertiesValue(line.slice(0, separator));
     segments.push({
       text: value,
       key,
       structure: {
         format: "properties",
         key,
-        lineIndex,
-        prefix: line.slice(0, valueStart)
+        lineIndex: firstLine,
+        lineEnd: Math.min(lineIndex, lines.length - 1),
+        prefix: `${lines[firstLine].match(/^[ \t\f]*/)[0]}${line.slice(0, valueStart)}`
       }
     });
-  });
+  }
   if (!segments.length) throw new Error("No translatable properties were found.");
   return { structure: { format: "properties", sourceLines: lines }, segments };
 }
 
 function buildProperties(segments, structure = null) {
   const lines = [...(structure?.sourceLines || [])];
-  segments.forEach((segment) => {
+  [...segments].sort((a, b) => b.structure.lineIndex - a.structure.lineIndex).forEach((segment) => {
     const lineIndex = segment.structure?.lineIndex;
     if (!Number.isFinite(lineIndex)) return;
-    lines[lineIndex] = `${segment.structure?.prefix || ""}${encodePropertiesValue(targetText(segment))}`;
+    const lineEnd = Number.isInteger(segment.structure.lineEnd) ? segment.structure.lineEnd : lineIndex;
+    lines.splice(lineIndex, lineEnd - lineIndex + 1, `${segment.structure?.prefix || ""}${encodePropertiesValue(targetText(segment))}`);
   });
   return lines.join("\n");
 }
 
-function decodeCodeString(raw) {
+function decodeCodeString(raw, quote, documentFormat) {
+  if (documentFormat === "php" && quote === "'") return String(raw || "").replace(/\\(['\\])/g, "$1");
+  if (documentFormat === "php") {
+    return String(raw || "").replace(/\\u\{([0-9a-fA-F]+)\}|\\x([0-9a-fA-F]{1,2})|\\([0-7]{1,3})|\\([\s\S])/g, (match, unicode, hex, octal, escaped) => {
+      if (unicode) {
+        const codePoint = Number.parseInt(unicode, 16);
+        if (codePoint > 0x10ffff) throw new Error("Invalid PHP Unicode escape.");
+        return String.fromCodePoint(codePoint);
+      }
+      if (hex) return String.fromCharCode(Number.parseInt(hex, 16));
+      if (octal) return String.fromCharCode(Number.parseInt(octal, 8) % 256);
+      return ({ n: "\n", r: "\r", t: "\t", v: "\v", e: "\x1b", f: "\f", '"': '"', "\\": "\\", $: "$" })[escaped] ?? match;
+    });
+  }
   return String(raw || "").replace(/\\u\{([0-9a-fA-F]+)\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})|\\(.)/g, (match, codePoint, unicode, hex, escaped) => {
     if (codePoint) {
       const value = Number.parseInt(codePoint, 16);
@@ -2433,24 +2755,39 @@ function decodeCodeString(raw) {
   });
 }
 
-function encodeCodeString(value, quote = '"') {
+function encodeCodeString(value, quote = '"', documentFormat, interpolation = []) {
+  if (documentFormat === "php" && quote === "'") return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const escapedQuote = quote === "`" ? "`" : quote;
-  return String(value || "")
+  let output = String(value || "")
     .replace(/\\/g, "\\\\")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
     .replace(/\t/g, "\\t")
     .replaceAll(escapedQuote, `\\${escapedQuote}`);
+  if (documentFormat === "php") {
+    output = output.replace(/\$/g, "\\$");
+    for (const token of interpolation) {
+      const encoded = token.replace(/\$/g, "\\$");
+      output = output.replace(encoded, token);
+    }
+  }
+  return output;
 }
 
 function parseCodeStringText(text, documentFormat = "php") {
   const source = String(text || "");
-  const pattern = /(["'`])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
+  const pattern = /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|#[^\r\n]*|(["'`])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
   const segments = [];
   for (const match of source.matchAll(pattern)) {
+    if (!match[1]) continue;
     const quote = match[1];
     const raw = match[2] || "";
-    const value = decodeCodeString(raw);
+    const after = source.slice(match.index + match[0].length);
+    const before = source.slice(0, match.index);
+    // Resource identifiers and comments are scaffolding, never translations.
+    if (/^\s*(?:=>|:)/.test(after) || (/\[\s*$/.test(before) && /^\s*\]/.test(after))) continue;
+    if (documentFormat === "php" && quote === "`") continue;
+    const value = decodeCodeString(raw, quote, documentFormat);
     if (!hasMeaningfulText(value)) continue;
     const tokenIndex = segments.length;
     segments.push({
@@ -2462,7 +2799,10 @@ function parseCodeStringText(text, documentFormat = "php") {
         tokenIndex,
         start: match.index,
         end: match.index + match[0].length,
-        quote
+        quote,
+        interpolation: documentFormat === "php" && quote === '"'
+          ? Array.from(raw.matchAll(/\\[\s\S]|(\$[A-Za-z_\x80-\uffff][\w\x80-\uffff]*)/g), (item) => item[1]).filter(Boolean)
+          : []
       }
     });
   }
@@ -2477,7 +2817,11 @@ function buildCodeStringText(segments, structure = null) {
     .sort((a, b) => b.structure.start - a.structure.start)
     .forEach((segment) => {
       const quote = segment.structure?.quote || '"';
-      const replacement = `${quote}${encodeCodeString(targetText(segment), quote)}${quote}`;
+      const value = targetText(segment);
+      const encoded = structure?.documentFormat === "dtd"
+        ? value.replace(/&(?!(?:[A-Za-z_:][\w.:-]*|#\d+|#x[\da-fA-F]+);)/g, "&amp;").replace(/%/g, "&#37;").replace(/</g, "&lt;").replaceAll(quote, quote === '"' ? "&quot;" : "&apos;")
+        : encodeCodeString(value, quote, structure?.documentFormat, segment.structure?.interpolation || []);
+      const replacement = `${quote}${encoded}${quote}`;
       output = `${output.slice(0, segment.structure.start)}${replacement}${output.slice(segment.structure.end)}`;
     });
   return output;
@@ -2485,22 +2829,29 @@ function buildCodeStringText(segments, structure = null) {
 
 function parseQuotedText(text, documentFormat = "dtd") {
   const source = String(text || "");
-  const pattern = /(["'])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
+  const pattern = /<!--[\s\S]*?-->|<!ENTITY\s+([\w.:-]+)\s+(["'])([\s\S]*?)\2\s*>/g;
   const segments = [];
   for (const match of source.matchAll(pattern)) {
-    const value = decodeCodeString(match[2] || "");
+    if (!match[1]) continue;
+    const value = (match[3] || "").replace(/&(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);/g, (entity) => {
+      const named = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };
+      if (named[entity]) return named[entity];
+      const value = entity.startsWith("&#x") ? Number.parseInt(entity.slice(3, -1), 16) : Number.parseInt(entity.slice(2, -1), 10);
+      if (value > 0x10ffff) throw new Error("Invalid DTD character reference.");
+      return String.fromCodePoint(value);
+    });
     if (!hasMeaningfulText(value)) continue;
     const tokenIndex = segments.length;
     segments.push({
       text: value,
-      key: `${documentFormat}-${tokenIndex + 1}`,
+      key: match[1],
       structure: {
         format: "quoted-text",
         documentFormat,
         tokenIndex,
-        start: match.index,
-        end: match.index + match[0].length,
-        quote: match[1]
+        start: match.index + match[0].indexOf(match[2]),
+        end: match.index + match[0].indexOf(match[2]) + match[3].length + 2,
+        quote: match[2]
       }
     });
   }
@@ -2546,18 +2897,23 @@ function buildMifText(segments, structure = null) {
 }
 
 function subtitleTimingPattern(format) {
-  if (format === "sbv") return /^\d{1,2}:\d{2}:\d{2}\.\d{3}\s*,\s*\d{1,2}:\d{2}:\d{2}\.\d{3}$/;
-  return /^(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}\.\d{3}(?:\s+.*)?$/;
+  if (format === "sbv") return /^\d+:\d{2}:\d{2}\.\d{3}\s*,\s*\d+:\d{2}:\d{2}\.\d{3}$/;
+  return /^(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2,}:)?\d{2}:\d{2}\.\d{3}(?:\s+.*)?$/;
 }
 
 function parseSubtitleText(text, format) {
   const source = String(text || "").replace(/^\uFEFF/, "").replace(/\r/g, "");
-  const rawBlocks = source.split(/\n{2,}/).map((block) => block.split("\n"));
+  if (format === "vtt" && !/^WEBVTT(?:[ \t]|\n|$)/.test(source)) throw new Error("WebVTT files must begin with a WEBVTT header.");
+  const rawBlocks = source.split(/\n[ \t]*\n(?:[ \t]*\n)*/).map((block) => block.split("\n"));
   const timingPattern = subtitleTimingPattern(format);
   const segments = [];
   rawBlocks.forEach((lines, blockIndex) => {
+    if (format === "vtt" && /^(?:WEBVTT|NOTE|STYLE|REGION)(?:[ \t]|$)/.test(lines[0])) return;
     const timingIndex = lines.findIndex((line) => timingPattern.test(line.trim()));
-    if (timingIndex < 0) return;
+    if (timingIndex < 0) {
+      if (lines.some((line) => line.trim())) throw new Error(`${format.toUpperCase()} cue ${blockIndex + 1} has invalid timing data.`);
+      return;
+    }
     const textStart = timingIndex + 1;
     const cueText = lines.slice(textStart).map((line) => line.trimEnd()).filter((line) => line.trim()).join("\n");
     if (!hasMeaningfulText(cueText)) return;
@@ -2604,10 +2960,13 @@ function openXmlKindForEntries(entries) {
 function openXmlTextPaths(entries, kind) {
   const paths = Array.from(entries.keys());
   if (kind === "word") {
-    return paths.filter((path) => /^word\/(?:document|header\d+|footer\d+|footnotes|endnotes)\.xml$/i.test(path)).sort();
+    return paths.filter((path) => /^word\/(?:document|header\d+|footer\d+|footnotes|endnotes|comments)\.xml$/i.test(path)).sort();
   }
   if (kind === "spreadsheet") {
-    return paths.filter((path) => path === "xl/sharedStrings.xml" || /^xl\/worksheets\/sheet\d+\.xml$/i.test(path)).sort();
+    const workbook = entries.has("xl/_rels/workbook.xml.rels") ? excelWorkbook(entries) : null;
+    return workbook
+      ? [...(entries.has(workbook.sharedStringsPath) ? [workbook.sharedStringsPath] : []), ...workbook.sheets.map((sheet) => sheet.path)]
+      : paths.filter((path) => path === "xl/sharedStrings.xml" || /^xl\/worksheets\/[^/]+\.xml$/i.test(path)).sort();
   }
   if (kind === "presentation") {
     return paths.filter((path) => /^ppt\/(?:slides\/slide|notesSlides\/notesSlide)\d+\.xml$/i.test(path)).sort();
@@ -2623,24 +2982,120 @@ function xmlTextValue(container, name = "t") {
   return xmlTextNodesByLocalName(container, name).map((node) => node.textContent || "").join("");
 }
 
-function replaceXmlTextNodes(container, value, textName = "t") {
-  const nodes = xmlTextNodesByLocalName(container, textName);
-  if (!nodes.length) return false;
-  const text = String(value || "");
-  nodes[0].textContent = text;
-  if (/^\s|\s$/.test(text)) nodes[0].setAttribute("xml:space", "preserve");
-  nodes.slice(1).forEach((node) => {
-    node.textContent = "";
+const OPENXML_PROPERTIES = new Set(["ppr", "rpr", "endpararpr", "phoneticpr", "rph"]);
+
+function openXmlTextModel(container, kind) {
+  const spreadsheet = kind === "spreadsheet";
+  const leaves = localNameLower(container) === "v" ? [container] : xmlTextNodesByLocalName(container).filter((node) => {
+    for (let parent = node.parentElement; parent && parent !== container; parent = parent.parentElement) {
+      if (["rph", "fld", "fldsimple", "del"].includes(localNameLower(parent))) return false;
+      if (localNameLower(parent) === "p") return false;
+    }
+    return true;
   });
+  const leafSet = new Set(leaves);
+  const decode = (value) => spreadsheet ? decodeExcelText(value) : value;
+  const plain = leaves.map((node) => decode(node.textContent || "")).join("");
+  const records = new Map();
+  const hasLeaf = (node) => leaves.some((leaf) => node === leaf || node.contains(leaf));
+  const children = (node) => Array.from(node.children).filter((child) => !OPENXML_PROPERTIES.has(localNameLower(child)));
+  const collapsible = (node) => {
+    if (leafSet.has(node)) return true;
+    const flow = children(node);
+    return flow.length === 1 && hasLeaf(flow[0]) && collapsible(flow[0]);
+  };
+  const record = (node, parent) => {
+    const id = `o${records.size + 1}`;
+    const item = { id, node, parent, type: "opaque", children: [], leaf: null, group: 0 };
+    records.set(id, item);
+    if (hasLeaf(node)) {
+      item.type = collapsible(node) ? "text" : "branch";
+      if (item.type === "text") item.leaf = leaves.find((leaf) => node === leaf || node.contains(leaf));
+      else {
+        let group = 0;
+        item.children = children(node).map((child) => {
+          const childItem = record(child, id); childItem.group = group;
+          if (childItem.type === "opaque") group += 1;
+          return childItem;
+        });
+      }
+    }
+    return item;
+  };
+  const root = record(container, "");
+  const encode = (item) => item.type === "opaque" ? `<x id="${item.id}"/>` :
+    `<g id="${item.id}">${item.type === "text" ? escapeXml(decode(item.leaf.textContent || "")) : item.children.map(encode).join("")}</g>`;
+  // Identical unstyled spreadsheet runs have no distinct formatting to map.
+  const simpleSpreadsheetRuns = spreadsheet && leaves.length > 1 && children(container).every((child) =>
+    localNameLower(child) === "r" && !child.attributes.length && Array.from(child.children).every((part) => localNameLower(part) === "t"));
+  const rich = root.type === "branch" && !simpleSpreadsheetRuns;
+  const value = rich ? root.children.map(encode).join("") : plain;
+  return { container, kind, leaves, plain, rich, value, root, records };
+}
+
+function openXmlSetLeafText(node, value, kind) {
+  node.textContent = kind === "spreadsheet" ? encodeExcelText(value) : value;
+  if (localNameLower(node) !== "v") node.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+}
+
+function applyOpenXmlTextModel(model, value, allowRich = true) {
+  const text = String(value || "");
+  if (text === model.value || (!allowRich && text === model.plain)) return false;
+  if (!model.rich) {
+    if (!model.leaves.length) throw new Error("OpenXML text leaf mapping is missing.");
+    openXmlSetLeafText(model.leaves[0], text, model.kind);
+    model.leaves.slice(1).forEach((node) => openXmlSetLeafText(node, "", model.kind));
+  } else {
+    if (!allowRich && text) throw new Error("This saved Office segment predates formatting-preserving import. Reimport the original file before changing its rich text.");
+    if (!text) model.leaves.forEach((node) => openXmlSetLeafText(node, "", model.kind));
+    else {
+      const markup = `<root>${text.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/g, "&amp;")}</root>`;
+      const target = parseXmlDocument(markup, "Office formatting tags").documentElement;
+      const seen = new Set();
+      const rebuildChildren = (original, translated, destination) => {
+        let group = 0;
+        const nodes = [];
+        for (const child of translated.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE && !child.nodeValue) continue;
+          if (child.nodeType !== Node.ELEMENT_NODE || !["g", "x"].includes(child.localName) || child.attributes.length !== 1) throw new Error("Keep translated Office text inside its original formatting tags.");
+          const item = model.records.get(child.getAttribute("id"));
+          if (!item || item.parent !== original.id || seen.has(item.id) || item.group !== group || child.localName !== (item.type === "opaque" ? "x" : "g")) throw new Error("Office formatting tags are missing, duplicated, moved across a structural boundary or invalid.");
+          seen.add(item.id);
+          const node = item.node.cloneNode(true);
+          if (item.type === "opaque") {
+            if (child.childNodes.length) throw new Error("Office control tags cannot contain translated text.");
+            group += 1;
+          } else if (item.type === "text") {
+            if (child.children.length) throw new Error("Office text tags cannot contain additional markup.");
+            const leaf = localNameLower(node) === "t" || localNameLower(node) === "v" ? node : xmlTextNodesByLocalName(node)[0];
+            openXmlSetLeafText(leaf, child.textContent, model.kind);
+          } else rebuildChildren(item, child, node);
+          nodes.push(node);
+        }
+        if (nodes.length !== original.children.length) throw new Error("Keep every original Office formatting and control tag when translating.");
+        for (const child of Array.from(destination.childNodes)) {
+          if (child.nodeType !== Node.ELEMENT_NODE || !OPENXML_PROPERTIES.has(localNameLower(child))) child.remove();
+        }
+        const end = Array.from(destination.children).find((child) => localNameLower(child) === "endpararpr");
+        for (const node of nodes) destination.insertBefore(node, end || null);
+      };
+      rebuildChildren(model.root, target, model.container);
+    }
+  }
+  if (model.kind === "spreadsheet") excelChildren(model.container, "rPh").forEach((node) => node.remove());
   return true;
 }
 
 function collectOpenXmlItemsForPath(doc, path, kind) {
   let containers = [];
-  if (kind === "spreadsheet" && path === "xl/sharedStrings.xml") {
+  if (kind === "spreadsheet" && localNameLower(doc.documentElement) === "sst") {
     containers = Array.from(doc.getElementsByTagNameNS("*", "si")).filter((node) => localNameLower(node) === "si");
   } else if (kind === "spreadsheet") {
-    containers = Array.from(doc.getElementsByTagNameNS("*", "is")).filter((node) => localNameLower(node) === "is");
+    // Preserve existing inline-string indexes in saved projects. Static string
+    // value cells are newly supported and are appended after those mappings.
+    containers = Array.from(doc.getElementsByTagNameNS("*", "is"));
+    containers.push(...Array.from(doc.getElementsByTagNameNS("*", "c")).flatMap((cell) =>
+      cell.getAttribute("t") === "str" && !excelChildren(cell, "f").length ? excelChildren(cell, "v") : []));
   } else {
     containers = Array.from(doc.getElementsByTagNameNS("*", "p")).filter((node) => localNameLower(node) === "p");
   }
@@ -2648,10 +3103,320 @@ function collectOpenXmlItemsForPath(doc, path, kind) {
     .map((container, itemIndex) => ({
       container,
       itemIndex,
-      value: xmlTextValue(container),
+      value: kind === "spreadsheet"
+        ? (localNameLower(container) === "v" ? decodeExcelText(container.textContent || "") : excelStringValue(container))
+        : xmlTextValue(container),
       key: `${path}#${itemIndex + 1}`
     }))
     .filter((item) => hasMeaningfulText(item.value));
+}
+
+const EXCEL_TYPES = new Set(["xlsx", "xlsm", "xltx", "xltm"]);
+const EXCEL_NAMESPACE = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+function excelColumnNumber(value) {
+  const letters = String(value || "").trim().toUpperCase();
+  if (!/^[A-Z]{1,3}$/.test(letters)) return 0;
+  const number = [...letters].reduce((result, letter) => result * 26 + letter.charCodeAt(0) - 64, 0);
+  return number <= 16384 ? number : 0;
+}
+
+function excelColumnLetter(number) {
+  let result = "";
+  while (number > 0) {
+    number -= 1;
+    result = String.fromCharCode(65 + number % 26) + result;
+    number = Math.floor(number / 26);
+  }
+  return result;
+}
+
+function excelCellAddress(value) {
+  const match = /^([A-Z]{1,3})([1-9]\d{0,6})$/.exec(String(value || "").toUpperCase());
+  if (!match || !excelColumnNumber(match[1]) || Number(match[2]) > 1048576) return null;
+  return { reference: match[0], column: match[1], columnNumber: excelColumnNumber(match[1]), rowNumber: Number(match[2]) };
+}
+
+function excelChildren(element, name) {
+  return Array.from(element?.children || []).filter((child) => localNameLower(child) === name.toLowerCase());
+}
+
+function decodeExcelText(value) {
+  return String(value || "").replace(/_x([0-9a-f]{4})_/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+function encodeExcelText(value) {
+  return String(value).replace(/_x[0-9a-f]{4}_/gi, (code) => `_x005F_${code.slice(1)}`)
+    .replace(/[\x00-\x08\x0b-\x0d\x0e-\x1f]/g, (character) => `_x${character.charCodeAt(0).toString(16).padStart(4, "0").toUpperCase()}_`);
+}
+
+function excelStringValue(element) {
+  // Phonetic annotations also contain <t> elements, but are not the cell's text.
+  return decodeExcelText(excelChildren(element, "t").map((node) => node.textContent || "").join("") ||
+    excelChildren(element, "r").map((run) => excelChildren(run, "t").map((node) => node.textContent || "").join("")).join(""));
+}
+
+function excelCellValue(cell, sharedStrings) {
+  if (!cell) return { text: "", translatable: true };
+  const type = cell.getAttribute("t") || "";
+  const raw = excelChildren(cell, "v")[0]?.textContent || "";
+  if (excelChildren(cell, "f").length) return { text: `=${excelChildren(cell, "f")[0].textContent || ""}`, translatable: false };
+  if (type === "s") {
+    if (!/^\d+$/.test(raw.trim()) || Number(raw) >= sharedStrings.length) throw new Error("Excel cell has an invalid shared-string reference.");
+    return { text: sharedStrings[Number(raw)], translatable: true };
+  }
+  if (type === "inlineStr") return { text: excelStringValue(excelChildren(cell, "is")[0]), translatable: true };
+  if (type === "str") return { text: decodeExcelText(raw), translatable: true };
+  return { text: raw, translatable: !raw };
+}
+
+function excelRelationshipPath(target) {
+  const parts = String(target || "").startsWith("/") ? [] : ["xl"];
+  for (const part of String(target || "").split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (!parts.length) throw new Error("Excel worksheet relationship escapes the package.");
+      parts.pop();
+    } else parts.push(part);
+  }
+  return safeArchiveEntryName(parts.join("/"));
+}
+
+function excelWorkbook(entries) {
+  if (!entries.has("xl/workbook.xml") || !entries.has("xl/_rels/workbook.xml.rels")) {
+    throw new Error("Excel workbook or worksheet relationships are missing.");
+  }
+  const workbook = parseXmlDocument(readPackageText(entries, "xl/workbook.xml"), "Excel workbook");
+  const relationships = parseXmlDocument(readPackageText(entries, "xl/_rels/workbook.xml.rels"), "Excel workbook relationships");
+  const relations = Array.from(relationships.getElementsByTagNameNS("*", "Relationship"));
+  const byId = new Map(relations
+    .filter((relation) => relation.getAttribute("TargetMode") !== "External" && /\/worksheet$/.test(relation.getAttribute("Type") || ""))
+    .map((relation) => [relation.getAttribute("Id"), excelRelationshipPath(relation.getAttribute("Target"))]));
+  const sharedStringsRelation = relations.find((relation) => relation.getAttribute("TargetMode") !== "External" && /\/sharedStrings$/.test(relation.getAttribute("Type") || ""));
+  const sharedStringsPath = sharedStringsRelation ? excelRelationshipPath(sharedStringsRelation.getAttribute("Target")) : "xl/sharedStrings.xml";
+  const sharedStringNodes = entries.has(sharedStringsPath)
+    ? Array.from(parseXmlDocument(readPackageText(entries, sharedStringsPath), "Excel shared strings")
+      .getElementsByTagNameNS("*", "si"))
+    : [];
+  const sharedStrings = sharedStringNodes.map(excelStringValue);
+  const sheets = Array.from(workbook.getElementsByTagNameNS("*", "sheet")).flatMap((sheet) => {
+    const relationshipId = Array.from(sheet.attributes).find((attribute) => attribute.localName === "id")?.value;
+    const path = byId.get(relationshipId);
+    if (!path) return [];
+    if (!entries.has(path)) throw new Error(`Excel worksheet ${sheet.getAttribute("name")} is missing.`);
+    return [{ name: sheet.getAttribute("name") || path, path, hidden: sheet.getAttribute("state") === "hidden" || sheet.getAttribute("state") === "veryHidden" }];
+  });
+  if (!sheets.length) throw new Error("No Excel worksheets were found.");
+  return { sheets, sharedStrings, sharedStringsPath, sharedStringNodes };
+}
+
+function excelCellStringNode(cell, workbook) {
+  if (!cell) return null;
+  if (cell.getAttribute("t") === "s") return workbook.sharedStringNodes[Number(excelChildren(cell, "v")[0]?.textContent)];
+  return excelChildren(cell, "is")[0] || null;
+}
+
+function excelInlineFromTemplate(xml, template) {
+  const inline = xml.createElementNS(xml.documentElement.namespaceURI || EXCEL_NAMESPACE, "is");
+  if (template) {
+    for (const attr of template.attributes) if (!attr.name.startsWith("xmlns")) inline.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+    for (const child of template.childNodes) inline.append(xml.importNode(child, true));
+  } else inline.append(xml.createElementNS(xml.documentElement.namespaceURI || EXCEL_NAMESPACE, "t"));
+  return inline;
+}
+
+function excelSheetRows(xml) {
+  const data = xml.getElementsByTagNameNS("*", "sheetData")[0];
+  if (!data) throw new Error("Excel worksheet data is missing.");
+  let previousRow = 0;
+  return excelChildren(data, "row").map((row) => {
+    const rowNumber = Number(row.getAttribute("r") || previousRow + 1);
+    if (!Number.isInteger(rowNumber) || rowNumber <= previousRow || rowNumber > 1048576) throw new Error("Excel worksheet row references are invalid.");
+    previousRow = rowNumber;
+    const cells = new Map();
+    let previousColumn = 0;
+    for (const cell of excelChildren(row, "c")) {
+      const address = excelCellAddress(cell.getAttribute("r") || `${excelColumnLetter(previousColumn + 1)}${rowNumber}`);
+      if (!address || address.rowNumber !== rowNumber || cells.has(address.column)) throw new Error("Excel worksheet cell references are invalid.");
+      previousColumn = address.columnNumber;
+      cells.set(address.column, cell);
+    }
+    return { row, rowNumber, cells };
+  });
+}
+
+function excelMergedRanges(xml) {
+  return Array.from(xml.getElementsByTagNameNS("*", "mergeCell")).map((element) => {
+    const [start, end] = (element.getAttribute("ref") || "").split(":").map(excelCellAddress);
+    if (!start || !end) throw new Error("Excel merged-cell range is invalid.");
+    return { start, end };
+  });
+}
+
+function excelCellIsMerged(ranges, column, rowNumber) {
+  return ranges.some(({ start, end }) => rowNumber >= start.rowNumber && rowNumber <= end.rowNumber &&
+    column >= start.columnNumber && column <= end.columnNumber);
+}
+
+async function inspectMultilingualExcel(file) {
+  if (!EXCEL_TYPES.has(file.name.split(".").pop().toLowerCase())) throw new Error("Choose an Excel .xlsx, .xlsm, .xltx or .xltm workbook.");
+  const entries = await unzipPackageEntries(new Uint8Array(await file.arrayBuffer()));
+  const workbook = excelWorkbook(entries);
+  return { sheets: workbook.sheets.map((sheet) => {
+    const xml = parseXmlDocument(readPackageText(entries, sheet.path), `Excel worksheet ${sheet.name}`);
+    const rows = excelSheetRows(xml);
+    let lastColumn = 26;
+    rows.forEach(({ cells }) => cells.forEach((_, letter) => { lastColumn = Math.max(lastColumn, excelColumnNumber(letter)); }));
+    const previewRows = rows.slice(0, 8).map(({ rowNumber, cells }) => ({
+      rowNumber,
+      cells: Object.fromEntries(Array.from(cells, ([letter, cell]) => [letter, excelCellValue(cell, workbook.sharedStrings).text]))
+    }));
+    return { ...sheet, columns: Array.from({ length: lastColumn }, (_, index) => {
+      const letter = excelColumnLetter(index + 1);
+      return { letter, label: previewRows.find((row) => row.rowNumber === 1)?.cells[letter] || "" };
+    }), previewRows };
+  }) };
+}
+
+function normalizeExcelMapping(mapping, workbook) {
+  const sourceColumn = String(mapping?.sourceColumn || "").trim().toUpperCase();
+  const targetColumn = String(mapping?.targetColumn || "").trim().toUpperCase();
+  if (!excelColumnNumber(sourceColumn) || !excelColumnNumber(targetColumn)) throw new Error("Choose source and target columns between A and XFD.");
+  if (sourceColumn === targetColumn) throw new Error("Source and target must use different columns.");
+  const sheet = workbook.sheets.find((item) => item.path === mapping.sheetPath);
+  if (!sheet) throw new Error("Choose a worksheet from this Excel workbook.");
+  return {
+    sheetPath: sheet.path,
+    sheetName: sheet.name,
+    sourceColumn,
+    targetColumn,
+    firstRowIsHeader: mapping.firstRowIsHeader !== false,
+    importExistingTargets: mapping.importExistingTargets !== false
+  };
+}
+
+async function parseMultilingualExcelFile(file, mapping) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const entries = await unzipPackageEntries(bytes);
+  const workbook = excelWorkbook(entries);
+  const settings = normalizeExcelMapping(mapping, workbook);
+  const xml = parseXmlDocument(readPackageText(entries, settings.sheetPath), `Excel worksheet ${settings.sheetName}`);
+  const rows = excelSheetRows(xml);
+  const mergedRanges = excelMergedRanges(xml);
+  const skippedRows = { emptySource: 0, nonTextSource: 0, nonTextTarget: 0, mergedCells: 0 };
+  const segments = [];
+  for (const { rowNumber, cells } of rows) {
+    if (settings.firstRowIsHeader && rowNumber === 1) continue;
+    if ([settings.sourceColumn, settings.targetColumn].some((letter) => excelCellIsMerged(mergedRanges, excelColumnNumber(letter), rowNumber))) {
+      skippedRows.mergedCells += 1;
+      continue;
+    }
+    const source = excelCellValue(cells.get(settings.sourceColumn), workbook.sharedStrings);
+    const target = excelCellValue(cells.get(settings.targetColumn), workbook.sharedStrings);
+    if (!source.translatable) { skippedRows.nonTextSource += 1; continue; }
+    if (!source.text.trim()) { skippedRows.emptySource += 1; continue; }
+    if (!target.translatable) { skippedRows.nonTextTarget += 1; continue; }
+    const sourceCell = `${settings.sourceColumn}${rowNumber}`;
+    const targetCell = `${settings.targetColumn}${rowNumber}`;
+    const key = `${settings.sheetPath}#${sourceCell}`;
+    const targetTemplate = excelCellStringNode(cells.get(settings.targetColumn), workbook);
+    const sourceTemplate = excelCellStringNode(cells.get(settings.sourceColumn), workbook);
+    const template = targetTemplate || sourceTemplate;
+    const model = template ? openXmlTextModel(template, "spreadsheet") : null;
+    const richSource = !targetTemplate && model?.rich;
+    const text = richSource ? model.value : source.text;
+    const existingTarget = settings.importExistingTargets ? (targetTemplate && model?.rich ? model.value : target.text) : "";
+    const tags = detectTags(text);
+    if (targetTemplate && model?.rich) tags.push(...detectTags(model.value).filter((tag) => tag.type === "tag"));
+    segments.push({
+      text,
+      target: existingTarget,
+      status: existingTarget.trim() ? "draft" : "empty",
+      key,
+      tags,
+      structure: { format: "openxml", kind: "spreadsheet", path: settings.sheetPath, itemIndex: rowNumber - 1, sourceCell, targetCell, key,
+        richTextVersion: 1, richTextTemplate: targetTemplate ? "target" : "source" }
+    });
+  }
+  if (!segments.length) throw new Error("No text rows were found in the selected Excel columns. Check the worksheet, header and column choices. Blank sources, numbers, formulas and merged cells are skipped.");
+  const extension = file.name.split(".").pop().toLowerCase();
+  return {
+    fileName: file.name,
+    documentName: stripExt(file.name),
+    documentType: extension,
+    segments,
+    structure: { format: "openxml", kind: "spreadsheet", extension, packageBase64: bytesToBase64(bytes),
+      textPaths: [settings.sheetPath], multilingualExcel: { ...settings, skippedRows } }
+  };
+}
+
+async function buildMultilingualExcelFile(segments, structure) {
+  if (!structure?.packageBase64) throw new Error("Excel reconstruction package data is missing.");
+  const entries = await unzipPackageEntries(base64ToBytes(structure.packageBase64));
+  const workbook = excelWorkbook(entries);
+  const settings = normalizeExcelMapping(structure.multilingualExcel, workbook);
+  const xml = parseXmlDocument(readPackageText(entries, settings.sheetPath), `Excel worksheet ${settings.sheetName}`);
+  const rows = excelSheetRows(xml);
+  const byRow = new Map(rows.map((row) => [row.rowNumber, row]));
+  const mergedRanges = excelMergedRanges(xml);
+  const visited = new Set();
+  let changed = false;
+  for (const segment of segments) {
+    const sourceAddress = excelCellAddress(segment.structure?.sourceCell);
+    const targetAddress = excelCellAddress(segment.structure?.targetCell);
+    if (segment.structure?.path !== settings.sheetPath || !sourceAddress || !targetAddress ||
+        sourceAddress.column !== settings.sourceColumn || targetAddress.column !== settings.targetColumn ||
+        sourceAddress.rowNumber !== targetAddress.rowNumber || visited.has(targetAddress.reference)) {
+      throw new Error("Excel source or target cell mapping is missing, duplicated or inconsistent.");
+    }
+    visited.add(targetAddress.reference);
+    const record = byRow.get(targetAddress.rowNumber);
+    if (!record || (settings.firstRowIsHeader && record.rowNumber === 1)) throw new Error("Excel mapped row is missing or refers to the header.");
+    if ([sourceAddress, targetAddress].some((address) => excelCellIsMerged(mergedRanges, address.columnNumber, address.rowNumber))) throw new Error("Excel mapped cells cannot be merged.");
+    const sourceValue = excelCellValue(record.cells.get(settings.sourceColumn), workbook.sharedStrings);
+    let targetCell = record.cells.get(settings.targetColumn);
+    const targetValue = excelCellValue(targetCell, workbook.sharedStrings);
+    if (!sourceValue.translatable || !sourceValue.text.trim() || !targetValue.translatable) throw new Error("Excel mapped row contains a blank source, number or formula.");
+    const translated = targetText(segment);
+    const template = segment.structure.richTextTemplate === "source"
+      ? excelCellStringNode(record.cells.get(settings.sourceColumn), workbook)
+      : excelCellStringNode(targetCell, workbook);
+    const inline = excelInlineFromTemplate(xml, template);
+    const model = openXmlTextModel(inline, "spreadsheet");
+    if (targetValue.text === translated || (segment.structure.richTextTemplate === "target" && translated === model.value)) continue;
+    applyOpenXmlTextModel(model, translated, segment.structure.richTextVersion === 1);
+    if (excelStringValue(inline).length > 32767) throw new Error(`Excel target cell ${targetAddress.reference} exceeds the 32,767-character cell limit.`);
+    if (!targetCell) {
+      targetCell = xml.createElementNS(xml.documentElement.namespaceURI || EXCEL_NAMESPACE, "c");
+      targetCell.setAttribute("r", targetAddress.reference);
+      const nextCell = Array.from(record.cells).find(([letter]) => excelColumnNumber(letter) > targetAddress.columnNumber)?.[1];
+      for (const [letter, cell] of record.cells) if (!cell.hasAttribute("r")) cell.setAttribute("r", `${letter}${record.rowNumber}`);
+      record.row.insertBefore(targetCell, nextCell || excelChildren(record.row, "extLst")[0] || null);
+      record.cells.set(settings.targetColumn, targetCell);
+      // Row spans are optional optimization hints and must not exclude a newly added target column.
+      record.row.removeAttribute("spans");
+    }
+    targetCell.setAttribute("t", "inlineStr");
+    for (const child of [...excelChildren(targetCell, "v"), ...excelChildren(targetCell, "is")]) child.remove();
+    targetCell.insertBefore(inline, excelChildren(targetCell, "extLst")[0] || null);
+    changed = true;
+  }
+  if (!changed) return base64ToBytes(structure.packageBase64);
+  const dimension = xml.getElementsByTagNameNS("*", "dimension")[0];
+  if (dimension) {
+    let minColumn = 16384, maxColumn = 1, minRow = 1048576, maxRow = 1;
+    for (const { rowNumber, cells } of rows) for (const letter of cells.keys()) {
+      minColumn = Math.min(minColumn, excelColumnNumber(letter)); maxColumn = Math.max(maxColumn, excelColumnNumber(letter));
+      minRow = Math.min(minRow, rowNumber); maxRow = Math.max(maxRow, rowNumber);
+    }
+    for (const reference of (dimension.getAttribute("ref") || "").split(":")) {
+      const address = excelCellAddress(reference);
+      if (address) { minColumn = Math.min(minColumn, address.columnNumber); maxColumn = Math.max(maxColumn, address.columnNumber); minRow = Math.min(minRow, address.rowNumber); maxRow = Math.max(maxRow, address.rowNumber); }
+    }
+    dimension.setAttribute("ref", `${excelColumnLetter(minColumn)}${minRow}:${excelColumnLetter(maxColumn)}${maxRow}`);
+  }
+  entries.set(settings.sheetPath, { name: settings.sheetPath, data: localizationTextEncoder.encode(new XMLSerializer().serializeToString(xml)) });
+  return zipPackageEntries(entries);
 }
 
 async function parseOpenXmlPackageFile(file) {
@@ -2659,22 +3424,28 @@ async function parseOpenXmlPackageFile(file) {
   const entries = await unzipPackageEntries(bytes);
   const kind = openXmlKindForEntries(entries);
   if (!kind) throw new Error("OpenXML package type was not recognized.");
+  const extension = file.name.split(".").pop().toLowerCase();
+  const expectedKind = EXCEL_TYPES.has(extension) ? "spreadsheet" : ["docm", "dotx", "dotm"].includes(extension) ? "word" : "presentation";
+  if (kind !== expectedKind) throw new Error("OpenXML package contents do not match the file extension.");
   const textPaths = openXmlTextPaths(entries, kind);
   const segments = [];
   textPaths.forEach((path) => {
     const xml = parseXmlDocument(readPackageText(entries, path), `OpenXML part ${path}`);
     collectOpenXmlItemsForPath(xml, path, kind).forEach((item) => {
       const itemIndex = item.itemIndex;
+      const model = openXmlTextModel(item.container, kind);
+      if (!hasMeaningfulText(model.plain)) return;
       segments.push({
-        text: item.value,
+        text: model.value,
         key: item.key,
-        tags: detectTags(item.value),
+        tags: detectTags(model.value),
         structure: {
           format: "openxml",
           kind,
           path,
           itemIndex,
-          key: item.key
+          key: item.key,
+          richTextVersion: 1
         }
       });
     });
@@ -2700,10 +3471,12 @@ async function buildOpenXmlPackageFile(segments, structure = null) {
   if (!structure?.packageBase64) throw new Error("OpenXML reconstruction package data is missing.");
   const entries = await unzipPackageEntries(base64ToBytes(structure.packageBase64));
   const kind = structure.kind || openXmlKindForEntries(entries);
+  const validPaths = new Set(openXmlTextPaths(entries, kind));
   const byPath = new Map();
+  let changed = false;
   segments.forEach((segment) => {
     const path = segment.structure?.path;
-    if (!path) return;
+    if (!validPaths.has(path)) throw new Error("OpenXML text part mapping is missing or invalid.");
     if (!byPath.has(path)) byPath.set(path, []);
     byPath.get(path).push(segment);
   });
@@ -2711,15 +3484,31 @@ async function buildOpenXmlPackageFile(segments, structure = null) {
     if (!entries.has(path)) continue;
     const xml = parseXmlDocument(readPackageText(entries, path), `OpenXML part ${path}`);
     const items = collectOpenXmlItemsForPath(xml, path, kind);
-    pathSegments.forEach((segment) => {
+    const visited = new Set();
+    let partChanged = false;
+    const depth = (segment) => {
+      let node = items.find((item) => item.itemIndex === segment.structure?.itemIndex)?.container, level = 0;
+      while (node?.parentElement) { level += 1; node = node.parentElement; }
+      return level;
+    };
+    // A containing paragraph can clone an opaque drawing/textbox. Translate
+    // nested paragraphs first so their current content travels with that clone.
+    [...pathSegments].sort((left, right) => depth(right) - depth(left)).forEach((segment) => {
       const itemIndex = segment.structure?.itemIndex;
       const item = items.find((candidate) => candidate.itemIndex === itemIndex);
-      if (!Number.isFinite(itemIndex) || !item) return;
-      replaceXmlTextNodes(item.container, targetText(segment));
+      if (!Number.isInteger(itemIndex) || !item || visited.has(itemIndex)) throw new Error("OpenXML text mapping is missing, invalid or duplicated.");
+      visited.add(itemIndex);
+      const translated = targetText(segment);
+      if (segment.structure.richTextVersion !== 1 && translated === item.value) return;
+      const model = openXmlTextModel(item.container, kind);
+      const changedItem = applyOpenXmlTextModel(model, translated, segment.structure.richTextVersion === 1);
+      if (kind === "spreadsheet" && openXmlTextModel(item.container, kind).plain.length > 32767) throw new Error("Excel text exceeds the 32,767-character cell limit.");
+      partChanged ||= changedItem;
     });
-    entries.set(path, { name: path, data: localizationTextEncoder.encode(new XMLSerializer().serializeToString(xml)) });
+    if (partChanged) entries.set(path, { name: path, data: localizationTextEncoder.encode(new XMLSerializer().serializeToString(xml)) });
+    changed ||= partChanged;
   }
-  return zipPackageEntries(entries);
+  return changed ? zipPackageEntries(entries) : base64ToBytes(structure.packageBase64);
 }
 
 function openDocumentTextPaths(entries) {
@@ -2804,26 +3593,22 @@ async function buildOpenDocumentPackageFile(segments, structure = null) {
 function parseIcmlText(text, fileName = "file.icml") {
   const doc = parseXmlDocument(text, "ICML XML");
   const contents = idmlContentElements(doc);
-  const segments = contents.map((element, contentIndex) => {
-    const value = serializedXmlChildren(element);
-    if (!hasMeaningfulText(value)) return null;
-    return {
+  const segments = contents.flatMap((element, contentIndex) => idmlTextPieces(element).flatMap(({ value, textNodeIndex }) => {
+    if (!value.trim()) return [];
+    return [{
       text: value,
-      key: `icml-content-${contentIndex + 1}`,
-      tags: detectTags(value),
-      structure: {
-        format: "icml",
-        contentIndex
-      }
-    };
-  }).filter(Boolean);
+      key: `icml-content-${contentIndex + 1}${textNodeIndex === undefined ? "" : `-text-${textNodeIndex}`}`,
+      tags: detectTags(value).filter((tag) => tag.type !== "tag"),
+      structure: { format: "icml", contentIndex, idmlVersion: 2, ...(textNodeIndex === undefined ? {} : { textNodeIndex }) }
+    }];
+  }));
   if (!segments.length) throw new Error("No translatable ICML content was found.");
   return {
     fileName,
     documentName: stripExt(fileName),
     documentType: "icml",
     segments,
-    structure: { format: "icml", source: text }
+    structure: { format: "icml", source: text, idmlVersion: 2 }
   };
 }
 
@@ -2831,17 +3616,24 @@ function buildIcmlText(segments, structure = null) {
   if (!structure?.source) throw new Error("ICML reconstruction source data is missing.");
   const doc = parseXmlDocument(structure.source, "ICML XML");
   const contents = idmlContentElements(doc);
+  const occupied = new Set();
+  let changed = false;
   segments.forEach((segment) => {
     const contentIndex = segment.structure?.contentIndex;
-    if (!Number.isFinite(contentIndex) || !contents[contentIndex]) return;
-    replaceXmlChildren(doc, contents[contentIndex], targetText(segment));
+    const nodeIndex = segment.structure?.textNodeIndex;
+    if (!Number.isInteger(contentIndex) || contentIndex < 0 || !contents[contentIndex]) throw new Error("ICML Content mapping is invalid. Reimport the original file.");
+    const key = `${contentIndex}:${nodeIndex === undefined ? "all" : nodeIndex}`;
+    if (occupied.has(key) || occupied.has(`${contentIndex}:all`) || (nodeIndex === undefined && [...occupied].some((value) => value.startsWith(`${contentIndex}:`)))) throw new Error("ICML contains duplicate or overlapping Content mappings.");
+    occupied.add(key);
+    changed = setIdmlLiteralText(contents[contentIndex], targetText(segment), nodeIndex) || changed;
   });
-  return new XMLSerializer().serializeToString(doc);
+  return changed ? new XMLSerializer().serializeToString(doc) : structure.source;
 }
 
 async function parseLocalizationFile(file, options = {}) {
   const ext = file.name.split(".").pop().toLowerCase();
   if (ext === "idml") return parseIdmlFile(file);
+  if (EXCEL_TYPES.has(ext) && options.multilingualExcel) return parseMultilingualExcelFile(file, options.multilingualExcel);
   if (OPENXML_TYPES.has(ext)) return parseOpenXmlPackageFile(file);
   if (OPENDOCUMENT_TYPES.has(ext)) return parseOpenDocumentPackageFile(file);
   const decoded = await decodeLocalizationTextFile(file, options);
@@ -2939,11 +3731,11 @@ async function parseLocalizationFile(file, options = {}) {
     structure = codeStrings.structure;
   }
   else if (ext === "ts") {
-    try {
+    if (/^\s*(?:<\?xml\b|<!DOCTYPE\s+TS\b|<TS\b)/i.test(text)) {
       const tsXml = parseTsXmlText(text);
       segments = tsXml.segments;
       structure = tsXml.structure;
-    } catch {
+    } else {
       const codeStrings = parseCodeStringText(text, ext);
       segments = codeStrings.segments;
       structure = codeStrings.structure;
@@ -3008,11 +3800,12 @@ function buildLocalizationFile(format, segments, structure = null) {
   else if (normalizedFormat === "mif") output = buildMifText(segmentList, structure);
   else if (normalizedFormat === "icml") output = buildIcmlText(segmentList, structure);
   else if (normalizedFormat === "idml") output = buildIdmlFile(segmentList, structure);
+  else if (EXCEL_TYPES.has(normalizedFormat) && structure?.multilingualExcel) output = buildMultilingualExcelFile(segmentList, structure);
   else if (OPENXML_TYPES.has(normalizedFormat)) output = buildOpenXmlPackageFile(segmentList, structure);
   else if (OPENDOCUMENT_TYPES.has(normalizedFormat)) output = buildOpenDocumentPackageFile(segmentList, structure);
   else throw new Error(`Unsupported export format: ${normalizedFormat}`);
   return encodeLocalizationTextOutput(output, normalizedFormat, structure);
 }
 
-window.CatHan.localization = { parseLocalizationFile, buildLocalizationFile };
+window.CatHan.localization = { parseLocalizationFile, buildLocalizationFile, inspectMultilingualExcel };
 })();

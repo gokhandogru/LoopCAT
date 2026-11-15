@@ -18,6 +18,7 @@ function resourceType(value) {
  *   keyForItem: (item: any, type: "tm" | "tb") => string,
  *   loadPage?: (type: "tm" | "tb", key: string, page: { after: string | null, limit: number }) => Promise<{ rows: any[], next: string | null }>,
  *   navigate?: () => Promise<unknown> | unknown,
+ *   openEditor?: (descriptor: {type: "tm" | "tb", resourceId: string}) => Promise<unknown> | unknown,
  *   normalizeLanguageInput?: (input: any) => unknown,
  *   runImportTask?: (label: string, task: () => Promise<unknown>) => Promise<unknown>,
  *   importTm?: (file: File) => Promise<unknown>,
@@ -59,6 +60,7 @@ export function createResourcesController(options) {
 
   const scheduleFrame = typeof options?.scheduleFrame === "function" ? options.scheduleFrame : (callback) => callback();
   const reportError = typeof options?.onError === "function" ? options.onError : () => {};
+  const editorLauncher = options.openEditor;
   const listeners = [];
   let mounted = false;
   let type = /** @type {"tm" | "tb"} */ ("tm");
@@ -192,6 +194,12 @@ export function createResourcesController(options) {
   }
 
   function openResource(nextType, key, options = {}) {
+    if (typeof editorLauncher === "function") {
+      void Promise.resolve(editorLauncher({ type: resourceType(nextType), resourceId: String(key) })).catch((error) =>
+        reportError(error, { phase: "open-editor", type: resourceType(nextType) })
+      );
+      return snapshot();
+    }
     pageRevision++;
     pageCursors = [null];
     type = resourceType(nextType);

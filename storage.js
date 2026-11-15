@@ -1,8 +1,8 @@
 (() => {
   const DB_NAME = "cathan-local-cat";
-  const DB_VERSION = 9;
-  const PROJECT_PACKAGE_SCHEMA_VERSION = 7;
-  const BACKUP_SCHEMA_VERSION = 8;
+  const DB_VERSION = 10;
+  const PROJECT_PACKAGE_SCHEMA_VERSION = 8;
+  const BACKUP_SCHEMA_VERSION = 9;
   const LOCAL_WORKSPACE_ID = "local-workspace";
   const LOCAL_USER_ID = "local-user";
   const APP_NAME = "LoopCAT";
@@ -203,6 +203,67 @@
     "trashEntries", "documentVersions", "versionSegments", "fileLifecycleReceipts"
   ];
   const writerId = makeId("writer");
+  let resourceChannel = null;
+  try {
+    if (typeof window.BroadcastChannel === "function") {
+      resourceChannel = new window.BroadcastChannel("loopcat-resource-commits-v1");
+      resourceChannel.onmessage = ({ data }) => {
+        if (data?.sender === writerId || !Number.isSafeInteger(data?.generation) || !Array.isArray(data?.resourceIds)) return;
+        window.dispatchEvent?.(new CustomEvent("loopcat-resources-changed", { detail: { ...data, external: true } }));
+      };
+    }
+  } catch { /* Focus-time generation checks remain available without BroadcastChannel. */ }
+  async function getCommittedGeneration() {
+    return Number((await get("appMeta", "committed-generation"))?.value || 0);
+  }
+  async function projectResourceGeneration(project, meta) {
+    const ids = [...new Set((project?.resourceLinks || []).map((link) => link.resourceId).filter(Boolean))];
+    const generations = await Promise.all(ids.map((id) => requestToPromise(meta.get(`resource-generation:${id}`))));
+    return Math.max(0, ...generations.map((record) => Number(record?.value) || 0));
+  }
+  async function getProjectResourceGeneration(projectId) {
+    const db = await openDatabase();
+    const tx = db.transaction(["projects", "appMeta"], "readonly");
+    return projectResourceGeneration(await requestToPromise(tx.objectStore("projects").get(projectId)), tx.objectStore("appMeta"));
+  }
+  async function listResourceDirtyProjects() {
+    const db = await openDatabase();
+    const tx = db.transaction(["projects", "appMeta"], "readonly");
+    const projects = await requestToPromise(tx.objectStore("projects").getAll());
+    const meta = tx.objectStore("appMeta");
+    const records = await Promise.all(projects.map(async (project) => {
+      const [generation, acknowledged] = await Promise.all([
+        projectResourceGeneration(project, meta), requestToPromise(meta.get(`resource-package-generation:${project.id}`))
+      ]);
+      return generation > (Number(acknowledged?.value) || 0) ? { projectId: project.id, generation } : null;
+    }));
+    return records.filter(Boolean);
+  }
+  async function acknowledgeProjectResourceGeneration(projectId, expectedGeneration) {
+    if (!Number.isSafeInteger(expectedGeneration) || expectedGeneration < 0) throw new TypeError("A package generation is required.");
+    const db = await openDatabase();
+    const tx = strictTransaction(db, ["projects", "appMeta"]);
+    const done = txDone(tx);
+    const project = await requestToPromise(tx.objectStore("projects").get(projectId));
+    const meta = tx.objectStore("appMeta");
+    const generation = await projectResourceGeneration(project, meta);
+    if (!project || generation !== expectedGeneration) { await done; return false; }
+    meta.put({ key: `resource-package-generation:${projectId}`, value: generation, updatedAt: new Date().toISOString() });
+    await done;
+    return true;
+  }
+  async function deleteResourceDraftIfUnchanged(draft) {
+    const db = await openDatabase();
+    const tx = strictTransaction(db, ["resourceDrafts"]);
+    const done = txDone(tx);
+    const store = tx.objectStore("resourceDrafts");
+    const current = await requestToPromise(store.get(draft.id));
+    const fields = ["sessionId", "resourceId", "entryId", "before", "values", ...(draft.updatedAt ? ["updatedAt"] : [])];
+    const unchanged = Boolean(current && fields.every((field) => stableJson(current[field]) === stableJson(draft[field])));
+    if (unchanged) store.delete(draft.id);
+    await done;
+    return unchanged;
+  }
   const ownedProjects = new Map();
   const ownershipRequests = new Map();
   const knownVersions = new Map();
@@ -466,7 +527,8 @@
     if (checkpoint.format !== 2) {
       if (await digestBlob(checkpoint.blob) !== checkpoint.digest) throw new Error("Checkpoint integrity check failed.");
       const records = JSON.parse(await checkpoint.blob.text());
-      for (const store of AUTHORITATIVE_STORES) for (const value of records[store] || []) yield { store, value };
+      const context = portable ? createPortableSanitizerContext() : null;
+      for (const store of AUTHORITATIVE_STORES) for (const value of records[store] || []) yield { store, value: portable ? sanitizePortableValue(value, "", [], context) : value };
       return;
     }
     const hashes = [];
@@ -605,6 +667,15 @@
   }
 
   function ensureStores(db) {
+    for (const name of ["resourceDrafts", "resourceOperations"]) {
+      if (!db.objectStoreNames.contains(name)) {
+        const store = db.createObjectStore(name, { keyPath: "id" });
+        store.createIndex("resourceId", "resourceId");
+        store.createIndex("sessionId", "sessionId");
+        store.createIndex("operationId", "operationId");
+        store.createIndex("updatedAt", "updatedAt");
+      }
+    }
     for (const name of ["documentVersions", "versionSegments", "fileLifecycleReceipts"]) {
       if (!db.objectStoreNames.contains(name)) { const store = db.createObjectStore(name, {keyPath:"id"}); store.createIndex("projectId","projectId"); store.createIndex("documentId","documentId"); if(name === "versionSegments") store.createIndex("sourceVersionId","sourceVersionId"); }
     }
@@ -1212,7 +1283,7 @@
       tx.objectStore("appMeta").put({ key: "schema", version: DB_VERSION });
     }
     if (oldVersion < 8) migrateToVersion8(db, tx);
-    if (oldVersion < 9) tx.objectStore("appMeta").put({ key: "schema", version: DB_VERSION });
+    if (oldVersion < 10) tx.objectStore("appMeta").put({ key: "schema", version: DB_VERSION });
   }
 
   function normalizedResourceText(value) {
@@ -1621,6 +1692,21 @@
     if (key === "apiKeyMode") return "bring-your-own";
     if (key === "domain" && !isSourceJsonPath(currentPath)) return redactSensitiveText(value);
     if (key === "academicMetadata" && !isSourceJsonPath(currentPath)) return undefined;
+    if (key === "exchangeLocalBinding" && !isSourceJsonPath(currentPath)) return undefined;
+    if (key === "exchangeRequirements" && !isSourceJsonPath(currentPath)) {
+      if (!Array.isArray(value) || value.length > 128) throw new Error("Invalid Exchange requirements.");
+      const seen = new Set();
+      return value.map(r => {
+        if (!r || typeof r !== "object" || typeof r.id !== "string" || r.id.length > 96 || !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/.test(r.id) ||
+            seen.has(r.id) || typeof r.version !== "string" || r.version.length > 64 || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/.test(r.version) ||
+            typeof r.digest !== "string" || !/^[0-9a-f]{64}$/.test(r.digest) || !["qa","terminology","lesson","client","ai"].includes(r.kind) ||
+            typeof r.required !== "boolean" || (r.priority !== undefined && (!Number.isSafeInteger(r.priority) || r.priority < 0 || r.priority > 100)) ||
+            Object.keys(r).some(k => !["id","version","digest","kind","required","priority"].includes(k)))
+          throw new Error("Invalid Exchange requirement in portable data.");
+        seen.add(r.id);
+        return {id:r.id, version:r.version, digest:r.digest, kind:r.kind, required:r.required, ...(r.priority===undefined?{}:{priority:r.priority})};
+      });
+    }
     if (isPortableLabelPath(currentPath) && (typeof value === "string" || typeof value === "number"))
       return redactSensitiveText(value);
     if (isPortableRecordIdPath(currentPath) && (typeof value === "string" || typeof value === "number"))
@@ -1951,11 +2037,12 @@
       }
     }
     const db = await openDatabase();
-    const stores = [...new Set([...changes.map((change) => change.store), ...(mutation.snapshots || []).map((guard)=>guard.store), "versionSegments", "journal", "appMeta", "ownershipLeases"])];
+    const stores = [...new Set([...changes.map((change) => change.store), ...(mutation.snapshots || []).map((guard)=>guard.store), ...(mutation.resourceOperation || mutation.resourceOperationUndo ? ["resourceOperations"] : []), "versionSegments", "journal", "appMeta", "ownershipLeases"])];
     const tx = strictTransaction(db, stores);
     const done = txDone(tx);
     const values = [];
     let generation = 0;
+    let touchedResourceIds = [];
     try {
       const leases = tx.objectStore("ownershipLeases");
       const workspaceLease = await requestToPromise(leases.get("workspace"));
@@ -1973,6 +2060,11 @@
       const current = await requestToPromise(meta.get("committed-generation"));
       const catalog = await requestToPromise(meta.get(CATALOG_KEY));
       generation = (Number(current?.value) || 0) + 1;
+      let undoReceipt = null;
+      if (mutation.resourceOperationUndo) {
+        undoReceipt = await requestToPromise(tx.objectStore("resourceOperations").get(mutation.resourceOperationUndo));
+        if (!undoReceipt || undoReceipt.undone) throw new Error("This operation step has already been undone or is unavailable.");
+      }
       const expanded = [];
       for (const guard of mutation.snapshots || []) {
         const records = (await requestToPromise(tx.objectStore(guard.store).index(guard.index).getAll(guard.value))).filter((record)=>Object.entries(guard.where || {}).every(([key,value])=>record[key]===value));
@@ -1997,10 +2089,12 @@
       }
       changes.splice(0, changes.length, ...expanded);
       const journal = [];
+      const operationChanges = [];
       for (const change of changes) {
         const store = tx.objectStore(change.store);
         const key = change.key ?? change.value?.id;
         if (!AUTHORITATIVE_STORES.includes(change.store)) {
+          if (mutation.resourceOperation) operationChanges.push({ store: change.store, key, before: await requestToPromise(store.get(key)) || null, after: change.delete ? null : change.value });
           if (change.delete) store.delete(key); else store.put(change.value);
           values.push(change.value || null);
           continue;
@@ -2032,6 +2126,21 @@
         }
         journal.push({ store: change.store, key, before: previous || null, after: values.at(-1) });
       }
+      touchedResourceIds = [...new Set(journal.filter((change) => ["resources", "tmEntries", "terms", "termConcepts", "termDesignations"].includes(change.store))
+        .map((change) => change.store === "resources" ? change.key : (change.after || change.before)?.resourceId).filter(Boolean))];
+      for (const resourceId of touchedResourceIds) meta.put({ key: `resource-generation:${resourceId}`, value: generation });
+      if (mutation.resourceOperation) {
+        const descriptor = mutation.resourceOperation;
+        const operations = tx.objectStore("resourceOperations");
+        const operation = await requestToPromise(operations.get(descriptor.operationId));
+        if (!operation || operation.resourceId !== descriptor.resourceId) throw new Error("Resource operation receipt is unavailable.");
+        const receiptId = `${descriptor.operationId}:${descriptor.step}`;
+        if (await requestToPromise(operations.get(receiptId))) throw new Error("This resource operation step was already committed.");
+        operations.put({ id: receiptId, operationId: descriptor.operationId, resourceId: descriptor.resourceId,
+          kind: "batch", step: descriptor.step, generation, changes: [...journal, ...operationChanges], updatedAt: new Date().toISOString() });
+        operations.put({ ...operation, applied: Number(operation.applied || 0) + Number(descriptor.count || 1), updatedAt: new Date().toISOString() });
+      }
+      if (undoReceipt) tx.objectStore("resourceOperations").put({ ...undoReceipt, undone: true, undoGeneration: generation, updatedAt: new Date().toISOString() });
       for (const projectId of projectIds) meta.put({ key: `project-generation:${projectId}`, value: generation });
       meta.put({ key: "committed-generation", value: generation });
       tx.objectStore("journal").put({ id: makeId("journal"), generation, projectId: projectIds[0] || "", projectIds,
@@ -2060,10 +2169,18 @@
     changes.forEach((change, index) => {
       if (values[index]) knownVersions.set(`${change.store}:${values[index].id}`, values[index].storageVersion);
     });
-    window.dispatchEvent?.(new CustomEvent("loopcat-committed", { detail: { generation, projectIds,
+    window.dispatchEvent?.(new CustomEvent("loopcat-committed", { detail: { generation, projectIds, resourceIds: touchedResourceIds,
       recordKeys: changes.filter((change) => AUTHORITATIVE_STORES.includes(change.store))
         .map((change) => JSON.stringify([change.store, change.key ?? change.value?.id]))
     } }));
+    const resourceChanges = changes.filter((change) => ["resources", "tmEntries", "terms", "termConcepts", "termDesignations"].includes(change.store));
+    if (resourceChanges.length) {
+      const detail = { sender: writerId, generation,
+        resourceIds: touchedResourceIds,
+        entryIds: resourceChanges.filter((change) => ["tmEntries", "terms"].includes(change.store)).map((change) => change.key || change.value?.id) };
+      window.dispatchEvent?.(new CustomEvent("loopcat-resources-changed", { detail: { ...detail, external: false } }));
+      try { resourceChannel?.postMessage(detail); } catch { /* A closing window must not turn a committed save into a failure. */ }
+    }
     return { generation, values };
   }
 
@@ -3195,6 +3312,11 @@
     readCatalogPreview,
     rebuildCatalog,
     resourceEntries,
+    getCommittedGeneration,
+    getProjectResourceGeneration,
+    listResourceDirtyProjects,
+    acknowledgeProjectResourceGeneration,
+    deleteResourceDraftIfUnchanged,
     openDatabase,
     commitMutation,
     acquireProject,

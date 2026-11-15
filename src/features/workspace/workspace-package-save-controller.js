@@ -10,7 +10,7 @@
  *   build: { buildProjectPackage: (project?: any, segments?: any[] | null, options?: any) => Promise<any>, assertValidProjectPackageForWrite: (pkg: any, action: string) => unknown },
  *   projects: { knownById: (projectId: string) => any, list: () => Promise<any[]> },
  *   activity: { draft: (project: any, type: string, summary: string, detail?: any) => any, bulkPut: (storeName: string, records: any[]) => Promise<unknown>, list: (projectId: string) => Promise<any[]> },
- *   workspace: { isConnected: () => boolean, setStatus: (status: any) => unknown, markMissingLocalDirty: () => Promise<number>, clearDirty: (projectId: string, generation?: number) => unknown, generation?: (projectId: string) => number, markDirty: (projectId?: string) => unknown, hasDirty: () => boolean, dirtyIds: () => string[], recoveryIds: () => string[], isAutosaving: () => boolean, setAutosaving: (value: boolean) => unknown, getAutosaveTimer: () => any, setAutosaveTimer: (timer: any) => unknown },
+ *   workspace: { isConnected: () => boolean, setStatus: (status: any) => unknown, markMissingLocalDirty: () => Promise<number>, clearDirty: (projectId: string, generation?: number) => unknown, generation?: (projectId: string) => number, resourceGeneration?: (projectId: string) => Promise<number>, acknowledgeResourceGeneration?: (projectId: string, generation: number) => Promise<boolean>, markDirty: (projectId?: string) => unknown, hasDirty: () => boolean, dirtyIds: () => string[], recoveryIds: () => string[], isAutosaving: () => boolean, setAutosaving: (value: boolean) => unknown, getAutosaveTimer: () => any, setAutosaveTimer: (timer: any) => unknown },
  *   validation: { count: (report: any) => number },
  *   presentation: { renderWorkspaceStatus: () => unknown, renderValidation: (report: any) => unknown, renderBackupReminder: () => unknown, renderRecovery: () => unknown },
  *   status: { set: (message: string, mode?: string) => unknown },
@@ -117,10 +117,19 @@ export function createWorkspacePackageSaveController(options) {
     try {
       await autosave.flush(projectId);
       const generation = workspace.generation?.(projectId);
+      const resourceGeneration = await workspace.resourceGeneration?.(projectId);
       const pkg = await build.buildProjectPackage(project, null, saveOptions);
       build.assertValidProjectPackageForWrite(pkg, "save project package to workspace");
       const result = await storage.saveProjectPackage(pkg);
       if (session.getProject()?.id === projectId) workspace.setStatus(await storage.getStatus());
+      if (
+        resourceGeneration !== undefined &&
+        workspace.acknowledgeResourceGeneration &&
+        !(await workspace.acknowledgeResourceGeneration(projectId, resourceGeneration))
+      ) {
+        workspace.markDirty(projectId);
+        return { pkg, result, resourceDirty: true };
+      }
       if (generation === undefined) workspace.clearDirty(projectId);
       else workspace.clearDirty(projectId, generation);
       return { pkg, result };
@@ -141,7 +150,7 @@ export function createWorkspacePackageSaveController(options) {
     const pendingActivityEvent = shouldSimulateActivityFailure
       ? null
       : activity.draft(session.getProject(), "workspace-save", "Project package saved to workspace folder");
-    const { pkg, result } = await saveById(session.getProject().id, {
+    const { pkg, result, resourceDirty } = await saveById(session.getProject().id, {
       activityEvents: pendingActivityEvent ? [pendingActivityEvent] : []
     });
     let activityLogged = true;
@@ -161,10 +170,14 @@ export function createWorkspacePackageSaveController(options) {
     presentation.renderValidation(pkg.validation);
     const validationReportWarning = result.validationReportSaved === false ? "; validation report sidecar failed" : "";
     status.set(
-      activityLogged
-        ? `Saved to ${result.packagePath}${validationReportWarning}`
-        : `Saved to ${result.packagePath}; activity log failed${validationReportWarning}`,
-      !activityLogged || result.validationReportSaved === false || validation.count(pkg.validation) ? "dirty" : "saved"
+      resourceDirty
+        ? `Saved to ${result.packagePath}; newer resource changes remain pending${validationReportWarning}`
+        : activityLogged
+          ? `Saved to ${result.packagePath}${validationReportWarning}`
+          : `Saved to ${result.packagePath}; activity log failed${validationReportWarning}`,
+      resourceDirty || !activityLogged || result.validationReportSaved === false || validation.count(pkg.validation)
+        ? "dirty"
+        : "saved"
     );
   }
 

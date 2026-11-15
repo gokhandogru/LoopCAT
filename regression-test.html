@@ -1696,13 +1696,13 @@
         });
         const trackedImport = await window.CatHan.docx.extractDocxSegments(new File([trackedChangesDocx], "tracked.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
         assert(
-          trackedImport.segments.some((segment) => segment.text === "Keep inserted text.") &&
+          trackedImport.segments.some((segment) => segment.text.replace(/<[^>]+>/g, "") === "Keep inserted text." && segment.structure.fidelityVersion === 2) &&
             !trackedImport.segments.some((segment) => segment.text.includes("deleted source")),
           "DOCX import ignores tracked deleted text"
         );
         const rebuiltTrackedDocx = await window.CatHan.docx.buildTargetDocx(
           { name: "Tracked fixture", docxStructure: trackedImport.structure },
-          trackedImport.segments.map((segment) => ({ ...segment, target: "Hedef metin." }))
+          trackedImport.segments.map((segment) => ({ ...segment, target: segment.text.replace("Keep ", "Hedef ").replace("inserted text.", "metin.") }))
         );
         const rebuiltTrackedEntries = await (async () => {
           const out = {};
@@ -1733,7 +1733,8 @@
           return out;
         })();
         assert(
-          rebuiltTrackedEntries["word/document.xml"].includes("Hedef metin.") &&
+          rebuiltTrackedEntries["word/document.xml"].replace(/<[^>]+>/g, "").includes("Hedef metin.") &&
+            rebuiltTrackedEntries["word/document.xml"].includes('<w:ins w:id="2" w:author="Reviewer">') &&
             !rebuiltTrackedEntries["word/document.xml"].includes("deleted source") &&
             !rebuiltTrackedEntries["word/document.xml"].includes("<w:del"),
           "DOCX export removes tracked deleted source text from rebuilt paragraphs"
@@ -2697,11 +2698,11 @@
         assert(
           parsedIdml.documentType === "idml" &&
             parsedIdml.segments.length === 1 &&
-            parsedIdml.segments[0].text.includes("<b>layout</b>") &&
-            parsedIdml.segments[0].tags.length === 2,
+            parsedIdml.segments[0].text.includes('<b id="idml-c1">layout</b>') &&
+            parsedIdml.segments[0].tags.length === 6,
           "IDML localization import extracts story content with inline tags"
         );
-        parsedIdml.segments[0].target = "Merhaba <b>mizanpaj</b> metni.";
+        parsedIdml.segments[0].target = parsedIdml.segments[0].text.replace("Hello", "Merhaba").replace("layout", "mizanpaj").replace("text.", "metni.");
         const rebuiltIdml = await window.CatHan.localization.buildLocalizationFile("idml", parsedIdml.segments, parsedIdml.structure);
         const rebuiltIdmlText = new TextDecoder().decode(rebuiltIdml);
         assert(rebuiltIdmlText.includes("preserve-this-spread"), "IDML localization export preserves unrelated package entries");
@@ -2712,7 +2713,7 @@
           "IDML localization export preserves real character style ranges for semantic inline tags"
         );
         const reparsedIdml = await window.CatHan.localization.parseLocalizationFile(new File([rebuiltIdml], "layout.idml", { type: "application/vnd.adobe.indesign-idml-package" }));
-        assert(reparsedIdml.segments[0].text.includes("<b>mizanpaj</b>"), "IDML localization export can be imported again with translated story text");
+        assert(reparsedIdml.segments[0].text.includes('<b id="idml-c1">mizanpaj</b>'), "IDML localization export can be imported again with translated story text");
         let unsafeIdmlRejected = false;
         try {
           await window.CatHan.localization.parseLocalizationFile(new File([storedZip({
@@ -2822,7 +2823,7 @@
         );
         assert(sourceFallbackAndroid.includes("Hello <b>world</b>") && sourceFallbackAndroid.includes("Skip me"), "Android XML incomplete export uses source fallback");
         assert(sourceFallbackApple.includes("Hello world") && sourceFallbackApple.includes('Say \\"hello\\"'), "Apple strings incomplete export uses source fallback");
-        assert(reparsedSourceFallbackIdml.segments[0].text.includes("<b>layout</b>"), "IDML incomplete export uses source fallback");
+        assert(reparsedSourceFallbackIdml.segments[0].text.includes('<b id="idml-c1">layout</b>'), "IDML incomplete export uses source fallback");
         assert(
           emptyHtmlSegments.every((segment) => segment.target === "") && emptyIdmlSegments.every((segment) => segment.target === ""),
           "format-aware localization export falls back only in monolingual delivery formats"

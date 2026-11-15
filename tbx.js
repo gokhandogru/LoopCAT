@@ -112,11 +112,10 @@ function decodeXmlEntities(value) {
 }
 
 function xmlTextContent(value) {
-  return decodeXmlEntities(String(value || "")
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<\?[\s\S]*?\?>/g, "")
-    .replace(/<[^>]+>/g, ""));
+  return String(value || "").split(/(<!\[CDATA\[[\s\S]*?\]\]>)/g).map((part) => {
+    if (part.startsWith("<![CDATA[")) return part.slice(9, -3);
+    return decodeXmlEntities(part.replace(/<!--[\s\S]*?-->/g, "").replace(/<\?[\s\S]*?\?>/g, "").replace(/<[^>]+>/g, ""));
+  }).join("");
 }
 
 function createElementBlockRegex(tagName) {
@@ -146,27 +145,40 @@ function descripTypeFromAttrs(attrs) {
 
 function validateTbxEnvelope(text) {
   const value = String(text || "");
-  if (!/<(?:[A-Za-z_][\w.-]*:)?tbx\b/i.test(value) || !/<\/(?:[A-Za-z_][\w.-]*:)?tbx>/i.test(value)) {
+  if (typeof DOMParser !== "undefined") {
+    const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(value) || value;
+    const xml = new DOMParser().parseFromString(parserInput, "application/xml");
+    if (xml.getElementsByTagName("parsererror").length || !["tbx", "martif"].includes(xml.documentElement?.localName)) {
+      throw new Error("The TBX file could not be parsed.");
+    }
+  } else if (!/<(?:[A-Za-z_][\w.-]*:)?(?:tbx|martif)\b/i.test(value) || !/<\/(?:[A-Za-z_][\w.-]*:)?(?:tbx|martif)>/i.test(value)) {
     throw new Error("The TBX file could not be parsed.");
   }
+  // Protect literal CDATA markup from the streaming matcher and ignore comments.
+  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->/g, (match, cdata) => cdata === undefined ? "" : esc(cdata));
 }
 
 function bestVariantIndex(variants, rawExpected, portableExpected, excluded = new Set()) {
   let bestIndex = -1;
   let bestScore = 0;
+  let tied = false;
   variants.forEach((variant, index) => {
     if (excluded.has(index) || !variant.term) return;
     const score = languageMatchScore(variant.lang, rawExpected, portableExpected);
     if (score > bestScore) {
       bestScore = score;
       bestIndex = index;
+      tied = false;
+    } else if (score > 0 && score === bestScore) {
+      tied = true;
     }
   });
+  if (tied) throw new Error(`TBX language ${cleanText(rawExpected)} has ambiguous variants. Choose an exact locale.`);
   return bestIndex;
 }
 
 function firstTermVariantIndex(variants, excluded = new Set()) {
-  return variants.findIndex((variant, index) => !excluded.has(index) && Boolean(variant.term));
+  return variants.findIndex((variant, index) => !excluded.has(index) && !canonicalLanguageCode(variant.lang) && Boolean(variant.term));
 }
 
 function pairedVariantIndexes(variants, options, defaults) {
@@ -183,7 +195,7 @@ function pairedVariantIndexes(variants, options, defaults) {
   return { sourceIndex, targetIndex };
 }
 
-function tbxTermFromEntry(entryInner, defaults, options, now) {
+function tbxTermFromEntry(entryInner, defaults, options, now, entryAttrs = "") {
   const descrips = [];
   const descripPattern = createAnyElementBlockRegex(["descrip", "note"]);
   let descripMatch;
@@ -209,18 +221,31 @@ function tbxTermFromEntry(entryInner, defaults, options, now) {
   let langMatch;
   while ((langMatch = langPattern.exec(entryInner))) {
     const termInner = firstElementInner(langMatch[3], "term");
+    const designations = [];
+    const designationPattern = createAnyElementBlockRegex(["tig", "ntig", "termSec"]);
+    let designation;
+    while ((designation = designationPattern.exec(langMatch[3]))) {
+      const term = cleanText(xmlTextContent(firstElementInner(designation[3], "term")));
+      if (!term) continue;
+      const notePattern = createElementBlockRegex("termNote");
+      const termNotes = {};
+      let note;
+      while ((note = notePattern.exec(designation[3]))) termNotes[descripTypeFromAttrs(note[2])] = cleanText(xmlTextContent(note[3]));
+      designations.push({ term, id: getAttribute(designation[2], "id"), notes: termNotes });
+    }
     variants.push({
       lang: getAttribute(langMatch[2], "lang"),
-      term: cleanText(xmlTextContent(termInner || langMatch[3]))
+      term: cleanText(xmlTextContent(termInner)),
+      designations: designations.length ? designations : [{ term: cleanText(xmlTextContent(termInner)), id: "", notes: {} }]
     });
   }
   const { sourceIndex, targetIndex } = pairedVariantIndexes(variants, options, defaults);
   const sourceTerm = variants[sourceIndex]?.term || "";
   const targetTerm = variants[targetIndex]?.term || "";
-  if (!sourceTerm || !targetTerm) return null;
-  return {
+  if (!sourceTerm || !targetTerm) return [];
+  const base = {
     id: window.CatHan.storage.makeId("term"),
-    conceptId: cleanText(metadata.xloopcatconceptid || metadata.loopcatconceptid || metadata.conceptid),
+    conceptId: cleanText(metadata.xloopcatconceptid || metadata.loopcatconceptid || metadata.conceptid || getAttribute(entryAttrs, "id")),
     sourceDesignationId: cleanText(
       metadata.xloopcatsourcedesignationid || metadata.loopcatsourcedesignationid || metadata.sourcedesignationid
     ),
@@ -232,7 +257,7 @@ function tbxTermFromEntry(entryInner, defaults, options, now) {
     sourceLang: defaults.sourceLang,
     targetLang: defaults.targetLang,
     languagePair: `${defaults.sourceLang}::${defaults.targetLang}`,
-    notes,
+    notes: metadata.xloopcatnotes == null ? notes : redactSensitiveText(metadata.xloopcatnotes),
     definition: cleanText(metadata.definition),
     subject: cleanText(metadata.subjectfield || metadata.subject),
     domain: cleanText(metadata.domain),
@@ -249,19 +274,34 @@ function tbxTermFromEntry(entryInner, defaults, options, now) {
     createdAt: now,
     updatedAt: now
   };
+  return variants[sourceIndex].designations.flatMap((source) => variants[targetIndex].designations.map((target) => {
+    const administrativeStatus = String(target.notes.administrativestatus || target.notes.termstatus || "").toLowerCase();
+    const designationStatus = administrativeStatus.includes("deprecated") || administrativeStatus.includes("forbidden")
+      ? "forbidden" : administrativeStatus.includes("admitted") ? "admitted" : administrativeStatus.includes("preferred") ? "preferred" : base.status;
+    return {
+      ...base,
+      id: window.CatHan.storage.makeId("term"),
+      sourceTerm: source.term,
+      targetTerm: target.term,
+      sourceDesignationId: base.sourceDesignationId || source.id,
+      targetDesignationId: base.targetDesignationId || target.id,
+      status: designationStatus,
+      isForbidden: designationStatus === "forbidden",
+      partOfSpeech: target.notes.partofspeech || source.notes.partofspeech || base.partOfSpeech
+    };
+  }));
 }
 
 function parseTbx(text, options = {}) {
   const { sourceLang, targetLang, termBaseName } = tbxResourceOptions(options, { requireTermBaseName: true });
-  validateTbxEnvelope(text);
+  text = validateTbxEnvelope(text);
   const now = new Date().toISOString();
   const terms = [];
   const defaults = { sourceLang, targetLang, termBaseName };
   const entryPattern = createAnyElementBlockRegex(["termEntry", "conceptEntry"]);
   let entryMatch;
   while ((entryMatch = entryPattern.exec(String(text || "")))) {
-    const term = tbxTermFromEntry(entryMatch[3], defaults, options, now);
-    if (term) terms.push(term);
+    terms.push(...tbxTermFromEntry(entryMatch[3], defaults, options, now, entryMatch[2]));
   }
   return terms;
 }
@@ -272,7 +312,7 @@ function defaultYield() {
 
 async function parseTbxAsync(text, options = {}, progress = {}) {
   const { sourceLang, targetLang, termBaseName } = tbxResourceOptions(options, { requireTermBaseName: true });
-  validateTbxEnvelope(text);
+  text = validateTbxEnvelope(text);
   const value = String(text || "");
   const now = new Date().toISOString();
   const terms = [];
@@ -305,8 +345,7 @@ async function parseTbxAsync(text, options = {}, progress = {}) {
 
   while ((entryMatch = entryPattern.exec(value))) {
     unitCount += 1;
-    const term = tbxTermFromEntry(entryMatch[3], defaults, options, now);
-    if (term) terms.push(term);
+    terms.push(...tbxTermFromEntry(entryMatch[3], defaults, options, now, entryMatch[2]));
     await report(false);
   }
   await report(true);
@@ -314,77 +353,14 @@ async function parseTbxAsync(text, options = {}, progress = {}) {
 }
 
 function parseTbxDom(text, options = {}) {
-  const { sourceLang, targetLang, termBaseName } = tbxResourceOptions(options, { requireTermBaseName: true });
-  const parserInput = window.CatHan?.appRuntime?.safeHtml?.trusted?.(text) || text;
-  const xml = new DOMParser().parseFromString(parserInput, "application/xml");
-  if (xml.querySelector("parsererror")) throw new Error("The TBX file could not be parsed.");
-  const now = new Date().toISOString();
-  const terms = [];
-  Array.from(xml.getElementsByTagNameNS("*", "termEntry")).forEach((entry) => {
-    let sourceTerm = "";
-    let targetTerm = "";
-    const descrips = Array.from(entry.getElementsByTagNameNS("*", "descrip"));
-    const status = descrips
-      .filter((node) => ["termstatus", "status"].includes(descripType(node)))
-      .map((node) => String(node.textContent || "").trim().toLowerCase())
-      .join(" ");
-    const rawNotes = descrips
-      .filter((node) => ["context", "note", "definition", "explanation"].includes(descripType(node)))
-      .map((node) => String(node.textContent || "").trim())
-      .filter(Boolean)
-      .join("; ");
-    const notes = redactSensitiveText(rawNotes).trim();
-    const metadata = Object.fromEntries(
-      descrips.map((node) => [descripType(node), cleanText(node.textContent || "")])
-    );
-    Array.from(entry.getElementsByTagNameNS("*", "langSet")).forEach((langSet) => {
-      const lang = langOf(langSet).toLowerCase();
-      const term = cleanText(langSet.getElementsByTagNameNS("*", "term")[0]?.textContent || "");
-      if (languageMatches(lang, options.sourceLang, sourceLang)) sourceTerm = term;
-      if (languageMatches(lang, options.targetLang, targetLang)) targetTerm = term;
-    });
-    if (sourceTerm && targetTerm) {
-      terms.push({
-        id: makeId("term"),
-        conceptId: cleanText(metadata.xloopcatconceptid || metadata.loopcatconceptid || metadata.conceptid),
-        sourceDesignationId: cleanText(
-          metadata.xloopcatsourcedesignationid || metadata.loopcatsourcedesignationid || metadata.sourcedesignationid
-        ),
-        targetDesignationId: cleanText(
-          metadata.xloopcattargetdesignationid || metadata.loopcattargetdesignationid || metadata.targetdesignationid
-        ),
-        sourceTerm,
-        targetTerm,
-        sourceLang,
-        targetLang,
-        languagePair: `${sourceLang}::${targetLang}`,
-        notes,
-        definition: cleanText(metadata.definition),
-        subject: cleanText(metadata.subjectfield || metadata.subject),
-        domain: cleanText(metadata.domain),
-        partOfSpeech: cleanText(metadata.partofspeech),
-        usageExample: cleanText(metadata.context || metadata.usageexample),
-        status: status.includes("forbidden") ? "forbidden" : status.includes("admitted") ? "admitted" : "preferred",
-        caseSensitivity: ["sensitive", "initial-sensitive", "insensitive"].includes(metadata.casesensitivity)
-          ? metadata.casesensitivity
-          : "insensitive",
-        matchMode: ["exact", "prefix", "fuzzy"].includes(metadata.matchmode) ? metadata.matchmode : "exact",
-        fuzzyThreshold: Math.max(50, Math.min(100, Number(metadata.fuzzythreshold) || 85)),
-        termBaseName,
-        isForbidden: status.includes("forbidden"),
-        createdAt: now,
-        updatedAt: now
-      });
-    }
-  });
-  return terms;
+  return parseTbx(text, options);
 }
 
 function buildTbx(terms, optionsInput = {}) {
   const options = tbxResourceOptions(optionsInput);
   const body = (terms || [])
     .map((term) => tbxTermRecord(term, options))
-    .map((term) => {
+    .map((term, index) => {
       const notes = redactSensitiveText(term.notes || "").trim();
       const metadata = [
         ["x-loopcat-conceptId", term.conceptId],
@@ -396,25 +372,28 @@ function buildTbx(terms, optionsInput = {}) {
         ["domain", term.domain],
         ["partOfSpeech", term.partOfSpeech],
         ["context", term.usageExample || notes],
+        ["x-loopcat-notes", term.usageExample && notes ? notes : ""],
         ["caseSensitivity", term.caseSensitivity],
         ["matchMode", term.matchMode],
         ["fuzzyThreshold", term.matchMode === "fuzzy" ? term.fuzzyThreshold || 85 : ""]
       ].filter(([, value]) => value !== undefined && value !== null && String(value).trim());
-      return `      <termEntry id="${esc(term.id)}">
+      const entryId = /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(String(term.id || "")) ? term.id : `term-${index + 1}`;
+      return `      <termEntry id="${esc(entryId)}">
+        ${metadata.map(([type, value]) => `<descrip type="${esc(type)}">${esc(value)}</descrip>`).join("\n        ")}
         <langSet xml:lang="${esc(term.sourceLang)}"><tig><term>${esc(term.sourceTerm)}</term></tig></langSet>
         <langSet xml:lang="${esc(term.targetLang)}"><tig><term>${esc(term.targetTerm)}</term></tig></langSet>
-        ${metadata.map(([type, value]) => `<descrip type="${esc(type)}">${esc(value)}</descrip>`).join("\n        ")}
       </termEntry>`;
     })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<tbx>
+<martif type="TBX" xml:lang="${esc(options.sourceLang)}">
+  <martifHeader><fileDesc><sourceDesc><p>LoopCAT terminology export</p></sourceDesc></fileDesc></martifHeader>
   <text>
     <body>
 ${body}
     </body>
   </text>
-</tbx>`;
+</martif>`;
 }
 
 window.CatHan.tbx = { parseTbx, parseTbxAsync, parseTbxDom, buildTbx };

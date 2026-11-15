@@ -17,7 +17,7 @@ Required fields:
 - `app`: Must be `"LoopCAT"` for new exports. Older `"CatHan"` packages may be imported as legacy packages.
 - `type`: Must be `"project-package"`.
 - `version`: Package contract version. Current value: `1`.
-- `schemaVersion`: Project-package schema version. Current version: `7`. Current accepted range for package import: `3` through `7`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
+- `schemaVersion`: Project-package schema version. Current version: `8`. Current accepted range for package import: `3` through `8`; packages from newer schemas must be opened with a newer LoopCAT build. This contract is validated independently from the workspace-manifest version and from any future local-only storage schema.
 - `exportedAt`: ISO timestamp for package creation.
 - `packageMetadata`: Metadata about the package and storage mode.
 - `project`: Project metadata and settings.
@@ -195,7 +195,7 @@ Derived local indexes, such as the persistent TM token index used for faster mat
 Local Trash and Undo/Redo have different portability rules:
 
 - A single-project `.loopcat.json` package contains the active project state and does not include local Trash entries or the in-memory Undo/Redo command stack.
-- The current full browser-backup schema is version `7` and includes shared resource collections and sanitized `trashEntries` so local deleted items can survive a full-profile backup/restore. The local IndexedDB schema is version `8`.
+- The full browser-backup schema is now version `9` and includes shared resource collections and sanitized `trashEntries` so local deleted items can survive a full-profile backup/restore. The local IndexedDB schema is version `9`.
 - The bounded Undo/Redo command stack is runtime-only and starts empty after an application restart or restore; durable segment history and Trash records remain available through their own data models.
 
 Before packages and backups are written, LoopCAT defensively removes secret-shaped fields such as API keys, tokens, authorization headers, passwords, AI provider trace fields such as `prompt`, `promptTemplate`, `responseId`, `requestId`, `providerRequestId`, `providerResponseId`, and `customEndpoint`, plus browser-only handle fields such as `fileHandle`, `directoryHandle`, and `workspaceHandle` from exported project, segment, resource, and activity records. Original JSON source reconstruction data under `localizationStructures/<documentId>/sourceJson` is path-aware and preserves source-file keys with those names, including common software-localization keys such as `password`, `accessToken`, and `fileHandle`, because they are real file structure rather than LoopCAT metadata. A `sourceJson` object anywhere else is not treated as reconstruction data and must not bypass privacy stripping or validation. Delimited CSV/TSV reconstruction stores those words as row cell values and preserves them for the same reason. `apiKeyMode` is preserved because it records workflow preference, not a credential.
@@ -230,3 +230,8 @@ The validation report is advisory for exports and blocking for imports when `err
 ## October 2026 file history extension
 
 Schema 7 preserves document versions, archived source/target segments, file Trash and source-update receipts. Workspace backups use schema 8 and IndexedDB uses schema 9. Historical segments remain separate from live project scope; restoring a previous version creates a new head. Earlier package schemas remain importable.
+
+
+### Exchange requirements (project schema 8; backup schema 9)
+
+A project's optional `exchangeRequirements` lists the exact pack ID, version, SHA-256 digest, kind, required flag and optional non-negative priority. It carries no installation, credential or activation. The device binding is stripped on handoff and restore. Installed resources are independent of native linked termbases. The core IndexedDB schema stays at 9. See [LoopCAT Exchange](loopcat-exchange.md).

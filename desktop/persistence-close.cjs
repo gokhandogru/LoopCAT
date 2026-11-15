@@ -8,6 +8,15 @@ function attachPersistenceClose(
   let permitted = false;
   let pending = null;
   let showingFailure = false;
+  const closeWaiters = new Set();
+  function settleClose(closed) {
+    for (const resolve of closeWaiters) resolve(closed);
+    closeWaiters.clear();
+  }
+  function resume() {
+    window.webContents.send("loopcat:prepare-close", { id: randomUUID(), mode: "resume" });
+    settleClose(false);
+  }
   async function failed() {
     if (window.isDestroyed() || showingFailure) return;
     showingFailure = true;
@@ -26,7 +35,7 @@ function attachPersistenceClose(
     else if (choice.response === 2) {
       permitted = true;
       window.close();
-    } else window.webContents.send("loopcat:prepare-close", { id: randomUUID(), mode: "resume" });
+    } else resume();
   }
   function request(mode) {
     if (pending || window.isDestroyed()) return;
@@ -44,6 +53,10 @@ function attachPersistenceClose(
     const mode = pending.mode;
     clearTimeout(pending.timer);
     pending = null;
+    if (message.cancelled) {
+      resume();
+      return;
+    }
     if (!message.ok) {
       await failed();
       return;
@@ -56,7 +69,7 @@ function attachPersistenceClose(
           defaultPath: "loopcat-emergency.txt"
         });
         if (picked.canceled || !picked.filePath) {
-          window.webContents.send("loopcat:prepare-close", { id: randomUUID(), mode: "resume" });
+          resume();
           return;
         }
         const bytes = Buffer.from(message.text, "utf8");
@@ -82,7 +95,7 @@ function attachPersistenceClose(
           type: "info",
           message: translate("Emergency export verified. The editor remains open.")
         });
-        window.webContents.send("loopcat:prepare-close", { id: randomUUID(), mode: "resume" });
+        resume();
       } catch {
         await failed();
       }
@@ -100,6 +113,16 @@ function attachPersistenceClose(
   window.on("closed", () => {
     if (pending) clearTimeout(pending.timer);
     ipcMain.removeListener("loopcat:close-ready", complete);
+    settleClose(true);
+  });
+  return Object.freeze({
+    close() {
+      if (window.isDestroyed()) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        closeWaiters.add(resolve);
+        window.close();
+      });
+    }
   });
 }
 module.exports = { attachPersistenceClose };

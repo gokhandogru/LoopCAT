@@ -47,6 +47,12 @@ LoopCAT's shortcut system is optimized for the translator's main loop: edit, ins
 
 `Escape` closes Quick Insert, concordance, the command palette, or Focus mode, starting with the topmost active surface.
 
+## Resource workspaces
+
+Resource editors have their own focused context, separate from the project editor. `Ctrl/Cmd+S` saves the selected entry; `Ctrl/Cmd+Enter` saves it and moves to the next result, including across pages. `F2` focuses the selected entry's source field. Use **Save all** to commit all drafts in this editor. Ordinary `Ctrl/Cmd+Z` continues to undo text inside the field; **Undo last operation** reverses a committed resource edit or maintenance operation when its records have not since changed. Shortcuts are ignored during IME composition and AltGraph input.
+
+Use Tab/Shift+Tab to reach search, filters, row source buttons, selection checkboxes, and the editing form. Below 900 CSS pixels, **Back to results** returns from the full-width form to the table. See [Resources workspaces](resources-workspaces.md) for draft recovery and close behavior.
+
 ## Predictive typing
 
 With predictive typing enabled in Preferences, start typing in the target to see local word and phrase suggestions from matched TM and terminology resources. Use Up/Down to select, Tab or click to accept, and Escape to dismiss. Completion replaces only the typed prefix. Forbidden terms are excluded, and suggestions are suppressed during composition and protected-tag editing. This feature never calls AI or sends text over the network.

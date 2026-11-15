@@ -1,3 +1,10 @@
+// eslint-disable-next-line no-unused-vars -- LANGUAGE_CODES is consumed by the isolated workflow driver injected during its test build.
+import { LANGUAGE_ENTRIES, LANGUAGE_CODES, LANGUAGE_ALIAS_CODES } from "../i18n/language-catalog.js";
+import { createExchangeHost } from "../features/exchange/host.js";
+import { createResourceLibraryController } from "../features/resources/resource-library-controller.js";
+import { createResourceTransferService } from "../features/resources/resource-transfer-service.js";
+import { createResourceUi } from "../features/resources/resource-ui.js";
+import { SENSITIVE_TEXT_VALUE_PATTERN } from "../security/sensitive-value-pattern.js";
 import { installSourceTermContextMenu } from "../features/editor/source-term-context-menu.js";
 import { createMatchContextMenu } from "../ui/match-context-menu.js";
 import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
@@ -7,6 +14,7 @@ import { createFileManagementController } from "../features/projects/file-manage
 import { createWorkspaceToolbarController } from "../ui/workspace-toolbar-controller.js";
 import { linguistics } from "../features/linguistics/core.js";
 import { createBatchImportController } from "../features/import-export/batch-import-controller.js";
+import { createMultilingualExcelImportDialog } from "../features/import-export/multilingual-excel-import-dialog.js";
 import { createStatisticsController } from "../features/statistics/statistics-controller.js";
 import { createSegmentSelectionStore } from "../features/editor/segment-selection-store.js";
 /* eslint-disable no-use-before-define -- Composition preserves call-time adapters to later checked boundaries. */
@@ -115,7 +123,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   } = compatibilityModules.termbase;
   const { buildTbx, parseTbx, parseTbxAsync } = compatibilityModules.tbx;
   const { buildTargetXliff, buildXliff, buildXliff22, parseXliffFile, xliffMimeType } = xliffApi;
-  const { buildLocalizationFile, parseLocalizationFile } = compatibilityModules.localization;
+  const { buildLocalizationFile, parseLocalizationFile, inspectMultilingualExcel } = compatibilityModules.localization;
   const { runQaChecks } = compatibilityModules.qa;
   const {
     validateProjectPackage: validatePackage,
@@ -189,8 +197,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const workerClient = compatibilityModules.workerClient;
   const workspaceStorage = compatibilityModules.workspaceStorage;
   const uiI18n = compatibilityModules.i18n;
-  const SENSITIVE_TEXT_VALUE_PATTERN =
-    /(sk-[A-Za-z0-9_-]{8,}|Bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|npm_[A-Za-z0-9_]{8,}|(?:session|cookie)[=:][A-Za-z0-9._~+/=-]{8,})/i;
   const applicationTextSafetyService = appRuntime.featureFactories.createApplicationTextSafetyService({
     patterns: { sensitiveValue: SENSITIVE_TEXT_VALUE_PATTERN }
   });
@@ -354,537 +360,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     "sbv",
     "txt"
   ]);
-  // Bundled language/locales for offline use.
-  const LOOPCAT_LANGUAGE_CATALOG_ENTRIES = [
-    ["ace-ID", "Acehnese"],
-    ["aa-ET", "Afar"],
-    ["af-ZA", "Afrikaans"],
-    ["ak-GH", "Akan"],
-    ["sq-AL", "Albanian"],
-    ["gsw-CH", "Alemannic"],
-    ["am-ET", "Amharic"],
-    ["blo-BJ", "Anii"],
-    ["aig-AG", "Antigua and Barbuda Creole English"],
-    ["ar-SA", "Arabic"],
-    ["ar-EG", "Arabic (Egypt)"],
-    ["ar-JO", "Arabic (Jordan)"],
-    ["ar-MA", "Arabic (Morocco)"],
-    ["ar-TN", "Arabic (Tunisia)"],
-    ["ar-AE", "Arabic (United Arab Emirates)"],
-    ["an-ES", "Aragonese"],
-    ["hy-AM", "Armenian"],
-    ["as-IN", "Assamese"],
-    ["ast-ES", "Asturian"],
-    ["asa-TZ", "Asu"],
-    ["awa-IN", "Awadhi"],
-    ["quy-PE", "Ayacucho Quechua"],
-    ["az-AZ", "Azerbaijani"],
-    ["bah-BS", "Bahamas Creole English"],
-    ["bjs-BB", "Bajan"],
-    ["ban-ID", "Balinese"],
-    ["rmn-BG", "Balkan Romani"],
-    ["bal-PK", "Baluchi (Pakistan)"],
-    ["bm-ML", "Bambara"],
-    ["bjn-ID", "Banjar"],
-    ["ba-RU", "Bashkir"],
-    ["eu-ES", "Basque"],
-    ["be-BY", "Belarusian"],
-    ["bem-ZM", "Bemba"],
-    ["bez-TZ", "Bena"],
-    ["bn-BD", "Bengali (Bangladesh)"],
-    ["bn-IN", "Bengali (India)"],
-    ["bho-IN", "Bhojpuri"],
-    ["bh-IN", "Bihari"],
-    ["bi-VU", "Bislama"],
-    ["brx-IN", "Bodo (India)"],
-    ["gax-KE", "Borana"],
-    ["bs-Cyrl-BA", "Bosnian (Cyrillic script)"],
-    ["bs-BA", "Bosnian (Latin script)"],
-    ["br-FR", "Breton"],
-    ["bug-ID", "Buginese"],
-    ["bg-BG", "Bulgarian"],
-    ["my-MM", "Burmese"],
-    ["yue-HK", "Cantonese"],
-    ["ca-ES", "Catalan (Catalonia)"],
-    ["cav-ES", "Catalan (Valencia)"],
-    ["ceb-PH", "Cebuano"],
-    ["tzm-MA", "Central Atlas Tamazight"],
-    ["ayr-BO", "Central Aymara"],
-    ["knc-NG", "Central Kanuri (Latin script)"],
-    ["shu-TD", "Chadian Arabic"],
-    ["ch-GU", "Chamorro"],
-    ["ce-RU", "Chechen (Russia)"],
-    ["chr-US", "Cherokee"],
-    ["hne-IN", "Chhattisgarhi"],
-    ["cgg-UG", "Chiga"],
-    ["zh-LA", "Chinese (Simplified, Laos)"],
-    ["zh-MY", "Chinese (Simplified, Malaysia)"],
-    ["zh-SG", "Chinese (Simplified, Singapore)"],
-    ["zh-CN", "Chinese (Simplified, mainland China)"],
-    ["zh-HK", "Chinese (Traditional, Hong Kong)"],
-    ["zh-MO", "Chinese (Traditional, Macao)"],
-    ["zh-TW", "Chinese (Traditional, Taiwan)"],
-    ["ctg-BD", "Chittagonian"],
-    ["cjk-AO", "Chokwe"],
-    ["cac-GT", "Chuj"],
-    ["chk-FM", "Chuukese (Micronesia)"],
-    ["grc-GR", "Classical Greek"],
-    ["ksh-DE", "Colognian"],
-    ["zdj-KM", "Comorian Ngazidja"],
-    ["cop-EG", "Coptic"],
-    ["kw-GB", "Cornish"],
-    ["crh-RU", "Crimean Tatar"],
-    ["pov-GW", "Crioulo Upper Guinea"],
-    ["hr-HR", "Croatian"],
-    ["cs-CZ", "Czech"],
-    ["da-DK", "Danish"],
-    ["prs-AF", "Dari"],
-    ["diq-TR", "Dimli"],
-    ["doi-IN", "Dogri (India)"],
-    ["nl-BE", "Dutch (Belgium)"],
-    ["nl-NL", "Dutch (Netherlands)"],
-    ["dyu-CI", "Dyula"],
-    ["dz-BT", "Dzongkha"],
-    ["ydd-US", "Eastern Yiddish"],
-    ["vmw-MZ", "Emakhuwa"],
-    ["en-AU", "English (Australia)"],
-    ["en-AT", "English (Austria)"],
-    ["en-BD", "English (Bangladesh)"],
-    ["en-KH", "English (Cambodia)"],
-    ["en-CA", "English (Canada)"],
-    ["en-CZ", "English (Czech Republic)"],
-    ["en-FI", "English (Finland)"],
-    ["en-DE", "English (Germany)"],
-    ["en-HK", "English (Hong Kong)"],
-    ["en-HU", "English (Hungary)"],
-    ["en-IN", "English (India)"],
-    ["en-IE", "English (Ireland)"],
-    ["en-JM", "English (Jamaica)"],
-    ["en-LA", "English (Laos)"],
-    ["en-MY", "English (Malaysia)"],
-    ["en-MM", "English (Myanmar)"],
-    ["en-NZ", "English (New Zealand)"],
-    ["en-NO", "English (Norway)"],
-    ["en-PK", "English (Pakistan)"],
-    ["en-PH", "English (Philippines)"],
-    ["en-SG", "English (Singapore)"],
-    ["en-ZA", "English (South Africa)"],
-    ["en-SE", "English (Sweden)"],
-    ["en-TW", "English (Taiwan)"],
-    ["en-TR", "English (Turkey)"],
-    ["en-US", "English (USA)"],
-    ["en-GB", "English (United Kingdom)"],
-    ["eo-EU", "Esperanto"],
-    ["et-EE", "Estonian"],
-    ["ee-GH", "Ewe"],
-    ["fn-FNG", "Fanagalo"],
-    ["fo-FO", "Faroese"],
-    ["fj-FJ", "Fijian"],
-    ["fil-PH", "Filipino"],
-    ["fi-FI", "Finnish"],
-    ["fon-BJ", "Fon"],
-    ["fr-BE", "French (Belgium)"],
-    ["fr-CA", "French (Canada)"],
-    ["fr-FR", "French (France)"],
-    ["fr-LU", "French (Luxembourg)"],
-    ["fr-MA", "French (Morocco)"],
-    ["fr-CH", "French (Switzerland)"],
-    ["fur-IT", "Friulian"],
-    ["ff-FUL", "Fula"],
-    ["ff-GN", "Fula (Guinea)"],
-    ["gl-ES", "Galician"],
-    ["grt-IN", "Garo"],
-    ["ka-GE", "Georgian"],
-    ["de-AT", "German (Austria)"],
-    ["de-DE", "German (Germany)"],
-    ["de-CH", "German (Switzerland)"],
-    ["gil-KI", "Gilbertese"],
-    ["glw-NG", "Glavda"],
-    ["el-GR", "Greek"],
-    ["gcl-GD", "Grenadian Creole English"],
-    ["gn-PY", "Guarani"],
-    ["gu-IN", "Gujarati"],
-    ["gyn-GY", "Guyanese Creole English"],
-    ["ht-HT", "Haitian Creole French"],
-    ["khk-MN", "Halh Mongolian"],
-    ["ha-NE", "Hausa"],
-    ["haw-US", "Hawaiian"],
-    ["he-IL", "Hebrew"],
-    ["hig-NG", "Higi"],
-    ["hil-PH", "Hiligaynon"],
-    ["mrj-RU", "Hill Mari"],
-    ["hi-IN", "Hindi"],
-    ["hi-FJ", "Hindi (Fiji)"],
-    ["hmn-CN", "Hmong"],
-    ["hnj-LA", "Hmong Njua"],
-    ["hoc-IN", "Ho"],
-    ["hu-HU", "Hungarian"],
-    ["is-IS", "Icelandic"],
-    ["io-001", "Ido"],
-    ["ig-NG", "Igbo"],
-    ["ilo-PH", "Ilocano"],
-    ["smn-FI", "Inari Sami"],
-    ["id-ID", "Indonesian"],
-    ["ia-001", "Interlingua"],
-    ["iu-CA", "Inuktitut"],
-    ["ga-IE", "Irish Gaelic"],
-    ["it-IT", "Italian (Italy)"],
-    ["it-CH", "Italian (Switzerland)"],
-    ["jam-JM", "Jamaican Creole English"],
-    ["ja-JP", "Japanese"],
-    ["jv-ID", "Javanese"],
-    ["kac-MM", "Jingpho"],
-    ["kaj-NG", "Jju"],
-    ["quc-GT", "K'iche'"],
-    ["kbp-TG", "Kabiyè"],
-    ["kea-CV", "Kabuverdianu"],
-    ["kab-DZ", "Kabylian"],
-    ["kkj-CM", "Kako"],
-    ["kl-GL", "Kalaallisut (Greenland)"],
-    ["kln-KE", "Kalenjin"],
-    ["kam-KE", "Kamba"],
-    ["kjb-GT", "Kanjobal"],
-    ["kn-IN", "Kannada"],
-    ["kr-KAU", "Kanuri"],
-    ["kar-MM", "Karen"],
-    ["kas-IN", "Kashmiri (Arabic script)"],
-    ["ks-IN", "Kashmiri (Devanagari script)"],
-    ["kk-KZ", "Kazakh"],
-    ["kha-IN", "Khasi"],
-    ["km-KH", "Khmer"],
-    ["ki-KE", "Kikuyu"],
-    ["kmb-AO", "Kimbundu"],
-    ["rw-RW", "Kinyarwanda"],
-    ["rn-BI", "Kirundi"],
-    ["guz-KE", "Kisii"],
-    ["kg-CG", "Kongo"],
-    ["kok-IN", "Konkani"],
-    ["ko-KR", "Korean"],
-    ["ses-ML", "Koyraboro Senni"],
-    ["ckb-IQ", "Kurdish Sorani"],
-    ["ky-KG", "Kyrgyz"],
-    ["lld-IT", "Ladin"],
-    ["lkt-US", "Lakota"],
-    ["lag-TZ", "Langi"],
-    ["lo-LA", "Lao"],
-    ["ltg-LV", "Latgalian"],
-    ["la-VA", "Latin"],
-    ["lv-LV", "Latvian"],
-    ["lij-IT", "Ligurian"],
-    ["li-NL", "Limburgish"],
-    ["ln-CD", "Lingala"],
-    ["lt-LT", "Lithuanian"],
-    ["jbo-001", "Lojban"],
-    ["lmo-IT", "Lombard"],
-    ["dsb-DE", "Lower Sorbian"],
-    ["lua-CD", "Luba-Kasai"],
-    ["lg-UG", "Luganda"],
-    ["luy-KE", "Luhya"],
-    ["smj-SE", "Lule Sami"],
-    ["luo-KE", "Luo"],
-    ["lb-LU", "Luxembourgish"],
-    ["mas-KE", "Maa"],
-    ["ymm-SO", "Maay Maay"],
-    ["mk-MK", "Macedonian"],
-    ["jmc-TZ", "Machame"],
-    ["mag-IN", "Magahi"],
-    ["mai-IN", "Maithili"],
-    ["kde-TZ", "Makonde"],
-    ["mg-MG", "Malagasy"],
-    ["ms-MY", "Malay"],
-    ["ml-IN", "Malayalam"],
-    ["dv-MV", "Maldivian"],
-    ["mfi-NG", "Malgwa"],
-    ["mt-MT", "Maltese"],
-    ["mam-GT", "Mam"],
-    ["mnk-GM", "Mandinka (Gambia)"],
-    ["mfv-SN", "Mandjak (Senegal)"],
-    ["mni-IN", "Manipuri"],
-    ["gv-IM", "Manx Gaelic"],
-    ["mi-NZ", "Maori"],
-    ["mr-IN", "Marathi"],
-    ["mrt-NG", "Margi"],
-    ["mhr-RU", "Mari"],
-    ["mh-MH", "Marshallese"],
-    ["men-SL", "Mende"],
-    ["mer-KE", "Meru"],
-    ["mgo-CM", "Metaʼ"],
-    ["nyf-KE", "Mijikenda"],
-    ["min-ID", "Minangkabau"],
-    ["lus-IN", "Mizo"],
-    ["mo-MD", "Moldavian"],
-    ["mn-MN", "Mongolian"],
-    ["sr-Cyrl-ME", "Montenegrin (Cyrillic script)"],
-    ["sr-ME", "Montenegrin (Latin script)"],
-    ["mfe-MU", "Morisyen"],
-    ["mos-BF", "Mossi"],
-    ["nqo-GN", "N'Ko"],
-    ["naq-NA", "Nama"],
-    ["ndc-MZ", "Ndau"],
-    ["ne-NP", "Nepali"],
-    ["nnh-CM", "Ngiemboon"],
-    ["jgo-CM", "Ngomba"],
-    ["fuv-NG", "Nigerian Fulfulde"],
-    ["pcm-NG", "Nigerian Pidgin"],
-    ["niu-NU", "Niuean"],
-    ["azj-AZ", "North Azerbaijani"],
-    ["kmr-TR", "Northern Kurdish"],
-    ["nd-ZW", "Northern Ndebele"],
-    ["se-NO", "Northern Sami"],
-    ["uzn-UZ", "Northern Uzbek"],
-    ["nb-NO", "Norwegian Bokmål"],
-    ["nn-NO", "Norwegian Nynorsk"],
-    ["nus-SS", "Nuer"],
-    ["nup-NG", "Nupe"],
-    ["ny-MW", "Nyanja"],
-    ["nyn-UG", "Nyankole"],
-    ["oc-ES", "Occitan (Aran)"],
-    ["oc-FR", "Occitan (France)"],
-    ["or-IN", "Odia"],
-    ["ory-IN", "Oriya"],
-    ["om-ET", "Oromo (Ethiopia)"],
-    ["osa-US", "Osage"],
-    ["os-GE", "Ossetic"],
-    ["pau-PW", "Palauan"],
-    ["pi-IN", "Pali"],
-    ["pag-PH", "Pangasinan"],
-    ["pap-CW", "Papiamentu"],
-    ["ps-PK", "Pashto"],
-    ["fa-IR", "Persian"],
-    ["pis-SB", "Pijin"],
-    ["plt-MG", "Plateau Malagasy"],
-    ["pon-FM", "Pohnpeian (Micronesia)"],
-    ["pl-PL", "Polish"],
-    ["pt-BR", "Portuguese (Brazil)"],
-    ["pt-PT", "Portuguese (Portugal)"],
-    ["pot-US", "Potawatomi"],
-    ["prg-001", "Prussian"],
-    ["fuc-SN", "Pulaar (Senegal)"],
-    ["pa-IN", "Punjabi (India)"],
-    ["pa-PK", "Punjabi (Pakistan)"],
-    ["pko-KE", "Pökoot (Kenya)"],
-    ["pko-UG", "Pökoot (Uganda)"],
-    ["qu-PE", "Quechua"],
-    ["rhg-MM", "Rohingya"],
-    ["rhl-MM", "Rohingyalish"],
-    ["ro-RO", "Romanian"],
-    ["roh-CH", "Romansh"],
-    ["rof-TZ", "Rombo"],
-    ["run-BI", "Rundi"],
-    ["ru-RU", "Russian"],
-    ["rwk-TZ", "Rwa"],
-    ["ksw-MM", "S'gaw Karen (Myanmar)"],
-    ["ssy-ER", "Saho (Eritrea)"],
-    ["acf-LC", "Saint Lucian Creole French"],
-    ["saq-KE", "Samburu"],
-    ["sm-WS", "Samoan"],
-    ["sg-CF", "Sango"],
-    ["sa-IN", "Sanskrit"],
-    ["sat-IN", "Santali"],
-    ["sc-IT", "Sardinian"],
-    ["gd-GB", "Scots Gaelic"],
-    ["seh-ZW", "Sena"],
-    ["sr-Cyrl-RS", "Serbian (Cyrillic script)"],
-    ["sr-Latn-RS", "Serbian (Latin script)"],
-    ["sh-HR", "Serbo-Croatian (Croatia)"],
-    ["crs-SC", "Seselwa Creole French"],
-    ["nso-ZA", "Sesotho"],
-    ["ksb-TZ", "Shambala"],
-    ["shn-MM", "Shan"],
-    ["sn-ZW", "Shona"],
-    ["ii-CN", "Sichuan Yi"],
-    ["scn-IT", "Sicilian"],
-    ["szl-PL", "Silesian"],
-    ["sd-PK", "Sindhi"],
-    ["si-LK", "Sinhala"],
-    ["rmo-NL", "Sinte Romani (Netherlands)"],
-    ["sms-FI", "Skolt Sami"],
-    ["sk-SK", "Slovak"],
-    ["sl-SI", "Slovenian"],
-    ["xog-UG", "Soga"],
-    ["so-SO", "Somali"],
-    ["snk-ML", "Soninke (Mali)"],
-    ["st-LS", "Sotho Southern"],
-    ["azb-AZ", "South Azerbaijani"],
-    ["sdh-IR", "Southern Kurdish"],
-    ["nr-ZA", "Southern Ndebele"],
-    ["pbt-PK", "Southern Pashto"],
-    ["sma-SE", "Southern Sami"],
-    ["dik-SS", "Southwestern Dinka"],
-    ["es-AR", "Spanish (Argentina)"],
-    ["es-CO", "Spanish (Colombia)"],
-    ["es-DO", "Spanish (Dominican Republic)"],
-    ["es-HN", "Spanish (Honduras)"],
-    ["es-419", "Spanish (Latin America)"],
-    ["es-MX", "Spanish (Mexico)"],
-    ["es-PA", "Spanish (Panama)"],
-    ["es-PE", "Spanish (Perù)"],
-    ["es-PR", "Spanish (Puerto Rico)"],
-    ["es-ES", "Spanish (Spain)"],
-    ["es-US", "Spanish (USA)"],
-    ["es-UY", "Spanish (Uruguay)"],
-    ["es-VE", "Spanish (Venezuela)"],
-    ["srn-SR", "Sranan Tongo"],
-    ["lvs-LV", "Standard Latvian"],
-    ["zsm-MY", "Standard Malay"],
-    ["su-ID", "Sundanese"],
-    ["sus-GN", "Susu (Guinea)"],
-    ["sw-KE", "Swahili"],
-    ["csw-CA", "Swampy Cree"],
-    ["ss-SZ", "Swati"],
-    ["sv-SE", "Swedish"],
-    ["syr-SY", "Syriac"],
-    ["syc-TR", "Syriac (Aramaic)"],
-    ["shi-MA", "Tachelhit"],
-    ["tl-PH", "Tagalog"],
-    ["ty-PF", "Tahitian"],
-    ["tg-TJ", "Tajik"],
-    ["tmh-DZ", "Tamashek (Tuareg)"],
-    ["taq-ML", "Tamasheq"],
-    ["ta-IN", "Tamil (India)"],
-    ["ta-LK", "Tamil (Sri Lanka)"],
-    ["trv-TW", "Taroko"],
-    ["tt-RU", "Tatar"],
-    ["te-IN", "Telugu"],
-    ["teo-UG", "Teso"],
-    ["tet-TL", "Tetum"],
-    ["th-TH", "Thai"],
-    ["bo-CN", "Tibetan"],
-    ["tig-ER", "Tigre"],
-    ["ti-ET", "Tigrinya"],
-    ["tiv-NG", "Tiv"],
-    ["tpi-PG", "Tok Pisin"],
-    ["tkl-TK", "Tokelauan"],
-    ["to-TO", "Tongan"],
-    ["als-AL", "Tosk Albanian"],
-    ["ts-ZA", "Tsonga"],
-    ["tsc-MZ", "Tswa"],
-    ["tn-BW", "Tswana (Botswana)"],
-    ["tn-ZA", "Tswana (South Africa)"],
-    ["tum-MW", "Tumbuka"],
-    ["tr-TR", "Turkish"],
-    ["tk-TM", "Turkmen"],
-    ["tvl-TV", "Tuvaluan"],
-    ["tw-GH", "Twi"],
-    ["kcg-NG", "Tyap"],
-    ["udm-RU", "Udmurt"],
-    ["uk-UA", "Ukrainian"],
-    ["ppk-ID", "Uma"],
-    ["umb-AO", "Umbundu"],
-    ["hsb-DE", "Upper Sorbian"],
-    ["ur-Latn-PK", "Urdu (Latin script)"],
-    ["ur-PK", "Urdu (Perso-arabic script)"],
-    ["ug-CN", "Uyghur"],
-    ["uz-UZ", "Uzbek"],
-    ["ve-ZA", "Venda"],
-    ["vec-IT", "Venetian"],
-    ["vi-VN", "Vietnamese"],
-    ["svc-VC", "Vincentian Creole English"],
-    ["vic-US", "Virgin Islands Creole English"],
-    ["vo-001", "Volapük"],
-    ["vun-TZ", "Vunjo"],
-    ["wls-WF", "Wallisian"],
-    ["wa-BE", "Walloon"],
-    ["wae-CH", "Walser"],
-    ["mfi-CM", "Wandala"],
-    ["war-PH", "Waray"],
-    ["cy-GB", "Welsh"],
-    ["gaz-ET", "West Central Oromo"],
-    ["vls-BE", "West Flemish"],
-    ["fy-NL", "Western Frisian"],
-    ["wo-SN", "Wolof"],
-    ["xh-ZA", "Xhosa"],
-    ["sah-RU", "Yakut"],
-    ["yi-YD", "Yiddish"],
-    ["yo-NG", "Yoruba"],
-    ["zu-ZA", "Zulu"]
-  ];
-  // Short and generic codes kept for existing LoopCAT projects and quick-pair defaults.
-  const LOOPCAT_SHORT_LANGUAGE_ENTRIES = [
-    ["af", "Afrikaans"],
-    ["am", "Amharic"],
-    ["ar", "Arabic"],
-    ["az", "Azerbaijani"],
-    ["be", "Belarusian"],
-    ["bg", "Bulgarian"],
-    ["bn", "Bangla"],
-    ["bs", "Bosnian"],
-    ["ca", "Catalan"],
-    ["cs", "Czech"],
-    ["cy", "Welsh"],
-    ["da", "Danish"],
-    ["de", "German"],
-    ["el", "Greek"],
-    ["en", "English"],
-    ["eo", "Esperanto"],
-    ["es", "Spanish"],
-    ["et", "Estonian"],
-    ["eu", "Basque"],
-    ["fa", "Persian"],
-    ["fi", "Finnish"],
-    ["fil", "Filipino"],
-    ["fr", "French"],
-    ["ga", "Irish"],
-    ["gl", "Galician"],
-    ["gu", "Gujarati"],
-    ["he", "Hebrew"],
-    ["hi", "Hindi"],
-    ["hr", "Croatian"],
-    ["hu", "Hungarian"],
-    ["hy", "Armenian"],
-    ["id", "Indonesian"],
-    ["is", "Icelandic"],
-    ["it", "Italian"],
-    ["ja", "Japanese"],
-    ["ka", "Georgian"],
-    ["kk", "Kazakh"],
-    ["km", "Khmer"],
-    ["kn", "Kannada"],
-    ["ko", "Korean"],
-    ["ku", "Kurdish"],
-    ["ky", "Kyrgyz"],
-    ["la", "Latin"],
-    ["lo", "Lao"],
-    ["lt", "Lithuanian"],
-    ["lv", "Latvian"],
-    ["mk", "Macedonian"],
-    ["ml", "Malayalam"],
-    ["mn", "Mongolian"],
-    ["mr", "Marathi"],
-    ["ms", "Malay"],
-    ["mt", "Maltese"],
-    ["my", "Burmese"],
-    ["nb", "Norwegian Bokmål"],
-    ["ne", "Nepali"],
-    ["nl", "Dutch"],
-    ["nn", "Norwegian Nynorsk"],
-    ["pa", "Punjabi"],
-    ["pl", "Polish"],
-    ["pt", "Portuguese"],
-    ["ro", "Romanian"],
-    ["ru", "Russian"],
-    ["si", "Sinhala"],
-    ["sk", "Slovak"],
-    ["sl", "Slovenian"],
-    ["sq", "Albanian"],
-    ["sr", "Serbian"],
-    ["sv", "Swedish"],
-    ["sw", "Swahili"],
-    ["ta", "Tamil"],
-    ["te", "Telugu"],
-    ["th", "Thai"],
-    ["tl", "Filipino"],
-    ["tr", "Turkish"],
-    ["uk", "Ukrainian"],
-    ["ur", "Urdu"],
-    ["uz", "Uzbek"],
-    ["vi", "Vietnamese"],
-    ["zh", "Chinese"],
-    ["zh-Hans", "Simplified Chinese"],
-    ["zh-Hant", "Traditional Chinese"]
-  ];
-  const LANGUAGE_ENTRIES = [...LOOPCAT_LANGUAGE_CATALOG_ENTRIES, ...LOOPCAT_SHORT_LANGUAGE_ENTRIES];
-  const LANGUAGE_CODES = LANGUAGE_ENTRIES.map(([code]) => code);
+
   const DEFAULT_LANGUAGE_PAIRS = [
     ["en", "tr"],
     ["ca", "tr"],
@@ -893,12 +369,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     ["de", "tr"],
     ["en", "es"]
   ];
-  const LANGUAGE_ALIAS_CODES = {
-    catalan: "ca",
-    english: "en",
-    spanish: "es",
-    turkish: "tr"
-  };
+
   const LOOPCAT_TEST_BUILD = window.location.hash === "#app-workflow-test";
   if (LOOPCAT_TEST_BUILD) window.__loopcatTestBuild = true;
   const CONFIRM_FAILURE_TEST_FLAG = Symbol("confirm-failure-test");
@@ -2280,7 +1751,170 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     window,
     onError: (error) => applicationSaveStatusController.set(error?.message || "Match action failed", "dirty")
   });
+  const openTmResourceMenu = (event) => {
+    const card = event.target.closest?.("[data-match-id]");
+    if (!card || !els.tmMatches.contains(card)) return;
+    const match = tmMatchesController.getResults().find((item) => item.id === card.dataset.matchId);
+    if (!match || match.id === "previous-source-version") return;
+    event.preventDefault();
+    matchContextMenu.open({
+      event,
+      anchor: card,
+      items: [
+        {
+          label: uiLocalizationService.source("View / edit TM entry"),
+          action: async () => {
+            const record = await storageApi.get("tmEntries", match.id);
+            if (!record?.resourceId) throw new Error("Resource entry is no longer available.");
+            return appRuntime.platform.openResourceEditor({
+              type: "tm",
+              resourceId: record.resourceId,
+              entryId: record.id
+            });
+          }
+        }
+      ]
+    });
+  };
+  els.tmMatches.addEventListener("contextmenu", openTmResourceMenu);
+  els.tmMatches.addEventListener("keydown", (event) => {
+    if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) openTmResourceMenu(event);
+  });
 
+  const exchange = createExchangeHost({
+    document,
+    getProject: editorSessionStore.getProject,
+    getSegments: editorSessionStore.getSegments,
+    parseTermList,
+    confirm: (message) => window.confirm(message),
+    projectName: (id) => editorSessionStore.getProjects().find((p) => p.id === id)?.name || id,
+    selected: () => {
+      const ids = new Set(segmentSelection.ids());
+      return editorSessionStore.getSegments().filter((s) => ids.has(s.id));
+    },
+    saveProject: async (p) => {
+      if (editorSessionStore.getProject()?.id !== p.id) throw Error("Project changed.");
+      const updated = await updateProject(p);
+      if (editorSessionStore.getProject()?.id === p.id) editorSessionStore.replaceProject(updated);
+      workspaceDirtyStateController.mark(p.id);
+      return updated;
+    },
+    refresh: () => {
+      editorSessionStore.replaceQaChecks(
+        editorSessionStore
+          .getQaChecks()
+          .filter((c) => !c.exchange && !c.packId && !String(c.type).startsWith("exchange"))
+      );
+      qaResultsController.render();
+      qualityWorkbenchController.render();
+      void termSuggestionsController.refresh().catch(console.warn);
+    },
+    aiHost: async () => {
+      const { createExchangeAiHost, adjacentSources } = await import("../features/exchange/workflow-ai-host.js");
+      return createExchangeAiHost({
+        registry: aiProviderRegistry,
+        readSettings: aiRuntimeSettingsService.localSettingsFromForm,
+        presets: LOCAL_AI_PROVIDER_PRESETS,
+        normalizeDestination: normalizedProviderBaseUrl,
+        readProjectId: () => editorSessionStore.getProject()?.id || "",
+        readCredential: (settings) =>
+          aiCredentialStorageService.storedLocalAiKey(settings) ||
+          (settings.providerId === "openai" ? aiCredentialStorageService.storedOpenAiKey() : ""),
+        assertReady: aiRuntimeSettingsService.assertRuntimeReady,
+        sharesExternally: localAiProviderSharesExternally,
+        allowExternal: (projectId) => {
+          const p = editorSessionStore.getProject();
+          return p?.id === projectId && Boolean(p.aiSettings?.sendSourceToAi);
+        },
+        confirmSend: (info) =>
+          createAiConsentDialog({ document, focusController, translate: uiLocalizationService.source })(
+            "Run Exchange workflow?\n" +
+              [
+                info.id,
+                info.model,
+                info.baseUrl,
+                info.external ? "External processing" : "Local runtime",
+                "Scope: " + info.scope,
+                "Fields: " + info.fields.join(", "),
+                "Requests: " + info.requestCount + " / " + info.limit,
+                "Cost: unknown"
+              ].join("\n")
+          ),
+        readScope: async (sharing) => {
+          const p = editorSessionStore.getProject(),
+            s = applicationActiveSegmentService.get();
+          if (!p || !s) return null;
+          const originalSource = s.source;
+          const linked = new Set(sharing.terminology ? projectResourceContextService.termBaseNames(p) : []);
+          // A local query must use this segment and only its project's linked native
+          // termbases. The Matches sidebar can also contain restricted pack overlays.
+          const terms = linked.size ? await aiSegmentContextService.glossaryTermsForSegment(s) : [];
+          if (
+            p !== editorSessionStore.getProject() ||
+            s !== applicationActiveSegmentService.get() ||
+            s.source !== originalSource
+          )
+            throw Error("Canceled or stale workflow. No change was applied.");
+          return {
+            projectId: p.id,
+            segmentId: s.id,
+            source: s.source,
+            target: s.target,
+            sourceLang: p.sourceLang,
+            targetLang: p.targetLang,
+            revision: String(s.storageVersion || 0) + ":" + String(s.updatedAt || ""),
+            locked: preTranslationService.isLockedSegment(s),
+            confirmed: s.status === "confirmed",
+            adjacent:
+              sharing.adjacent && aiRuntimeSettingsService.localSettingsFromForm().includeNearbyContext !== false
+                ? adjacentSources(s, editorSessionStore.getSegments())
+                : null,
+            terms: terms
+              .filter((t) => linked.has(t.termBaseName) && !t.exchangeReadOnly && !t.packId)
+              .slice(0, 12)
+              .map((t) => ({
+                sourceTerm: applicationTextSafetyService.redactSensitiveText(t.sourceTerm),
+                targetTerm: applicationTextSafetyService.redactSensitiveText(t.targetTerm),
+                status: t.status,
+                isForbidden: t.isForbidden
+              }))
+          };
+        },
+        applyCandidate: async (scope, item, active) => {
+          const stillCurrent = () => {
+            const p = editorSessionStore.getProject(),
+              s = applicationActiveSegmentService.get();
+            return Boolean(
+              active() &&
+              s &&
+              p?.id === scope.projectId &&
+              s.id === scope.segmentId &&
+              s.source === scope.source &&
+              (s.target || "") === scope.target &&
+              String(s.storageVersion || 0) + ":" + String(s.updatedAt || "") === scope.revision &&
+              !preTranslationService.isLockedSegment(s) &&
+              s.status !== "confirmed" &&
+              !protectedTagInspectionService.missing({ ...s, target: item.text }).length
+            );
+          };
+          if (!stillCurrent()) throw Error("This segment changed or the draft is missing protected tags.");
+          const suggestion = {
+            id: makeId("exchange-ai"),
+            suggestedTarget: item.text,
+            provider: item.providerId,
+            model: item.model,
+            origin: "Exchange"
+          };
+          const applied = await aiSuggestionApplicationController.apply(suggestion.id, {
+            transientSuggestion: suggestion,
+            stillCurrent
+          });
+          if (!applied) throw Error("The draft was not applied. Check the segment and save status.");
+          return true;
+        }
+      });
+    }
+  });
   const termSuggestionsController = appRuntime.featureFactories.createTermSuggestionsController({
     root: els.termSuggestions,
     session: {
@@ -2290,7 +1924,29 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     terms: {
       getNames: projectResourceContextService.termBaseNames,
       getLinks: projectResourceContextService.lookupTermbaseLinks,
-      find: findTerms
+      find: async (query) => {
+        const native = await findTerms(query);
+        let extra = [];
+        try {
+          extra = await exchange.terms(query);
+        } catch (error) {
+          console.warn("Exchange term lookup unavailable.", error?.name);
+        }
+        if (!extra.length) return native;
+        const priorities = new Map(
+          (query.resourceLinks || []).flatMap((r) => [
+            [r.resourceId, r.priority || 0],
+            [r.name, r.priority || 0]
+          ])
+        );
+        return [
+          ...native.map((t) => ({
+            ...t,
+            exchangePriority: priorities.get(t.resourceId) || priorities.get(t.termBaseName) || 0
+          })),
+          ...extra
+        ].sort((a, b) => a.exchangePriority - b.exchangePriority);
+      }
     },
     localization: uiLocalizationService,
     text: { escapeHtml: applicationTextSafetyService.escapeHtml },
@@ -2298,7 +1954,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     contextMenu: matchContextMenu,
     mutation: {
       deleteTerm: (...args) => resourceMutationController.deleteTerm(...args),
-      editTerm: (term) => termFormController.edit(term)
+      copyTerm: (term) =>
+        quickTermCaptureController.open({
+          sourceText: term.sourceTerm,
+          targetText: term.targetTerm,
+          activeOnly: true,
+          termStatus: term.status
+        }),
+      editTerm: (term) =>
+        term.resourceId
+          ? appRuntime.platform.openResourceEditor({ type: "tb", resourceId: term.resourceId, entryId: term.id })
+          : termFormController.edit(term)
     },
     target: { insert: (...args) => targetProducerController.insertTermTarget(...args) },
     dom: {
@@ -2716,6 +2382,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       },
       repositories: { getAllByIndex, listTerms, listActivityEvents },
       portable: { sanitize: sanitizePortableValue },
+      exchange,
       reporting: { validateExportReadiness, analyzeProject, runQaChecks, buildQualityPassportData },
       worker: workerClient,
       tags: { forSegment: protectedTagInspectionService.sourceTags, missing: protectedTagInspectionService.missing },
@@ -2783,6 +2450,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       sourceTags: protectedTagInspectionService.sourceTags,
       missing: protectedTagInspectionService.missing
     },
+    exchange,
     qa: { runChecks: runQaChecks },
     worker: workerClient,
     presentation: {
@@ -2836,6 +2504,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     xliff: { documentTypes: XLIFF_DOCUMENT_TYPES, mimeType: xliffMimeType }
   });
   const deliveryExportController = appRuntime.featureFactories.createDeliveryExportController({
+    exchange,
     session: {
       getProject: editorSessionStore.getProject,
       getSegments: editorSessionStore.getSegments,
@@ -5451,6 +5120,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       },
       markMissingLocalDirty: workspaceProjectCoverageService.markMissingLocalDirty,
       generation: workspaceDirtyStateController.generation,
+      resourceGeneration: (projectId) => storageApi.getProjectResourceGeneration(projectId),
+      acknowledgeResourceGeneration: (projectId, generation) =>
+        storageApi.acknowledgeProjectResourceGeneration(projectId, generation),
       clearDirty: workspaceDirtyStateController.clear,
       markDirty: workspaceDirtyStateController.mark,
       hasDirty: () => Boolean(state.workspaceDirtyProjectIds.size),
@@ -5611,6 +5283,16 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     confirm: uiLocalizationService.confirm
   });
+  const multilingualExcelImportDialog = createMultilingualExcelImportDialog({
+    document,
+    translate: uiLocalizationService.source,
+    inspect: (file) => {
+      fileImportService.assertSize(file, "Project file", MAX_PROJECT_IMPORT_BYTES);
+      return inspectMultilingualExcel(file);
+    },
+    showDialog: (dialog, initialFocus) =>
+      focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement })
+  });
   const batchImportController = createBatchImportController({
     document,
     session: editorSessionStore,
@@ -5622,6 +5304,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     flush: () => autosaveService.flush(),
     runTask: fileImportService.runTask,
     importFile: projectDocumentImportController.importFile,
+    configureMultilingualExcel: multilingualExcelImportDialog.configure,
     finishBatch: projectDocumentImportController.finishBatch,
     showDialog: (dialog, initialFocus) =>
       focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement }),
@@ -6070,7 +5753,21 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     escapeHtml: applicationTextSafetyService.escapeHtml,
     replaceSafeHtml
   });
+  const resourceUi = createResourceUi(document, compatibilityModules.i18n);
+  const resourceLibraryWorkspace = createResourceLibraryController({
+    document,
+    root: document.getElementById("resourcesView"),
+    storage: storageApi,
+    project: compatibilityModules.project,
+    platform: appRuntime.platform,
+    transfer: createResourceTransferService({ ...compatibilityModules }),
+    i18n: compatibilityModules.i18n,
+    refresh: () => resourceCatalogRefreshController.refresh(),
+    normalizeLanguage: languageInputService.normalizeElement,
+    reportError: (error) => applicationSaveStatusController.set(error.message || "Resource action failed.", "dirty")
+  });
   const resourcesController = appRuntime?.featureFactories?.createResourcesController?.({
+    openEditor: (descriptor) => appRuntime.platform.openResourceEditor(descriptor),
     loadPage: loadResourceEntries,
     elements: {
       viewButton: els.resourcesViewBtn,
@@ -6091,7 +5788,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       termListImportInput: els.resourceTermListImportInput
     },
     navigate: () => applicationViewController.show("resources"),
-    render: resourcesPresentationService.render,
+    render: resourceLibraryWorkspace.render,
     keyForItem: (item, type) =>
       item.resourceId || resourceCatalogService.key(item, type === "tm" ? "tmName" : "termBaseName"),
     normalizeLanguageInput: languageInputService.normalizeElement,
@@ -6114,7 +5811,27 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       const current = (resourcesController?.getState?.().resources || []).find(
         (resource) => resource.id === resourceId
       );
-      const name = window.prompt(`Rename ${type === "tm" ? "translation memory" : "termbase"}`, current?.name || "");
+      const name = await new Promise((resolve) => {
+        const input = resourceUi.node("input", {
+          value: current?.name || "",
+          "aria-label": resourceUi.t("Resource name")
+        });
+        let value = null;
+        const view = resourceUi.dialog("Rename resource", resourceUi.field("Resource name", input), [
+          resourceUi.button("Cancel", () => view.close()),
+          resourceUi.button(
+            "Rename",
+            () => {
+              if (input.value.trim()) {
+                value = input.value.trim();
+                view.close();
+              }
+            },
+            { className: "primary" }
+          )
+        ]);
+        view.addEventListener("close", () => resolve(value), { once: true });
+      });
       if (!String(name || "").trim()) return current;
       const renamed = await renameResource(resourceId, name);
       await resourceCatalogRefreshController.refresh();
@@ -6174,6 +5891,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     onError: (error) => applicationSaveStatusController.set(error?.message || "Resource action failed.", "dirty")
   });
   resourcesController?.mount?.();
+  resourcesController?.selectType?.(resourceLibraryWorkspace.getPreferredType(), { render: false });
   qualityReviewController = appRuntime?.featureFactories?.createQualityReviewController?.({
     elements: {
       reviewForm: els.reviewForm,
@@ -6536,6 +6254,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       const ext = file.name.split(".").pop().toLowerCase();
       const importOptions = {
         encoding: settings.encoding || "auto",
+        ...(settings.multilingualExcel ? { multilingualExcel: settings.multilingualExcel } : {}),
         ...(ext === "tmx" ? { importedTranslationStatus: settings.importedTranslationStatus || "draft" } : {})
       };
       const parsed =
@@ -6674,6 +6393,41 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     if (view === "resources" && !resourcesController.getState().openKey)
       void resourceCatalogRefreshController.refresh().catch(console.error);
   });
+  let resourceChangeTimer;
+  const knownResourceGenerations = new Map();
+  async function refreshSharedResources() {
+    const dirty = await storageApi.listResourceDirtyProjects();
+    const changed = dirty.filter(({ projectId, generation }) => knownResourceGenerations.get(projectId) !== generation);
+    for (const { projectId, generation } of changed) knownResourceGenerations.set(projectId, generation);
+    workspaceDirtyStateController.markProjects(changed.map(({ projectId }) => projectId));
+    if (applicationStore.getState().navigation.view === "resources") await resourceCatalogRefreshController.refresh();
+    const activeId = editorSessionStore.getProject()?.id;
+    if (activeId && changed.some(({ projectId }) => projectId === activeId)) {
+      await projectTermRefreshController.refresh({ rerender: true });
+      await Promise.all([tmMatchesController.refresh(), termSuggestionsController.refresh()]);
+      editorSessionStore.replaceQaChecks([]);
+      qaResultsController.render();
+    }
+  }
+  const scheduleResourceRefresh = () => {
+    clearTimeout(resourceChangeTimer);
+    resourceChangeTimer = setTimeout(() => void refreshSharedResources().catch(console.warn), 200);
+  };
+  window.addEventListener("loopcat-resources-changed", scheduleResourceRefresh);
+  window.addEventListener("focus", scheduleResourceRefresh);
+  async function openResourceLibrary() {
+    await applicationViewController.show("resources");
+    await resourceCatalogRefreshController.refresh();
+  }
+  window.LoopCATDesktop?.onResourceLibraryOpen?.(() => void openResourceLibrary().catch(console.warn));
+  window.addEventListener("message", (event) => {
+    if (
+      window.location.origin !== "null" &&
+      event.origin === window.location.origin &&
+      event.data?.type === "loopcat-resource-library-open"
+    )
+      void openResourceLibrary().catch(console.warn);
+  });
   aiCredentialStorageService
     .migrateRemembered()
     .catch(() =>
@@ -6682,6 +6436,16 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         "dirty"
       )
     );
+  function startApplicationWithResources() {
+    const started = applicationStartupController.start();
+    started
+      .then(async () => {
+        await refreshSharedResources();
+        if (window.location.hash === "#resources") await openResourceLibrary();
+      })
+      .catch(console.warn);
+    return started;
+  }
   if (window.LoopCATDesktop?.consumeRecoveryRequest) {
     window.LoopCATDesktop.consumeRecoveryRequest()
       .then(async ({ needed }) => {
@@ -6690,6 +6454,6 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       .catch((error) =>
         applicationSaveStatusController.setPersistence(`Recovery needs attention: ${error.message}`, "dirty")
       )
-      .finally(() => applicationStartupController.start());
-  } else applicationStartupController.start();
+      .finally(startApplicationWithResources);
+  } else startApplicationWithResources();
 }

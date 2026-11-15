@@ -58,20 +58,39 @@ test("LocalizationDownloadMimeTypeService preserves every non-XLIFF format mappi
   const families = [
     [["html", "htm"], "text/html"],
     [["xhtml"], "application/xhtml+xml"],
-    [["md"], "text/markdown"],
+    [["md", "markdown"], "text/markdown"],
+    [["json"], "application/json"],
+    [["yaml", "yml"], "application/yaml"],
+    [["vtt"], "text/vtt"],
     [["csv"], "text/csv"],
     [["tsv"], "text/tab-separated-values"],
     [["xml", "tmx", "dita", "txml", "ttx", "xini", "resx", "wix", "ts", "icml"], "application/xml"],
     [["idml"], "application/vnd.adobe.indesign-idml-package"],
-    [
-      ["docm", "dotx", "dotm", "xlsx", "xlsm", "xltx", "xltm", "pptx", "pptm", "ppsx", "ppsm", "potx", "potm"],
-      "application/vnd.openxmlformats-officedocument"
-    ],
-    [["odt", "ott", "ods", "ots", "odp", "otp"], "application/vnd.oasis.opendocument"]
+    [["docx"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+    [["docm"], "application/vnd.ms-word.document.macroEnabled.12"],
+    [["dotx"], "application/vnd.openxmlformats-officedocument.wordprocessingml.template"],
+    [["dotm"], "application/vnd.ms-word.template.macroEnabled.12"],
+    [["xlsx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    [["xlsm"], "application/vnd.ms-excel.sheet.macroEnabled.12"],
+    [["xltx"], "application/vnd.openxmlformats-officedocument.spreadsheetml.template"],
+    [["xltm"], "application/vnd.ms-excel.template.macroEnabled.12"],
+    [["pptx"], "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+    [["pptm"], "application/vnd.ms-powerpoint.presentation.macroEnabled.12"],
+    [["ppsx"], "application/vnd.openxmlformats-officedocument.presentationml.slideshow"],
+    [["ppsm"], "application/vnd.ms-powerpoint.slideshow.macroEnabled.12"],
+    [["potx"], "application/vnd.openxmlformats-officedocument.presentationml.template"],
+    [["potm"], "application/vnd.ms-powerpoint.template.macroEnabled.12"],
+    [["odt"], "application/vnd.oasis.opendocument.text"],
+    [["ott"], "application/vnd.oasis.opendocument.text-template"],
+    [["ods"], "application/vnd.oasis.opendocument.spreadsheet"],
+    [["ots"], "application/vnd.oasis.opendocument.spreadsheet-template"],
+    [["odp"], "application/vnd.oasis.opendocument.presentation"],
+    [["otp"], "application/vnd.oasis.opendocument.presentation-template"]
   ];
   for (const [extensions, expected] of families) {
     for (const extension of extensions) assert.equal(service.forExtension(extension), expected, extension);
   }
+  assert.equal(service.forExtension("ts", { format: "code-string" }), "text/plain");
   assert.equal(
     calls.some(([name]) => name === "xliff"),
     false

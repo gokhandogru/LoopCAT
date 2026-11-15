@@ -6,12 +6,16 @@ const { fileURLToPath, pathToFileURL } = require("node:url");
 const { loadRuntimeSettings, saveRuntimeSettings } = require("./runtime-settings.cjs");
 const { createProtectedCredentials } = require("./protected-credentials.cjs");
 const { attachPersistenceClose } = require("./persistence-close.cjs");
+const { createResourceEditorWindows, createQuitCoordinator } = require("./resource-editor-windows.cjs");
 const { createVerifiedExports } = require("./verified-export.cjs");
 const { createNativeLocalization } = require("./ui-localization.cjs");
 const nativeUi = createNativeLocalization(require("./ui-catalogs.json"));
 // A normal launch reads the atomically committed database. Reconstruction is
 // reserved for the renderer-crash route and explicit recovery operations.
-let journalRecoveryNeeded = false;
+const rendererRecoveryRequests = new Set();
+const persistenceClosers = new WeakMap();
+let libraryWindow = null;
+let resourceEditorWindows = null;
 
 let electron = {};
 try {
@@ -80,6 +84,8 @@ const SPELLCHECKER_LANGUAGE_FALLBACKS = new Map([
   ["zh", ["zh-CN", "zh-TW"]]
 ]);
 const DESKTOP_SMOKE_MODE = process.env.LOOPCAT_DESKTOP_SMOKE === "1";
+const DESKTOP_RESOURCE_SMOKE_MODE = DESKTOP_SMOKE_MODE && process.env.LOOPCAT_DESKTOP_RESOURCE_SMOKE === "1";
+let resourceSmokeStarted = false;
 const DESKTOP_SMOKE_TIMEOUT_MS = Number(process.env.LOOPCAT_DESKTOP_SMOKE_TIMEOUT_MS || 30000);
 const DESKTOP_SMOKE_RESULT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_RESULT_FILE || "";
 const DESKTOP_SMOKE_SCREENSHOT_FILE = process.env.LOOPCAT_DESKTOP_SMOKE_SCREENSHOT_FILE || "";
@@ -476,12 +482,14 @@ function isLoopcatOrigin(origin) {
 
 function isAllowedAppNavigationUrl(url) {
   try {
+    // Validate the original path before URL normalization can collapse traversal.
+    // Hash payloads are resource identifiers, not application filesystem paths.
+    const shellUrl = String(url).split(/[?#]/, 1)[0];
+    if (!resolveAppFile(shellUrl)) return false;
     const parsed = new URL(url);
     if (parsed.protocol !== `${APP_SCHEME}:` || parsed.hostname !== APP_HOST) return false;
-    const filePath = resolveAppFile(url);
-    if (!filePath) return false;
-    const relativePath = normalizeAppRelativePath(path.relative(APP_ROOT, filePath).replaceAll(path.sep, "/"));
-    return relativePath === "index.html";
+    if (!["", "/", "/index.html"].includes(parsed.pathname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -685,10 +693,29 @@ function desktopCreatorIdentity() {
 
 function configureDesktopBridge() {
   if (!ipcMain?.handle) return;
+  ipcMain.handle("loopcat:open-resource-library", (event) => {
+    if (
+      !isAllowedDesktopBridgeRequest(event) ||
+      !isAllowedAppNavigationUrl(desktopBridgeRequestUrl(event)) ||
+      event.senderFrame !== event.sender?.mainFrame
+    )
+      throw new Error("Resource library request rejected.");
+    focusLibraryWindow({ resources: true });
+    return { opened: true, mode: "window" };
+  });
+  ipcMain.handle("loopcat:open-resource-editor", (event, request) => {
+    if (
+      !isAllowedDesktopBridgeRequest(event) ||
+      !isAllowedAppNavigationUrl(desktopBridgeRequestUrl(event)) ||
+      event.senderFrame !== event.sender?.mainFrame ||
+      !resourceEditorWindows
+    )
+      throw new Error("Resource editor request rejected.");
+    return resourceEditorWindows.open(request);
+  });
   ipcMain.handle("loopcat:consume-recovery-request", (event) => {
     if (!isAllowedDesktopBridgeRequest(event)) throw new Error("Recovery request rejected.");
-    const needed = journalRecoveryNeeded;
-    journalRecoveryNeeded = false;
+    const needed = rendererRecoveryRequests.delete(event.sender.id);
     return { needed };
   });
   const exports = createVerifiedExports({
@@ -789,6 +816,7 @@ function desktopRuntimeStatus() {
     chromiumVersion: process.versions.chrome || "",
     nodeVersion: process.versions.node || "",
     platform: process.platform,
+    packaged: Boolean(app?.isPackaged),
     rendererSandbox: !DESKTOP_SMOKE_NO_SANDBOX,
     chromiumNoSandbox: DESKTOP_SMOKE_NO_SANDBOX,
     sandboxFallbackUsed: false,
@@ -1741,16 +1769,22 @@ function createRendererWebPreferences(options = {}) {
   };
 }
 
-function createWindow() {
+function createWindow(resourceHash = "", resourceType = "", initialHash = "") {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1080,
-    minHeight: 680,
+    minWidth: resourceHash ? 760 : 1080,
+    minHeight: resourceHash ? 540 : 680,
     show: !DESKTOP_SMOKE_MODE,
     backgroundColor: "#f7f9fb",
-    title: "LoopCAT",
+    title: resourceHash ? `${resourceType === "tm" ? "Translation memory" : "Termbase"} — LoopCAT` : "LoopCAT",
     webPreferences: createRendererWebPreferences({ isPackaged: Boolean(app?.isPackaged) })
+  });
+  const rendererId = mainWindow.webContents.id;
+  if (!resourceHash) libraryWindow = mainWindow;
+  mainWindow.once("closed", () => {
+    if (libraryWindow === mainWindow) libraryWindow = null;
+    rendererRecoveryRequests.delete(rendererId);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -1765,24 +1799,53 @@ function createWindow() {
     openExternalUrl(url);
   });
   attachSpellCheckerContextMenu(mainWindow);
-  if (!DESKTOP_SMOKE_MODE)
-    attachPersistenceClose(mainWindow, {
-      ipcMain,
-      dialog: electronRuntime.dialog,
-      isAllowedRequest: isAllowedDesktopBridgeRequest,
-      translate: nativeUi.translate
-    });
+  if (!DESKTOP_SMOKE_MODE || DESKTOP_RESOURCE_SMOKE_MODE)
+    persistenceClosers.set(
+      mainWindow,
+      attachPersistenceClose(mainWindow, {
+        ipcMain,
+        dialog: electronRuntime.dialog,
+        isAllowedRequest: isAllowedDesktopBridgeRequest,
+        translate: nativeUi.translate
+      })
+    );
 
-  if (DESKTOP_SMOKE_MODE) {
-    attachDesktopSmokeProbe(mainWindow);
+  if (DESKTOP_SMOKE_MODE && !resourceHash) {
+    if (DESKTOP_RESOURCE_SMOKE_MODE) {
+      if (!resourceSmokeStarted) {
+        resourceSmokeStarted = true;
+        require("./resource-editor-smoke.cjs").attachResourceEditorSmoke(mainWindow, {
+          BrowserWindow,
+          timeoutMs: DESKTOP_SMOKE_TIMEOUT_MS,
+          runtimeStatus: desktopRuntimeStatus,
+          finish: finishDesktopSmoke
+        });
+      }
+    } else attachDesktopSmokeProbe(mainWindow);
   } else {
     mainWindow.webContents.on("render-process-gone", (_event, details) => {
       console.error("LoopCAT renderer exited unexpectedly.", details);
-      journalRecoveryNeeded = true;
+      rendererRecoveryRequests.add(rendererId);
       if (!mainWindow.isDestroyed()) mainWindow.reload();
     });
   }
-  mainWindow.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html`);
+  mainWindow.loadURL(`${APP_SCHEME}://${APP_HOST}/index.html${resourceHash || initialHash}`);
+  return mainWindow;
+}
+
+function focusLibraryWindow(options = {}) {
+  if (!app.isReady()) {
+    void app.whenReady().then(() => focusLibraryWindow(options));
+    return;
+  }
+  const previous = libraryWindow && !libraryWindow.isDestroyed() ? libraryWindow : null;
+  const existing = previous || createWindow("", "", options.resources ? "#resources" : "");
+  if (!DESKTOP_SMOKE_MODE) {
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+  }
+  if (previous && options.resources) existing.webContents.send("loopcat:resource-library-open");
 }
 
 function boot() {
@@ -1790,11 +1853,7 @@ function boot() {
     app.quit();
     return;
   }
-  app.on("second-instance", () => {
-    const existing = BrowserWindow.getAllWindows()[0];
-    if (existing?.isMinimized()) existing.restore();
-    existing?.focus();
-  });
+  app.on("second-instance", focusLibraryWindow);
   registerPrivilegedSchemes();
   app.whenReady().then(() => {
     registerAppProtocol();
@@ -1802,14 +1861,31 @@ function boot() {
     configurePermissions();
     configureSpellChecker();
     configureSpellCheckerBridge();
+    resourceEditorWindows = createResourceEditorWindows({
+      createWindow,
+      ...(DESKTOP_SMOKE_MODE ? { focusWindow: () => {} } : {})
+    });
     configureDesktopBridge();
     nativeUi.setLocale(app.getLocale?.() || "en-US");
     createApplicationMenu();
     createWindow();
 
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    });
+    app.on("activate", focusLibraryWindow);
+    if (!DESKTOP_SMOKE_MODE || DESKTOP_RESOURCE_SMOKE_MODE) {
+      const quitting = createQuitCoordinator({
+        windows: () => BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed()),
+        closeWindow: (window) => {
+          const closer = persistenceClosers.get(window);
+          if (closer) return closer.close();
+          return new Promise((resolve) => {
+            window.once("closed", () => resolve(true));
+            window.close();
+          });
+        },
+        quit: () => app.quit()
+      });
+      app.on("before-quit", quitting.beforeQuit);
+    }
   });
 
   app.on("window-all-closed", () => {

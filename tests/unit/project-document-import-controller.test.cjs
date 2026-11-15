@@ -619,6 +619,51 @@ test("direct TMX imports offer confirmed or draft status before parsing", async 
   }
 });
 
+test("multilingual Excel mapping is passed to the parser, saved for source updates, and checked on retries", async () => {
+  const { createProjectDocumentImportController } = await loadFactory();
+  const mapping = {
+    sheetPath: "xl/worksheets/sheet2.xml",
+    sourceColumn: "B",
+    targetColumn: "D",
+    firstRowIsHeader: true,
+    importExistingTargets: false
+  };
+  const structure = {
+    format: "openxml",
+    packageBase64: "original-workbook",
+    multilingualExcel: { ...mapping, sheetName: "Strings", skippedRows: { emptySource: 2 } }
+  };
+  const harness = createHarness(createProjectDocumentImportController, {
+    file: { name: "strings.xlsx", size: 40 },
+    project: { id: "project-1", sourceLang: "en", targetLang: "tr", documents: [] },
+    localizationResult: {
+      fileName: "strings.xlsx",
+      documentType: "xlsx",
+      segments: [{ text: "Hello", target: "", status: "empty" }],
+      structure
+    }
+  });
+  const batch = { id: "batch", projectId: "project-1", committed: [], canceled: () => false };
+  const settings = { batch, rowId: "row", fingerprint: "hash", encoding: "auto", multilingualExcel: mapping };
+  await harness.controller.importFile(harness.file, settings);
+  assert.deepEqual(harness.calls.find(([name]) => name === "parseLocalization")[2], {
+    encoding: "auto",
+    multilingualExcel: mapping
+  });
+  const saved = harness.read().project;
+  assert.deepEqual(saved.documents[0].importOptions.multilingualExcel, mapping);
+  assert.deepEqual(saved.importReceipts[0].multilingualExcel, mapping);
+  assert.deepEqual(saved.localizationStructures["doc-uuid-1"], structure);
+  await harness.controller.importFile(harness.file, settings);
+  assert.equal(harness.calls.filter(([name]) => name === "append").length, 1);
+  for (const changed of [null, { ...mapping, targetColumn: "C" }, { ...mapping, importExistingTargets: true }]) {
+    await assert.rejects(
+      harness.controller.importFile(harness.file, { ...settings, multilingualExcel: changed }),
+      /differs from the committed/
+    );
+  }
+});
+
 test("ProjectDocumentImportController validates boundaries and exposes an immutable API", async () => {
   const { createProjectDocumentImportController } = await loadFactory();
   assert.throws(() => createProjectDocumentImportController(), /requires checked session/);

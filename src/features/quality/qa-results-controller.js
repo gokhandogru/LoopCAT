@@ -1,3 +1,4 @@
+import { qaIsIncomplete } from "./qa-completeness.js";
 /**
  * Owns QA summary/filter state, localized issue presentation, dynamic filter
  * and navigation actions, and safe results-root replacement. QA calculation,
@@ -81,7 +82,9 @@ export function createQaResultsController(options) {
     const qaChecks = session.getQaChecks();
     const checks = filter ? qaChecks.filter((check) => check.type === filter) : qaChecks;
     if (!qaChecks.length) {
-      root.textContent = localization.source("No QA issues found.");
+      root.textContent = localization.source(
+        qaIsIncomplete(qaChecks) ? "Required Exchange checks: Not evaluated." : "No QA issues found."
+      );
       root.classList.add("muted");
       return;
     }
@@ -112,6 +115,11 @@ export function createQaResultsController(options) {
         });
         summaryWrap.append(button);
       });
+    if (qaIsIncomplete(qaChecks)) {
+      const notice = dom.createElement("p");
+      notice.textContent = localization.source("Required Exchange checks: Not evaluated.");
+      fragment.append(notice);
+    }
     fragment.append(summaryWrap);
     checks.slice(0, 100).forEach((check) => {
       const card = dom.createElement("article");

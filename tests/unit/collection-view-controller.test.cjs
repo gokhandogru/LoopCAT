@@ -69,7 +69,7 @@ test("collection views preserve defaults and restore only valid independent pref
     true
   );
   assert.equal(h.controller.initialize({ collectionViews: { projects: "card" } }), false);
-  assert.deepEqual(h.controller.getState(), { ...DEFAULT_COLLECTION_VIEWS, projects: "list" });
+  assert.deepEqual(h.controller.getState(), { ...DEFAULT_COLLECTION_VIEWS, projects: "list", resources: "card" });
   assert.equal(h.attributes.get("data-projects-view"), "list");
   assert.equal(h.attributes.get("data-files-view"), "card");
   assert.equal(h.attributes.get("data-resource-entries-view"), "list");

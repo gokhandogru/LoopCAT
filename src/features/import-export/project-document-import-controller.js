@@ -69,6 +69,21 @@ export function createProjectDocumentImportController(options) {
   const { confirmDuplicate, hasDocumentNamed } = createProjectDocumentDuplicatePolicy({ catalog, text, confirm });
   let importContext = null;
 
+  function excelMapping(mapping) {
+    if (!mapping) return null;
+    return {
+      sheetPath: mapping.sheetPath,
+      sourceColumn: String(mapping.sourceColumn || "")
+        .trim()
+        .toUpperCase(),
+      targetColumn: String(mapping.targetColumn || "")
+        .trim()
+        .toUpperCase(),
+      firstRowIsHeader: mapping.firstRowIsHeader !== false,
+      importExistingTargets: mapping.importExistingTargets !== false
+    };
+  }
+
   function append(project, segments, documentOptions) {
     project = {
       ...project,
@@ -80,6 +95,9 @@ export function createProjectDocumentImportController(options) {
               originalFilename: document.name,
               importOptions: {
                 encoding: importContext?.encoding || formats.decodingOptions()?.encoding || "auto",
+                ...(project.localizationStructures?.[document.id]?.multilingualExcel
+                  ? { multilingualExcel: excelMapping(project.localizationStructures[document.id].multilingualExcel) }
+                  : {}),
                 ...(document.type === "tmx"
                   ? { importedTranslationStatus: importContext?.importedTranslationStatus || "draft" }
                   : {})
@@ -101,6 +119,9 @@ export function createProjectDocumentImportController(options) {
           fingerprint: importContext.fingerprint,
           encoding: importContext.encoding,
           allowLanguageMismatch: !!importContext.allowLanguageMismatch,
+          ...(importContext.multilingualExcel
+            ? { multilingualExcel: excelMapping(importContext.multilingualExcel) }
+            : {}),
           ...(documentOptions.documentType === "tmx"
             ? { importedTranslationStatus: importContext.importedTranslationStatus || "draft" }
             : {}),
@@ -221,6 +242,7 @@ export function createProjectDocumentImportController(options) {
     const isTmx = /\.tmx$/i.test(file.name);
     const result = await formats.parseLocalization(file, {
       ...decodingOptions,
+      ...(importContext?.multilingualExcel ? { multilingualExcel: importContext.multilingualExcel } : {}),
       ...(isTmx
         ? {
             sourceLang: session.getProject().sourceLang,
@@ -337,6 +359,8 @@ export function createProjectDocumentImportController(options) {
         receipt.encoding !== importOptions.encoding ||
         receipt.name !== file.name ||
         !!receipt.allowLanguageMismatch !== !!importOptions.allowLanguageMismatch ||
+        JSON.stringify(excelMapping(receipt.multilingualExcel)) !==
+          JSON.stringify(excelMapping(importOptions.multilingualExcel)) ||
         (/\.tmx$/i.test(file.name) &&
           (receipt.importedTranslationStatus || "draft") !== (importOptions.importedTranslationStatus || "draft"))
       )

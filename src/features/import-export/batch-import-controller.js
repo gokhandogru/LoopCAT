@@ -1,4 +1,5 @@
 export const BATCH_IMPORT_LIMITS = Object.freeze({ files: 50, bytes: 100 * 1024 * 1024 });
+const EXCEL_EXTENSIONS = new Set(["xlsx", "xlsm", "xltx", "xltm"]);
 
 export function validateImportBatch(files) {
   if (!files.length) return;
@@ -62,6 +63,8 @@ export function createBatchImportController(options) {
     projectId = "",
     batchId = "",
     running = false,
+    reviewing = false,
+    configuring = false,
     canceled = false;
   const start = button("Import ready files", () => run());
   const retry = button("Retry failed files", () => run(true));
@@ -78,9 +81,9 @@ export function createBatchImportController(options) {
   });
   stats.hidden = true;
   dialog.addEventListener("cancel", (event) => {
-    if (running) {
+    if (running || configuring) {
       event.preventDefault();
-      canceled = true;
+      if (running) canceled = true;
     }
   });
   function render() {
@@ -88,12 +91,16 @@ export function createBatchImportController(options) {
     const table = node("table", "", queue),
       header = node("tr", "", node("thead", "", table));
     const hasTmx = rows.some((row) => row.extension === "tmx");
+    const hasExcel =
+      typeof options.configureMultilingualExcel === "function" &&
+      rows.some((row) => EXCEL_EXTENSIONS.has(row.extension));
     tmxHelp.hidden = !hasTmx;
     for (const title of [
       "Import",
       "File",
       "Format / size",
       "Encoding",
+      ...(hasExcel ? ["Excel columns"] : []),
       ...(hasTmx ? ["Existing translations"] : []),
       "Result"
     ])
@@ -104,7 +111,7 @@ export function createBatchImportController(options) {
         check = node("input", "", node("td", "", tr));
       check.type = "checkbox";
       check.checked = row.include;
-      check.disabled = running || row.state === "imported" || row.state === "unsupported";
+      check.disabled = running || reviewing || configuring || row.state === "imported" || row.state === "unsupported";
       check.setAttribute("aria-label", t("Import ") + row.file.name);
       check.addEventListener("change", () => {
         row.include = check.checked;
@@ -113,7 +120,8 @@ export function createBatchImportController(options) {
       node("td", `${row.extension.toUpperCase()} · ${(row.file.size / 1024).toFixed(1)} KiB`, tr);
       const select = node("select", "", node("td", "", tr));
       select.setAttribute("aria-label", t("Encoding for ") + row.file.name);
-      select.disabled = running || row.state === "imported";
+      select.disabled =
+        running || reviewing || configuring || row.state === "imported" || EXCEL_EXTENSIONS.has(row.extension);
       for (const [value, label] of options.encodingOptions()) {
         const entry = node("option", label, select);
         entry.value = value;
@@ -123,13 +131,34 @@ export function createBatchImportController(options) {
         row.encoding = select.value;
         row.state = "ready";
       });
+      if (hasExcel) {
+        const cell = node("td", "", tr);
+        if (EXCEL_EXTENSIONS.has(row.extension)) {
+          const description = node("span", "", cell);
+          description.className = "excel-import-column-summary";
+          description.textContent = row.multilingualExcel
+            ? `${row.multilingualExcel.sourceColumn} → ${row.multilingualExcel.targetColumn}`
+            : t("All text");
+          const columns = node("button", "Columns…", cell);
+          columns.type = "button";
+          columns.id = `excelImportColumns-${row.id}`;
+          columns.setAttribute("aria-label", t("Excel columns") + ": " + row.file.name);
+          columns.setAttribute("aria-haspopup", "dialog");
+          columns.disabled =
+            running || reviewing || configuring || row.state === "imported" || row.state === "unsupported";
+          columns.addEventListener("click", () => {
+            void configureColumns(row);
+          });
+        } else cell.textContent = "—";
+      }
       if (hasTmx) {
         const cell = node("td", "", tr);
         if (row.extension === "tmx") {
           const translationStatus = node("select", "", cell);
           translationStatus.setAttribute("aria-label", t("Existing translations") + ": " + row.file.name);
           translationStatus.setAttribute("aria-describedby", tmxHelp.id);
-          translationStatus.disabled = running || row.state === "imported" || row.state === "unsupported";
+          translationStatus.disabled =
+            running || reviewing || configuring || row.state === "imported" || row.state === "unsupported";
           for (const [value, label] of [
             ["draft", "Draft"],
             ["confirmed", "Confirmed"]
@@ -145,8 +174,32 @@ export function createBatchImportController(options) {
       node("td", row.message || row.state, tr);
     }
   }
+  async function configureColumns(row) {
+    if (running || reviewing || configuring) return;
+    configuring = true;
+    start.disabled = retry.disabled = cancel.disabled = true;
+    const previousSummary = summary.textContent;
+    summary.textContent = t("Reading workbook…") + " " + row.file.name;
+    render();
+    try {
+      const mapping = await options.configureMultilingualExcel(row.file, row.multilingualExcel);
+      if (mapping !== null) {
+        row.multilingualExcel = mapping || undefined;
+        row.state = "ready";
+        row.message = "";
+      }
+      summary.textContent = previousSummary;
+    } catch (error) {
+      summary.textContent = error.message;
+    } finally {
+      configuring = false;
+      start.disabled = retry.disabled = cancel.disabled = false;
+      render();
+      doc.getElementById(`excelImportColumns-${row.id}`)?.focus();
+    }
+  }
   async function run(retryOnly = false) {
-    if (running) return;
+    if (running || reviewing || configuring) return;
     if (session.getProject()?.id !== projectId)
       throw Error(t("The project changed. Review these files in the intended project."));
     const pending = rows.filter(
@@ -191,6 +244,7 @@ export function createBatchImportController(options) {
                 rowId: row.id,
                 fingerprint,
                 encoding: row.encoding,
+                ...(row.multilingualExcel ? { multilingualExcel: row.multilingualExcel } : {}),
                 ...(row.extension === "tmx" ? { importedTranslationStatus: row.importedTranslationStatus } : {}),
                 acceptDuplicate: true,
                 allowLanguageMismatch: row.allowLanguageMismatch
@@ -241,7 +295,7 @@ export function createBatchImportController(options) {
     }
   }
   async function review(files) {
-    if (dialog.open || running) throw Error(t("Finish the current import review first."));
+    if (dialog.open || running || reviewing || configuring) throw Error(t("Finish the current import review first."));
     validateImportBatch(files);
     if (!files.length) return;
     projectId = session.getProject()?.id;
@@ -279,9 +333,15 @@ export function createBatchImportController(options) {
     stats.hidden = true;
     cancel.textContent = t("Cancel");
     summary.textContent = `${files.length} ${t("files selected")}`;
+    reviewing = true;
     render();
     start.disabled = true;
-    options.showDialog(dialog, start);
+    try {
+      options.showDialog(dialog, start);
+    } catch (error) {
+      reviewing = false;
+      throw error;
+    }
     summary.textContent = t("Checking file contents for duplicates…");
     const documentIds = new Set((session.getProject().documents || []).map((d) => d.id));
     const fingerprints = new Map(
@@ -309,6 +369,7 @@ export function createBatchImportController(options) {
         row.message = `${t("Cannot read file")}: ${error.message}`;
       }
     }
+    reviewing = false;
     if (rows !== reviewedRows) return;
     render();
     start.disabled = false;

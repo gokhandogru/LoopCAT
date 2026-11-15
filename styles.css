@@ -1139,6 +1139,20 @@ input[type="file"] {
   gap: 4px;
 }
 
+/* LoopCAT Exchange uses the same modal and native focus behavior as the editor. */
+.exchange-dialog { width: min(48rem, 94vw); max-height: 88vh; overflow:auto; }
+.exchange-dialog .dialog-card { display: grid; gap: .7rem; max-height:none; }
+.exchange-heading, .exchange-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.exchange-heading { justify-content:space-between; }
+#exchangeRoot section { display:grid; gap:.55rem; margin-block:.6rem; }
+#exchangeRoot button { justify-self:start; }
+.exchange-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(14rem,100%),1fr)); gap:.5rem; }
+.exchange-field { display:grid; gap:.2rem; margin-block:.3rem; }
+.exchange-field input, .exchange-field textarea, .exchange-field select { width:100%; }
+.exchange-field input[type=checkbox] { width:auto; justify-self:start; }
+.exchange-card, #exchangeRoot fieldset { padding:.75rem; border:1px solid currentColor; border-radius:.5rem; margin-block:.5rem; min-width:0; }
+.exchange-digest, #exchangeStatus { overflow-wrap:anywhere; }
+#exchangeStatus:empty { display:none; }
 /* Import is the first wide toolbar menu, so it must open into the editor. */
 .project-toolbar .import-menu > .menu-panel {
   left: 0;

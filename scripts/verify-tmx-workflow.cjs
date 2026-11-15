@@ -17,6 +17,7 @@ app.setPath("userData", path.join(root, "tmp", `tmx-profile-${process.pid}`));
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("in-process-gpu");
+if (process.env.LOOPCAT_BROWSER_RUNNER_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
 let server, win;
 const evaluate = (source) => win.webContents.executeJavaScript(source, true);
 const run = (fn, ...args) => evaluate(`(${fn.toString()})(...${JSON.stringify(args)})`);
@@ -404,7 +405,7 @@ app.whenReady().then(async () => {
     app.exit(0);
   } catch (error) {
     console.error(error.stack);
-    if (win) console.error(await evaluate("document.body.innerText.slice(-3500)").catch(() => ""));
+    if (win && !win.isDestroyed() && win.webContents.getURL()) console.error(await evaluate("document.body.innerText.slice(-3500)").catch(() => ""));
     app.exit(1);
   } finally {
     server?.close();

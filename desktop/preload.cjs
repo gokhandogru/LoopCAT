@@ -4,6 +4,23 @@ contextBridge.exposeInMainWorld(
   "LoopCATDesktop",
   Object.freeze({
     setUiLocale: (locale) => ipcRenderer.invoke("loopcat:set-ui-locale", locale),
+    openResourceEditor: (request) => ipcRenderer.invoke("loopcat:open-resource-editor", request),
+    openResourceLibrary: () => ipcRenderer.invoke("loopcat:open-resource-library"),
+    onResourceLibraryOpen: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on("loopcat:resource-library-open", handler);
+      return () => ipcRenderer.removeListener("loopcat:resource-library-open", handler);
+    },
+    onResourceEditorSelect: (listener) => {
+      const handler = (_event, request) =>
+        listener({
+          resourceType: request.resourceType,
+          resourceId: request.resourceId,
+          entryId: request.entryId
+        });
+      ipcRenderer.on("loopcat:resource-editor-select", handler);
+      return () => ipcRenderer.removeListener("loopcat:resource-editor-select", handler);
+    },
     consumeRecoveryRequest: () => ipcRenderer.invoke("loopcat:consume-recovery-request"),
     beginExport: (request) => ipcRenderer.invoke("loopcat:begin-export", request),
     writeExportChunk: (request) => ipcRenderer.invoke("loopcat:write-export-chunk", request),

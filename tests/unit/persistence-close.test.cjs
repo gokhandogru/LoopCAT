@@ -41,3 +41,42 @@ test("R11 desktop close waits for an authenticated persistence acknowledgement a
   assert.equal(closed, 1);
   window.emit("closed");
 });
+
+test("resource editor cancellation cancels Quit without a save-failure dialog", async () => {
+  const ipcMain = new EventEmitter();
+  const window = new EventEmitter();
+  const sent = [];
+  let destroyed = false;
+  window.webContents = { send: (_name, message) => sent.push(message) };
+  window.isDestroyed = () => destroyed;
+  window.close = () => {
+    let prevented = false;
+    window.emit("close", {
+      preventDefault() {
+        prevented = true;
+      }
+    });
+    if (!prevented) {
+      destroyed = true;
+      window.emit("closed");
+    }
+  };
+  const closer = attachPersistenceClose(window, {
+    ipcMain,
+    isAllowedRequest: () => true,
+    dialog: { showMessageBox: () => assert.fail("Cancel is not a persistence failure") }
+  });
+  const first = closer.close();
+  ipcMain.emit(
+    "loopcat:close-ready",
+    { sender: window.webContents },
+    { id: sent.at(-1).id, ok: true, cancelled: true }
+  );
+  assert.equal(await first, false);
+  assert.equal(destroyed, false);
+  assert.equal(sent.at(-1).mode, "resume");
+  const second = closer.close();
+  ipcMain.emit("loopcat:close-ready", { sender: window.webContents }, { id: sent.at(-1).id, ok: true });
+  assert.equal(await second, true);
+  assert.equal(destroyed, true);
+});

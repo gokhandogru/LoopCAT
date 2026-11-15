@@ -279,6 +279,8 @@ const SEMANTIC_INLINE_TAGS = new Map([
   ["i", { property: "i" }],
   ["u", { property: "u" }]
 ]);
+const WORD_VISIBLE_TEXT_CONTROL_NAMES = ["tab", "br", "cr", "noBreakHyphen", "softHyphen"];
+const SUPPORTED_TEXT_WRAPPERS = new Set(["hyperlink", "fldSimple", "sdt", "customXml", "smartTag"]);
 
 function wrapInlineTags(tags, text) {
   return tags.reduceRight((value, tag) => `<${tag}>${value}</${tag}>`, xmlEscape(text));
@@ -319,9 +321,13 @@ function semanticTagsForRunProperties(rPrXml) {
 function hasOnlySemanticRunProperties(rPrXml) {
   const runProperties = runPropertiesElement(rPrXml);
   if (!runProperties) return false;
-  const allowed = new Set(["b", "bCs", "i", "iCs", "u"]);
+  const allowed = new Set(["b", "i", "u"]);
   const children = Array.from(runProperties.childNodes).filter((child) => child.nodeType === Node.ELEMENT_NODE);
-  return Boolean(children.length) && children.every((child) => allowed.has(/** @type {Element} */ (child).localName));
+  return Boolean(children.length) && children.every((child) => {
+    const property = /** @type {Element} */ (child);
+    return allowed.has(property.localName) && Array.from(property.attributes).every((attr) => attr.name.startsWith("xmlns") ||
+      (attr.localName === "val" && (property.localName === "u" ? attr.value === "single" : ["1", "true", "on"].includes(attr.value))));
+  });
 }
 
 function wrapInlineTagsWithStyleId(tags, text, styleId = "") {
@@ -363,10 +369,121 @@ function visibleTextChunks(node, scopeParagraph, chunks = []) {
   return chunks;
 }
 
+function paragraphNeedsFidelityMap(paragraph) {
+  const textNodes = paragraphTextNodes(paragraph);
+  const wrappers = new Set(textNodes.map((node) => topLevelParagraphChild(node, paragraph)));
+  const wrapped = [...wrappers].filter((node) => node && node.localName !== "r");
+  if (wrapped.length && (wrappers.size > 1 || wrapped.some((node) => {
+    const nested = Array.from(node.getElementsByTagNameNS("*", "t"));
+    return nested.some((text) => {
+      let ancestor = text.parentElement;
+      let count = 0;
+      while (ancestor && ancestor !== paragraph) {
+        if (SUPPORTED_TEXT_WRAPPERS.has(ancestor.localName) || ancestor.localName === "ins" || ancestor.localName === "moveTo") count += 1;
+        ancestor = ancestor.parentElement;
+      }
+      return count > 1;
+    });
+  }))) return true;
+  const scoped = Array.from(paragraph.getElementsByTagNameNS("*", "*")).filter((node) => closestParagraph(node) === paragraph);
+  const boundaries = new Set(["bookmarkStart", "bookmarkEnd", "commentRangeStart", "commentRangeEnd", "permStart", "permEnd", "footnoteReference", "endnoteReference", "commentReference"]);
+  if (scoped.some((node, index) => boundaries.has(node.localName) && scoped.slice(0, index).some((before) => before.localName === "t") && scoped.slice(index + 1).some((after) => after.localName === "t"))) return true;
+  if (scoped.some((node) => node.localName === "ins" || node.localName === "moveTo")) return true;
+  if (scoped.some((node) => node.localName === "fldChar")) {
+    let depth = 0;
+    for (const node of scoped) {
+      if (node.localName === "fldChar") {
+        const type = node.getAttributeNS(WORD_NS, "fldCharType");
+        if (type === "begin") depth += 1;
+        if (type === "end") depth -= 1;
+      } else if (node.localName === "t" && depth === 0) return true;
+    }
+  }
+  if (scoped.some((node) => node.localName === "br" && (node.getAttributeNS(WORD_NS, "type") || node.getAttributeNS(WORD_NS, "clear")))) return true;
+  if (scoped.some((node) => node.localName === "r" && Array.from(node.children).some((child) => !["rPr", "t", ...WORD_VISIBLE_TEXT_CONTROL_NAMES].includes(child.localName)) && Array.from(node.children).some((child) => child.localName === "t"))) return true;
+  const visible = visibleTextChunks(paragraph, paragraph).map((run) => run.text).join("");
+  return / {2,}|\u00a0/.test(visible);
+}
+
+function paragraphFidelityProjection(paragraph) {
+  const records = new Map();
+  const staticNames = new Set(["pPr", "rPr", "sdtPr", "sdtEndPr", "customXmlPr"]);
+  const visible = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE || ["del", "moveFrom", "delText", "instrText"].includes(node.localName)) return false;
+    if (node.localName === "p" && node !== paragraph) return false;
+    if (node.localName === "t") return true;
+    return Array.from(node.childNodes).some(visible);
+  };
+  const render = (node, parentId) => {
+    if (node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) return "";
+    if (node.nodeType === Node.ELEMENT_NODE && ["del", "moveFrom"].includes(node.localName)) return "";
+    const id = `w${records.size + 1}`;
+    const kind = node.nodeType === Node.ELEMENT_NODE && node.localName === "t" ? "text" : visible(node) ? "group" : "opaque";
+    const record = { id, node, kind, parentId, properties: [] };
+    records.set(id, record);
+    if (kind === "opaque") return `<x id="${id}"/>`;
+    if (kind === "text") return `<g id="${id}">${xmlEscape(node.textContent)}</g>`;
+    const content = Array.from(node.childNodes).map((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE && staticNames.has(child.localName)) { record.properties.push(child); return ""; }
+      return render(child, id);
+    }).join("");
+    return `<g id="${id}">${content}</g>`;
+  };
+  const properties = [];
+  const text = Array.from(paragraph.childNodes).map((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.localName === "pPr") { properties.push(node); return ""; }
+    return render(node, "");
+  }).join("");
+  return { text, records, properties };
+}
+
+function replaceParagraphFromFidelityMap(paragraph, text) {
+  const projection = paragraphFidelityProjection(paragraph);
+  const escaped = String(text).replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[\da-fA-F]+);)/g, "&amp;");
+  const parsed = parseXml(`<root>${escaped}</root>`, "translated Word formatting tags");
+  const seen = new Set();
+  const targetChildren = new Map();
+  const operations = [];
+  const read = (node, parentId) => {
+    if (node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) return null;
+    if (node.nodeType !== Node.ELEMENT_NODE || !["g", "x"].includes(node.localName)) throw new Error("Word formatting tags contain text or markup outside an original text run.");
+    const id = node.getAttribute("id");
+    const record = projection.records.get(id);
+    if (!record || seen.has(id) || record.parentId !== parentId || (record.kind === "opaque") !== (node.localName === "x") || node.attributes.length !== 1) throw new Error("Word formatting tags were removed, duplicated, moved into another container or changed. Restore the original protected tags before exporting.");
+    seen.add(id);
+    if (!targetChildren.has(parentId)) targetChildren.set(parentId, []);
+    targetChildren.get(parentId).push(id);
+    if (record.kind === "opaque") {
+      if (node.childNodes.length) throw new Error("A protected Word object must remain empty.");
+      return record.node;
+    }
+    if (record.kind === "text") {
+      if (node.children.length) throw new Error("A Word text run contains unexpected nested formatting tags.");
+      operations.push(() => { record.node.textContent = node.textContent; record.node.setAttributeNS(XML_NS, "xml:space", "preserve"); });
+      return record.node;
+    }
+    const children = Array.from(node.childNodes).map((child) => read(child, id)).filter(Boolean);
+    operations.push(() => record.node.replaceChildren(...record.properties, ...children));
+    return record.node;
+  };
+  const children = Array.from(parsed.documentElement.childNodes).map((child) => read(child, "")).filter(Boolean);
+  if (seen.size !== projection.records.size) throw new Error("Word formatting tags are missing. Restore the original protected tags before exporting.");
+  for (const [parentId, ids] of targetChildren) {
+    const original = [...projection.records.values()].filter((record) => record.parentId === parentId);
+    if (original.some((record) => record.kind === "opaque") && original.map((record) => record.id).join() !== ids.join()) throw new Error("Word field, bookmark or object boundaries changed order. Preserve the original protected boundary order before exporting.");
+  }
+  // Validate every tag before touching the original DOM; reused opaque objects keep nested text boxes attached.
+  operations.forEach((operation) => operation());
+  paragraph.replaceChildren(...projection.properties, ...children);
+}
+
 function paragraphTextWithInlineTags(paragraph) {
   const runs = visibleTextChunks(paragraph, paragraph);
   const visibleRuns = runs.filter((run) => run.text.trim());
   if (!visibleRuns.length) return { text: "", inlineTags: [], baseRPrXml: "" };
+  if (paragraphNeedsFidelityMap(paragraph)) {
+    return { text: paragraphFidelityProjection(paragraph).text, inlineTags: [], baseRPrXml: "", fidelityVersion: 2 };
+  }
 
   const formatLengths = new Map();
   visibleRuns.forEach((run) => {
@@ -393,11 +510,11 @@ function paragraphTextWithInlineTags(paragraph) {
   const inlineTags = [];
   const semanticTags = new Set();
   const text = runs.map((run) => {
-    if (!run.text || run.rPrXml === baseRPrXml) return run.text;
+    if (!run.text || run.rPrXml === baseRPrXml) return xmlEscape(run.text);
     const semantic = semanticTagsForRunProperties(run.rPrXml);
     if (semantic.length) {
       semantic.forEach((tag) => semanticTags.add(tag));
-      if (hasOnlySemanticRunProperties(run.rPrXml)) return wrapInlineTags(semantic, run.text);
+      if (!baseRPrXml && hasOnlySemanticRunProperties(run.rPrXml)) return wrapInlineTags(semantic, run.text);
       if (!formatIds.has(run.rPrXml)) {
         const id = `fmt${formatIds.size + 1}`;
         formatIds.set(run.rPrXml, id);
@@ -497,6 +614,7 @@ function isAbbreviationBoundary(text, punctuationIndex) {
 }
 
 function splitIntoSegments(text, structure) {
+  if (structure.fidelityVersion === 2) return text ? [{ text, tags: detectProtectedTags(text), structure: { ...structure, segmentInParagraph: 0 } }] : [];
   const cleaned = String(text || "")
     .replace(/\r\n?/g, "\n")
     .replace(/[ \f\v\u00a0]+/g, " ")
@@ -544,7 +662,6 @@ function paragraphTextNodes(paragraph) {
   return Array.from(paragraph.getElementsByTagNameNS("*", "t")).filter((node) => closestParagraph(node) === paragraph && !closestRevisionContainer(node, paragraph));
 }
 
-const WORD_VISIBLE_TEXT_CONTROL_NAMES = ["tab", "br", "cr", "noBreakHyphen", "softHyphen"];
 
 function paragraphTextControlNodes(paragraph) {
   return WORD_VISIBLE_TEXT_CONTROL_NAMES.flatMap((localName) =>
@@ -602,7 +719,6 @@ function topLevelParagraphChild(node, paragraph) {
   return current === paragraph ? child : null;
 }
 
-const SUPPORTED_TEXT_WRAPPERS = new Set(["hyperlink", "fldSimple", "sdt", "customXml", "smartTag"]);
 
 function commonTextWrapper(paragraph) {
   const textNodes = paragraphTextNodes(paragraph);
@@ -790,7 +906,7 @@ function replaceParagraphWithRuns(xml, paragraph, text, structure = {}) {
     if (child.nodeType !== Node.ELEMENT_NODE || child.localName === "pPr") return false;
     return elementContainsParagraphText(child, paragraph) || elementContainsDeletedRevisionText(child, paragraph);
   }));
-  const firstRemovedIndex = children.findIndex((child) => removable.has(child));
+  const firstRemovedIndex = children.findIndex((child) => child.nodeType === Node.ELEMENT_NODE && removable.has(child));
   const referenceChild = firstRemovedIndex >= 0
     ? children.slice(firstRemovedIndex + 1).find((child) => !removable.has(child)) || null
     : null;
@@ -808,7 +924,7 @@ function replaceTextWrapperWithRuns(xml, paragraph, wrapper, text, structure = {
     if (child.nodeType !== Node.ELEMENT_NODE) return false;
     return elementContainsParagraphText(child, paragraph) || elementContainsDeletedRevisionText(child, paragraph);
   }));
-  const firstRemovedIndex = children.findIndex((child) => removable.has(child));
+  const firstRemovedIndex = children.findIndex((child) => child.nodeType === Node.ELEMENT_NODE && removable.has(child));
   const referenceChild = firstRemovedIndex >= 0
     ? children.slice(firstRemovedIndex + 1).find((child) => !removable.has(child)) || null
     : null;
@@ -865,7 +981,8 @@ async function extractDocxSegments(file) {
         partLabel: docxPartLabel(partPath),
         paragraphIndex,
         inlineTags: richText.inlineTags,
-        baseRPrXml: richText.baseRPrXml
+        baseRPrXml: richText.baseRPrXml,
+        ...(richText.fidelityVersion ? { fidelityVersion: richText.fidelityVersion } : {})
       });
       partSegmentCount += partSegments.length;
       segments.push(...partSegments);
@@ -895,23 +1012,43 @@ async function buildTargetDocx(project, segments) {
 
   const entries = await unzipEntries(base64ToBytes(packageBase64));
   const grouped = translatedParagraphs(segments);
+  let changed = false;
   grouped.forEach((byParagraph, partPath) => {
     const partXml = textParts[partPath] || readZipText(entries, partPath);
-    if (!partXml) return;
+    if (!partXml) throw new Error("The original Word XML part is missing. Reimport the source file.");
     const xml = parseXml(partXml, docxPartLabel(partPath));
     const paragraphs = Array.from(xml.getElementsByTagNameNS("*", "p"));
+    let partChanged = false;
     byParagraph.forEach((items, paragraphIndex) => {
       const paragraph = paragraphs[paragraphIndex];
-      if (!paragraph) return;
-      replaceParagraphWithRuns(xml, paragraph, items.map((segment) => targetFor(segment, false)).join(" "), items[0]?.structure || {});
-      if (/^ar(?:-|$)/i.test(project.targetLang || "")) applyArabicParagraphProperties(xml, paragraph, project.targetLang);
+      if (!paragraph) throw new Error("The original Word paragraph mapping is missing. Reimport the source file.");
+      const fidelity = items[0]?.structure?.fidelityVersion === 2;
+      const target = items.map((segment) => targetFor(segment, false)).join(fidelity ? "" : " ");
+      const source = items.map((segment) => segment.source ?? segment.text ?? "").join(fidelity ? "" : " ");
+      if (fidelity) {
+        if (target !== paragraphFidelityProjection(paragraph).text || deletedRevisionChildren(paragraph).length) {
+          replaceParagraphFromFidelityMap(paragraph, target);
+          partChanged = true;
+        }
+      } else if (target !== source || deletedRevisionChildren(paragraph).length) {
+        if (paragraphNeedsFidelityMap(paragraph)) throw new Error("This older Word import lacks protected container mappings for its formatting. Reimport the original file before exporting a changed translation.");
+        const originalVisible = visibleTextChunks(paragraph, paragraph).map((run) => run.text).join("");
+        const leading = originalVisible.match(/^\s*/u)?.[0] || "";
+        const trailing = originalVisible.match(/\s*$/u)?.[0] || "";
+        const paddedTarget = `${/^\s/u.test(target) ? "" : leading}${target}${/\s$/u.test(target) ? "" : trailing}`;
+        replaceParagraphWithRuns(xml, paragraph, paddedTarget, items[0]?.structure || {});
+        partChanged = true;
+      }
+      if (/^ar(?:-|$)/i.test(project.targetLang || "")) { applyArabicParagraphProperties(xml, paragraph, project.targetLang); partChanged = true; }
     });
+    if (!partChanged) return;
+    changed = true;
     entries.set(partPath, {
       name: partPath,
       data: textEncoder.encode(new XMLSerializer().serializeToString(xml))
     });
   });
-  return zipEntries(entries);
+  return changed ? zipEntries(entries) : base64ToBytes(packageBase64);
 }
 
 // Paragraph direction and proofing language are separate from the Unicode

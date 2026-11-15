@@ -1,3 +1,4 @@
+import { markQaIncomplete } from "./qa-completeness.js";
 /**
  * Owns current-project QA execution and Run QA button lifecycle. Project and
  * document state, terminology, protected-tag policy, QA implementations,
@@ -15,7 +16,7 @@
  *   documents: { currentSegments: () => any[] },
  *   tags: { sourceTags: (segment: any) => any[], missing: (segment: any) => any[] },
  *   qa: { runChecks: (segments: any[], terms: any[], options: object) => any[] },
- *   worker?: any,
+ *   worker?: any, exchange?: any,
  *   presentation: {
  *     clearResults: () => unknown,
  *     renderResults: () => unknown,
@@ -87,6 +88,8 @@ export function createProjectQaController(options) {
     if (!session.getProject()) return null;
     try {
       testHooks.beforeRun();
+      const initialProject = options.exchange ? session.getProject() : null;
+      const initialDocument = initialProject ? navigation.getDocumentId() : null;
       const termRecords = await terms.list({
         sourceLang: session.getProject().sourceLang,
         targetLang: session.getProject().targetLang,
@@ -106,6 +109,19 @@ export function createProjectQaController(options) {
       const checks = worker?.runQaChecks
         ? await worker.runQaChecks({ segments: qaSegments, terms: termRecords, fallback })
         : await fallback();
+      if (
+        initialProject &&
+        (session.getProject()?.id !== initialProject.id || navigation.getDocumentId() !== initialDocument)
+      )
+        return null;
+      const packRun = await options.exchange?.qa(qaSegments, initialProject);
+      if (
+        initialProject &&
+        (session.getProject()?.id !== initialProject.id || navigation.getDocumentId() !== initialDocument)
+      )
+        return null;
+      if (packRun) for (const finding of packRun.findings) checks.push(finding);
+      if (packRun) markQaIncomplete(checks, packRun.incomplete);
       session.replaceQaChecks(checks);
       presentation.clearResults();
       presentation.renderResults();
@@ -121,8 +137,12 @@ export function createProjectQaController(options) {
         logger.warn("QA activity log failed.", activityError);
       }
       status.set(
-        checks.length ? `QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}` : "QA found no issues",
-        checks.length ? "dirty" : "saved"
+        packRun?.incomplete
+          ? "QA incomplete: required Exchange checks not evaluated."
+          : checks.length
+            ? `QA found ${checks.length} issue${checks.length === 1 ? "" : "s"}`
+            : "QA found no issues",
+        checks.length || packRun?.incomplete ? "dirty" : "saved"
       );
       return checks;
     } catch (error) {

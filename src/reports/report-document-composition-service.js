@@ -326,7 +326,7 @@ export function createReportDocumentCompositionService(options) {
         <p class="muted">${uiLocalizationService.sourceHtml("Generated {date}", { date: formatDateTime(passport.generatedAt || data.generatedAt) })}</p>
       </header>
       <section>
-        <h2>${uiLocalizationService.sourceHtml("Quality Contract")}</h2>
+        ${passport.exchangeRuns?.length ? `<h2>LoopCAT Exchange — ${passport.exchangeIncomplete ? 'Incomplete' : 'Checks evaluated'}</h2><ul>${passport.exchangeRuns.map(r=>`<li>${escapeHtml(r.id)} ${escapeHtml(r.version)}: ${escapeHtml(r.status)}</li>`).join('')}</ul>` : ''}<h2>${uiLocalizationService.sourceHtml("Quality Contract")}</h2>
         <table>
           <tbody>
             <tr><th>${uiLocalizationService.sourceHtml("Standard")}</th><td>${escapeHtml(qualityLabel(profile.standard))}</td></tr>

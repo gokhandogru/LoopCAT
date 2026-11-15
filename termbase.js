@@ -362,6 +362,7 @@ function parseDelimitedRows(text, delimiter) {
       cell += char;
     }
   }
+  if (quoted) throw new Error("The term list contains an unclosed quoted field.");
   row.push(cell);
   if (row.some((item) => String(item || "").trim())) rows.push(row);
   return rows;
@@ -505,7 +506,12 @@ function parseXml(text, label) {
 }
 
 function xmlNodeText(node) {
-  return Array.from(node?.childNodes || []).map((child) => child.nodeType === Node.TEXT_NODE ? child.nodeValue : child.nodeType === Node.ELEMENT_NODE ? xmlNodeText(child) : "").join("");
+  if (node?.localName === "t") return node.textContent || "";
+  return Array.from(node?.children || []).filter((child) => ["is", "r", "t"].includes(child.localName)).map(xmlNodeText).join("");
+}
+
+function decodeXlsxText(value) {
+  return String(value || "").replace(/_x([0-9a-f]{4})_/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
 }
 
 function normalizeXlsxPath(target) {
@@ -531,10 +537,15 @@ function firstWorksheetPath(entries) {
 }
 
 function sharedStrings(entries) {
-  const text = readZipText(entries, "xl/sharedStrings.xml");
+  const relationshipsText = readZipText(entries, "xl/_rels/workbook.xml.rels");
+  const relationship = relationshipsText ? Array.from(parseXml(relationshipsText, "workbook relationships")
+    .getElementsByTagNameNS("*", "Relationship")).find((item) =>
+      item.getAttribute("TargetMode") !== "External" && /\/sharedStrings$/.test(item.getAttribute("Type") || "")) : null;
+  const path = relationship ? normalizeXlsxPath(relationship.getAttribute("Target")) : "xl/sharedStrings.xml";
+  const text = readZipText(entries, path);
   if (!text) return [];
   const xml = parseXml(text, "shared strings");
-  return Array.from(xml.getElementsByTagNameNS("*", "si")).map((item) => xmlNodeText(item));
+  return Array.from(xml.getElementsByTagNameNS("*", "si")).map((item) => decodeXlsxText(xmlNodeText(item)));
 }
 
 function columnIndex(cellRef, fallback) {
@@ -544,12 +555,16 @@ function columnIndex(cellRef, fallback) {
 }
 
 function cellValue(cell, shared) {
+  if (cell.getElementsByTagNameNS("*", "f").length) return "";
   const type = cell.getAttribute("t") || "";
-  if (type === "inlineStr") return xmlNodeText(cell);
+  if (type === "inlineStr") return decodeXlsxText(xmlNodeText(cell));
   const value = Array.from(cell.getElementsByTagNameNS("*", "v"))[0]?.textContent || "";
-  if (type === "s") return shared[Number(value)] || "";
+  if (type === "s") {
+    if (!/^\d+$/.test(value.trim()) || Number(value) >= shared.length) throw new Error("Excel cell has an invalid shared-string reference.");
+    return shared[Number(value)];
+  }
   if (type === "b") return value === "1" ? "true" : "false";
-  return value;
+  return decodeXlsxText(value);
 }
 
 async function parseTermWorkbook(arrayBufferOrBytes, options = {}) {
@@ -879,28 +894,36 @@ async function deleteTerms(ids) {
   return existingTerms.length;
 }
 
-async function updateTerm(term = {}) {
-  const updated = termRecord(term, { requireId: true });
+async function prepareTermMutation(term = {}, { isNew = false } = {}) {
+  const updated = termRecord(term, { requireId: !isNew });
+  updated.isForbidden = updated.status === "forbidden";
+  if (Object.hasOwn(updated, "forbidden")) updated.forbidden = updated.isForbidden;
   const previous = await get("terms", updated.id);
+  if (!isNew && !previous) throw new Error("Term no longer exists. Your draft was preserved.");
+  updated.storageVersion = Object.hasOwn(term, "storageVersion") ? term.storageVersion : previous?.storageVersion || 0;
   const languagePairsToEnsure = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
   for (const languagePair of languagePairsToEnsure) await ensureTermIndex(languagePair);
-  const [previousConcept, previousDesignations] = await Promise.all([
+  const [previousConcept, previousDesignations, relatedTerms] = await Promise.all([
     get("termConcepts", updated.conceptId),
-    getAllByIndex("termDesignations", "conceptId", updated.conceptId)
+    getAllByIndex("termDesignations", "conceptId", updated.conceptId),
+    getAllByIndex("terms", "conceptId", updated.conceptId)
   ]);
   const concept = {
     ...(previousConcept || {}), id: updated.conceptId, resourceId: updated.resourceId,
     definition: updated.definition, subject: updated.subject, domain: updated.domain, notes: updated.notes,
     createdAt: previousConcept?.createdAt || updated.createdAt, updatedAt: updated.updatedAt
   };
+  if (previousConcept?.resourceId && previousConcept.resourceId !== updated.resourceId) {
+    throw new Error("The term concept belongs to another resource.");
+  }
   const sourceDesignation = previousDesignations.find((designation) =>
-    previous?.sourceDesignationId
-      ? designation.id === previous.sourceDesignationId
+    updated.sourceDesignationId
+      ? designation.id === updated.sourceDesignationId
       : designation.language === previous?.sourceLang && normalizeText(designation.text) === normalizeText(previous?.sourceTerm)
   );
   const targetDesignation = previousDesignations.find((designation) =>
-    previous?.targetDesignationId
-      ? designation.id === previous.targetDesignationId
+    updated.targetDesignationId
+      ? designation.id === updated.targetDesignationId
       : designation.language === previous?.targetLang && normalizeText(designation.text) === normalizeText(previous?.targetTerm)
   );
   const designation = (language, value, status, matchMode, existing) => ({
@@ -917,15 +940,37 @@ async function updateTerm(term = {}) {
   ];
   updated.sourceDesignationId = designations[0].id;
   updated.targetDesignationId = designations[1].id;
+  const siblings = relatedTerms.filter((item) => item.id !== updated.id && item.resourceId === updated.resourceId).map((item) => {
+    const sharedSource = item.sourceDesignationId && item.sourceDesignationId === updated.sourceDesignationId;
+    const sharedTarget = item.targetDesignationId && item.targetDesignationId === updated.targetDesignationId;
+    const next = { ...item, definition: updated.definition, subject: updated.subject, domain: updated.domain,
+      notes: updated.notes, updatedAt: updated.updatedAt, updatedBy: updated.updatedBy };
+    if (sharedSource) Object.assign(next, { sourceTerm: updated.sourceTerm, caseSensitivity: updated.caseSensitivity,
+      matchMode: updated.matchMode, fuzzyThreshold: updated.fuzzyThreshold, partOfSpeech: updated.partOfSpeech, usageExample: updated.usageExample });
+    if (sharedTarget) Object.assign(next, { targetTerm: updated.targetTerm, status: updated.status, isForbidden: updated.isForbidden,
+      ...(Object.hasOwn(item, "forbidden") ? { forbidden: updated.isForbidden } : {}) });
+    return next;
+  });
   const resource = updated.resourceId ? await get("resources", updated.resourceId) : null;
-  const result = await commitMutation(null, null, { rebaseLocal: true, changes: [
-    { store: "terms", value: updated },
+  if (updated.resourceId && (!resource || resource.archived || resource.type !== "termbase")) {
+    throw new Error("The termbase was removed or archived. Your draft was preserved.");
+  }
+  return { record: updated, previous, changes: [
+    { store: "terms", value: updated, ...(isNew ? { insertOnly: true } : {}) },
+    ...siblings.map((value) => ({ store: "terms", value })),
     { store: "termConcepts", value: concept },
     ...designations.map((value) => ({ store: "termDesignations", value })),
-    { store: "termTokenIndex", where: { termId: updated.id } },
-    ...indexRecordsForTerm(updated).map((value) => ({ store: "termTokenIndex", value })),
+    ...[updated, ...siblings].flatMap((item) => [
+      { store: "termTokenIndex", where: { termId: item.id } },
+      ...indexRecordsForTerm(item).map((value) => ({ store: "termTokenIndex", value }))
+    ]),
     ...(resource ? [{ store: "resources", value: { ...resource, updatedAt: updated.updatedAt } }] : [])
-  ] });
+  ] };
+}
+
+async function updateTerm(term = {}) {
+  const { record: updated, previous, changes } = await prepareTermMutation(term);
+  const result = await commitMutation(null, null, { changes });
   Object.assign(updated, result.values[0] || updated);
   const languagePairs = new Set([languagePairOf(previous), updated.languagePair].filter(Boolean));
   for (const languagePair of languagePairs) await writeTermIndexMetaClean(languagePair);
@@ -1018,6 +1063,7 @@ window.CatHan.termbase = {
   deleteTerm,
   deleteTerms,
   updateTerm,
+  prepareTermMutation,
   findTerms,
   listTerms
 };

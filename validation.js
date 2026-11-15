@@ -4,8 +4,8 @@
   const PACKAGE_TYPE = "project-package";
   const PACKAGE_VERSION = 1;
   const MIN_SCHEMA_VERSION = 3;
-  const MAX_PACKAGE_SCHEMA_VERSION = 7;
-  const MAX_BACKUP_SCHEMA_VERSION = 8;
+  const MAX_PACKAGE_SCHEMA_VERSION = 8;
+  const MAX_BACKUP_SCHEMA_VERSION = 9;
   const PACKAGE_FORMAT = "loopcat-project-package";
   const CONTRACT_VERSION = "loopcat-package-v1";
   const STORAGE_MODES = new Set(["browser-cache", "workspace-folder"]);
@@ -479,6 +479,17 @@
     issueBucket = "errors"
   ) {
     validateAnalysisMetadata(report, project || {});
+    if (project && Object.hasOwn(project, "exchangeLocalBinding")) add(report, "errors", label + " contains device-only Exchange activation metadata.");
+    if (project && Object.hasOwn(project,"exchangeRequirements")) {
+      const refs=project.exchangeRequirements;
+      if (!Array.isArray(refs) || refs.length>128 || refs.some(r=>!r || typeof r!=="object" ||
+        typeof r.id!=="string" || r.id.length>96 || !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/.test(r.id) || typeof r.version!=="string" || r.version.length>64 || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/.test(r.version) ||
+        typeof r.digest!=="string" || !/^[0-9a-f]{64}$/.test(r.digest) || !["qa","terminology","lesson","client","ai"].includes(r.kind) ||
+        typeof r.required!=="boolean" || (r.priority!==undefined && (!Number.isSafeInteger(r.priority)||r.priority<0||r.priority>100)) ||
+        Object.keys(r).some(k=>!["id","version","digest","kind","required","priority"].includes(k))) ||
+        new Set(refs.map(r=>r.id)).size!==refs.length)
+        add(report,"errors",label+" has invalid Exchange requirements.");
+    }
     if (project?.resourceLinks === undefined) {
       add(report, missingBucket, `${label} resource links are missing.`);
       return;
@@ -1622,6 +1633,8 @@
       .toLowerCase();
     if (REVIEW_EXPORT_FORMATS.has(exportFormat)) return "review";
     if (EMPTY_TARGET_INTERCHANGE_FORMATS.has(exportFormat)) return "preserve-empty";
+    if (["xlsx", "xlsm", "xltx", "xltm"].includes(exportFormat) && structure?.multilingualExcel)
+      return "preserve-empty";
     if (exportFormat === "ts" && String(structure?.format || "").toLowerCase() === "ts-xml") return "preserve-empty";
     if (["csv", "tsv"].includes(exportFormat) && Number.isFinite(structure?.targetIndex) && structure.targetIndex >= 0)
       return "preserve-empty";

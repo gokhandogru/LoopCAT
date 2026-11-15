@@ -1,0 +1,20 @@
+[
+  ["kitap", "kitaplar", true, true],
+  ["kitap", "kitaptan", true, true],
+  ["kitap", "kitabı", true, true],
+  ["ev", "evleri", false, true],
+  ["göl", "gölü", false, true],
+  ["okul", "okullardan", false, true],
+  ["araba", "arabayı", false, true],
+  ["ağaç", "ağacı", true, true],
+  ["göz", "gözlerden", false, true],
+  ["kitap", "kitablar", true, false],
+  ["kitap", "kitapçı", true, false],
+  ["ev", "evrim", false, false],
+  ["göl", "gölümsü", false, false],
+  ["araba", "arabaa", false, false],
+  ["sanat", "sanadı", false, false],
+  ["okul", "oküllerden", false, false],
+  ["göz", "gözlar", false, false],
+  ["ev", "evtan", false, false]
+]

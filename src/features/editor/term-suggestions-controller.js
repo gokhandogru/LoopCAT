@@ -13,7 +13,7 @@
  *   },
  *   text: { escapeHtml: (value: unknown) => string },
  *   safeHtml: { replace: (element: any, html: string) => unknown },
- *   mutation: { deleteTerm: (term: any, options: object) => Promise<unknown> | unknown, editTerm?: (term: any) => unknown },
+ *   mutation: { deleteTerm: (term: any, options: object) => Promise<unknown> | unknown, editTerm?: (term: any) => unknown, copyTerm?: (term: any) => unknown },
  *   contextMenu?: { open: (options: { event: any, anchor: any, items: any[] }) => unknown },
  *   target?: { insert: (target: string, options?: object) => Promise<unknown> | unknown },
  *   dom: { createElement: (tagName: string) => any, createFragment: () => any }
@@ -57,7 +57,9 @@ export function createTermSuggestionsController(options) {
   let currentResults = [];
   let resultContext = Object.freeze({ projectId: "", segmentId: "" });
 
+  let revision = 0;
   async function refresh() {
+    const request = ++revision;
     const segment = session.getActiveSegment();
     if (!segment || !session.getProject()) {
       currentResults = [];
@@ -75,7 +77,8 @@ export function createTermSuggestionsController(options) {
       termBaseNames: terms.getNames(),
       ...(typeof terms.getLinks === "function" ? { resourceLinks: terms.getLinks() || [] } : {})
     });
-    if (session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId) return;
+    if (request !== revision || session.getProject()?.id !== projectId || session.getActiveSegment()?.id !== segmentId)
+      return;
     currentResults = suggestions.slice();
     resultContext = Object.freeze({ projectId, segmentId });
     root.classList.toggle("muted", !suggestions.length);
@@ -84,6 +87,13 @@ export function createTermSuggestionsController(options) {
       return;
     }
     const fragment = dom.createFragment();
+    const competing = new Map();
+    if (suggestions.some((t) => t.exchangeReadOnly))
+      for (const t of suggestions) {
+        const key = t.sourceTerm.toLocaleLowerCase(session.getProject().sourceLang);
+        if (!competing.has(key)) competing.set(key, new Set());
+        competing.get(key).add(t.targetTerm);
+      }
     suggestions.forEach((term) => {
       const card = dom.createElement("article");
       const forbidden = Boolean(term.isForbidden || term.status === "forbidden");
@@ -97,10 +107,12 @@ export function createTermSuggestionsController(options) {
       safeHtml.replace(
         card,
         `<div class="term-pair"><span class="term-source" dir="auto">${text.escapeHtml(term.sourceTerm)}</span><strong class="term-target" dir="auto">${text.escapeHtml(term.targetTerm)}</strong></div>
-      <div class="match-meta"><span class="match-resource">${text.escapeHtml(term.termBaseName || "")}</span>${forbidden ? `<span class="term-warning">${localization.labelHtml("forbidden")}</span>` : ""}</div>`
+      <div class="match-meta"><span class="match-resource">${text.escapeHtml(term.termBaseName || "")}${term.exchangePriority !== undefined ? " · " + (term.exchangeReadOnly ? "Exchange · " : "") + localization.source("Priority") + " " + text.escapeHtml(String(term.exchangePriority)) : ""}${competing.get(term.sourceTerm.toLocaleLowerCase(session.getProject().sourceLang))?.size > 1 ? " · " + localization.source("Conflicting terms") : ""}</span>${forbidden ? `<span class="term-warning">${localization.labelHtml("forbidden")}</span>` : ""}</div>`
       );
       function isCurrent() {
-        return session.getProject()?.id === projectId && session.getActiveSegment()?.id === segmentId;
+        return (
+          request === revision && session.getProject()?.id === projectId && session.getActiveSegment()?.id === segmentId
+        );
       }
       for (const selector of [".term-source", ".term-target"]) {
         const element = card.querySelector?.(selector);
@@ -122,16 +134,26 @@ export function createTermSuggestionsController(options) {
             disabled: forbidden || typeof target?.insert !== "function",
             action: insert
           },
-          ...(typeof mutation.editTerm === "function"
-            ? [{ label: localization.source("Edit term"), action: () => isCurrent() && mutation.editTerm(term) }]
-            : []),
-          {
-            label: localization.source("Delete"),
-            action: async () => {
-              if (!isCurrent()) return;
-              await mutation.deleteTerm(term, { refreshResourceView: false, refreshSuggestions: true });
-            }
-          }
+          ...(term.exchangeReadOnly
+            ? [
+                {
+                  label: localization.source("Copy to my termbase"),
+                  disabled: !term.allowTermCopy,
+                  action: () => term.allowTermCopy && isCurrent() && mutation.copyTerm?.(term)
+                }
+              ]
+            : [
+                ...(typeof mutation.editTerm === "function"
+                  ? [{ label: localization.source("Edit term"), action: () => isCurrent() && mutation.editTerm(term) }]
+                  : []),
+                {
+                  label: localization.source("Delete"),
+                  action: async () => {
+                    if (!isCurrent()) return;
+                    await mutation.deleteTerm(term, { refreshResourceView: false, refreshSuggestions: true });
+                  }
+                }
+              ])
         ];
         return contextMenu.open({ event, anchor: card, items });
       }

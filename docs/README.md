@@ -4,13 +4,21 @@ Use this page to distinguish current product documentation from dated research a
 
 ## Current Product And Engineering Documentation
 
+- [LoopCAT Exchange](loopcat-exchange.md) — author, share, and remove local terminology, QA and lesson packs; storage and qualification boundaries.
+- [Exchange preview verification](exchange-verification-20261106.md) — what was exercised, which editions were tested, and what still gates public release.
+
 - [Beginner Guide](beginner-guide/index.html) — friendly installation, first-project, everyday translation, QA, export, backup, and troubleshooting walkthrough ([download the Word edition](beginner-guide/LoopCAT-Beginners-Guide.docx)).
 - [Main README](../README.md) — project status, installation, capabilities, architecture, tests, privacy, and development workflow.
 - [macOS installation](macos-installation.md) — Apple Silicon and Intel selection, first-launch permission, checksum verification, and legacy unsigned-preview troubleshooting ([plain-text guide](../downloads/LoopCAT-macOS-INSTALL.txt)).
 - [Product and release roadmap](../ROADMAP.md) — shipped baseline, current priorities, release qualification, and production-ready exit criteria.
 - [Capability documentation](loopcat-capabilities.md) — detailed current behavior and suggested acceptance checks.
+- [File-format review and support matrix](file-format-review-2026-11-15.md) — tested import/export paths, repaired round-trip defects, unsupported formats and reproduction commands.
+- [Office/DTP formatting preservation](office-dtp-formatting-2026-11-15.md) — rich-format reconstruction, native Word/Excel/PowerPoint verification, IDML structure checks and existing-project compatibility.
 - [Statistics and batch import implementation](statistics-implementation-2026-10-11.md) — workflows, counting/matching policy, validation, and measured limits.
 - [Keyboard shortcuts](keyboard-shortcuts.md) — keyboard strategy, complete binding reference, Quick Insert behavior, context rules, and accessibility notes.
+- [Resources workspaces](resources-workspaces.md) — finding, editing, recovering, importing, exporting, and maintaining translation memories and termbases.
+- [Resources upgrade verification](resources-verification-2026-11-12.md) — completed checks, measured scale, and remaining platform qualification.
+- [Resources follow-up verification](resources-verification-2026-11-15.md) — button alignment, current browser checks, and the still-unmet cold-load target.
 - [Desktop packaging](desktop-packaging.md) — build, artifact, security, signing, checksum, clean-machine, and repository-mirror procedures.
 - [Project package format v1](loopcat-package-format-v1.md) — portable `.loopcat.json` contract, reconstruction metadata, privacy, and compatibility.
 - [Brand guidelines](brand-guidelines.md) — Loopbird, naming, palette, voice, and product principles.

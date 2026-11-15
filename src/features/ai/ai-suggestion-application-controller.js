@@ -75,7 +75,11 @@ export function createAiSuggestionApplicationController(options) {
   async function apply(suggestionId, applyOptions = {}) {
     const project = editorSessionStore.getProject();
     const segment = currentSegment();
-    const suggestion = (segment?.aiSuggestions || []).find((item) => item.id === suggestionId);
+    const candidate = applyOptions.transientSuggestion;
+    const suggestion =
+      candidate?.id === suggestionId
+        ? candidate
+        : (segment?.aiSuggestions || []).find((item) => item.id === suggestionId);
     if (!project || !segment || !suggestion?.suggestedTarget) return false;
     if (segment.locked || segment.status === "confirmed") {
       status.set("Confirmed or locked segments must be reopened before applying an AI suggestion", "dirty");
@@ -88,6 +92,9 @@ export function createAiSuggestionApplicationController(options) {
       return false;
     }
 
+    // A proposal from outside the existing suggestions list has no right to
+    // mutate an obsolete segment if selection or a pack changes during flush.
+    if (candidate && (typeof applyOptions.stillCurrent !== "function" || !applyOptions.stillCurrent())) return false;
     const snapshot = structuredClone(segment);
     let activityLogged = true;
     try {

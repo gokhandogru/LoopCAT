@@ -50,6 +50,7 @@
         <div class="topbar-actions">
           <button id="projectsViewBtn">Projects</button>
           <button id="resourcesViewBtn">Resources</button>
+          <button id="exchangeBtn" type="button" aria-haspopup="dialog">Exchange</button>
           <button id="trashBtn" type="button">Trash</button>
           <details class="menu workspace-menu">
             <summary id="workspaceMenuSummary">Workspace</summary>
@@ -1597,6 +1598,13 @@
       </section>
     </div>
 
+    <dialog id="exchangeDialog" class="exchange-dialog" aria-labelledby="exchangeTitle">
+      <section class="dialog-card">
+        <div class="exchange-heading"><h2 id="exchangeTitle">LoopCAT Exchange</h2><button id="exchangeClose" type="button">Close</button></div>
+        <div id="exchangeRoot"></div>
+        <p id="exchangeStatus" role="status" aria-live="polite"></p>
+      </section>
+    </dialog>
     <dialog id="aboutDialog" aria-labelledby="aboutDialogTitle">
       <section class="dialog-card about-card" aria-labelledby="aboutDialogTitle">
         <div>

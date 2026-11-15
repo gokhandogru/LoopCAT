@@ -48,6 +48,9 @@ export function installLazyLocalizationModule(browserWindow, options = {}) {
     },
     buildLocalizationFile(...args) {
       return invoke("buildLocalizationFile", args);
+    },
+    inspectMultilingualExcel(...args) {
+      return invoke("inspectMultilingualExcel", args);
     }
   };
   namespace.localization = lazyModule;

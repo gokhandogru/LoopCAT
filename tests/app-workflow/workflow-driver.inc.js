@@ -23,6 +23,18 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     dialog.querySelectorAll("button")[accepted ? 1 : 0].click();
   });
   aiConsentObserver.observe(document.body, { childList: true });
+  // This embedded workflow keeps its project editor alive; dedicated resource
+  // windows and their forms are covered by verify-resource-workspace.cjs.
+  const originalResourceWindowOpen = window.open;
+  const resourceEditorLaunches = [];
+  window.open = function captureResourceEditorLaunch(url, name, features) {
+    if (String(url).includes("#resource/")) {
+      const launch = { url: String(url), name: String(name || "") };
+      resourceEditorLaunches.push(launch);
+      return { closed: false, focus() { resourceEditorLaunches.push(launch); }, postMessage() {} };
+    }
+    return originalResourceWindowOpen.call(window, url, name, features);
+  };
   const out = [];
   const publishProgress = () => {
     let output = document.querySelector("#appWorkflowTestResults");
@@ -76,7 +88,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     assert(Boolean(document.querySelector('link[rel="manifest"]')), "installable app manifest linked");
     const workflowDatabase = await storageApi.openDatabase();
     assert(
-      workflowDatabase.version === 9 &&
+      workflowDatabase.version === 10 &&
         workflowDatabase.objectStoreNames.contains("documentVersions") &&
         workflowDatabase.objectStoreNames.contains("versionSegments") &&
         workflowDatabase.objectStoreNames.contains("fileLifecycleReceipts") &&
@@ -87,16 +99,19 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         workflowDatabase.objectStoreNames.contains("tmContributions") &&
         workflowDatabase.objectStoreNames.contains("termConcepts") &&
         workflowDatabase.objectStoreNames.contains("termDesignations") &&
-        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 7 &&
-        storageConstants.BACKUP_SCHEMA_VERSION === 8,
-      "schema 9 preserves shared resources and file history while portable schemas remain versioned independently"
+        workflowDatabase.objectStoreNames.contains("resourceDrafts") &&
+        workflowDatabase.objectStoreNames.contains("resourceOperations") &&
+        storageConstants.PROJECT_PACKAGE_SCHEMA_VERSION === 8 &&
+        storageConstants.BACKUP_SCHEMA_VERSION === 9,
+      "schema 10 preserves shared resources, resource drafts, and file history while portable schemas remain versioned independently"
     );
     const productionMockAiSelector = "#mock" + "AiSuggestionBtn";
     assert(!document.querySelector(productionMockAiSelector), "production UI does not expose mock AI suggestions");
+    resourcesController.render();
     assert(
-      Boolean(document.querySelector('label.compact-field input#tmResourceNameInput')) &&
+      Boolean(document.querySelector('.resource-library-toolbar input[type="search"][aria-label]')) &&
         Boolean(document.querySelector('#sourceTermInput[aria-label="Source term"]')),
-      "resource creation controls keep persistent and assistive labels"
+      "resource library search and terminology controls keep assistive labels"
     );
     const originalStorageDurability = state.storageDurability;
     state.storageDurability = { checked: true, supported: true, persisted: true, requested: true, usageBytes: 10 * 1024 * 1024, quotaBytes: 1000 * 1024 * 1024 };
@@ -3094,7 +3109,9 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       localStorage.removeItem(OPENAI_KEY_STORAGE);
       if (originalLocalOpenAiKey !== null) localStorage.setItem(OPENAI_KEY_STORAGE, originalLocalOpenAiKey);
       if (originalSessionOpenAiKey !== null) sessionStorage.setItem(OPENAI_KEY_STORAGE, originalSessionOpenAiKey);
-      editorSessionStore.replaceProject(await updateProject({ ...editorSessionStore.getProject(), aiSettings: originalAiSettings }));
+      // Cleanup must not mask the scenario's original result with a stale CAS version.
+      const cleanupProject = (await listProjects()).find((item) => item.id === editorSessionStore.getProject().id);
+      editorSessionStore.replaceProject(await updateProject({ ...cleanupProject, aiSettings: originalAiSettings }));
       editorSessionStore.replaceProjects(editorSessionStore.getProjects().map((item) => (item.id === editorSessionStore.getProject().id ? editorSessionStore.getProject() : item)));
       editorShellPresentationController.render();
     }
@@ -4443,6 +4460,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         resourcesController.selectType("tm", { render: false });
         resourcesController.setResources({ tmEntries: [{
           id: "ui-resource-label-entry",
+          resourceId: "ui-resource-label",
           tmName: "Bearer ui-resource-label-token-that-must-not-appear",
           source: "Resource source",
           target: "Resource target",
@@ -4451,7 +4469,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
           languagePair: `${editorSessionStore.getProject().sourceLang}::${editorSessionStore.getProject().targetLang}`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        }], terms: originalLabelResourceState.terms }, false);
+        }], terms: originalLabelResourceState.terms, resources: [{
+          id: "ui-resource-label", type: "tm", name: "Bearer ui-resource-label-token-that-must-not-appear",
+          sourceLang: editorSessionStore.getProject().sourceLang,
+          targetLang: editorSessionStore.getProject().targetLang,
+          entryCount: 1, linkedProjects: [], updatedAt: new Date().toISOString()
+        }] }, false);
         resourcesController?.render?.();
         assert(
           els.tmResourceDashboard.textContent.includes("[redacted secret]") &&
@@ -4466,7 +4489,8 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         resourcesController.selectType(originalLabelResourceState.type, { render: false });
         resourcesController.setResources({
           tmEntries: originalLabelResourceState.tmEntries,
-          terms: originalLabelResourceState.terms
+          terms: originalLabelResourceState.terms,
+          resources: originalLabelResourceState.resources
         }, false);
         if (originalLabelResourceState.openKey) {
           resourcesController.openResource(originalLabelResourceState.type, originalLabelResourceState.openKey, {
@@ -4618,45 +4642,23 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     await resourceCatalogRefreshController.refresh();
     els.resourcesViewBtn.click();
     await applicationImportProgressController.yieldToUi();
-    const workflowTmCard = Array.from(els.tmResourceDashboard.querySelectorAll(".resource-card")).find((card) =>
-      card.textContent.includes(projectResourceContextService.mainTm())
+    const workflowTmRow = Array.from(els.tmResourceDashboard.querySelectorAll("[data-library-id]")).find((row) =>
+      row.dataset.libraryId === projectResourceContextService.mainTmLink()?.resourceId
     );
-    const workflowTmOpenButton = workflowTmCard?.querySelector('[data-resource-action="open"]');
+    const workflowTmOpenButton = workflowTmRow?.querySelector('[data-resource-action="open"]');
+    resourceEditorLaunches.length = 0;
     workflowTmOpenButton?.click();
     await applicationImportProgressController.yieldToUi();
-    await waitFor(() => !resourcesController.getState().page.loading, "first resource page loaded");
-    assert(els.tmResourceDetail.querySelectorAll(".resource-row").length <= 100, "resource detail bounds rendered entries to one page");
-    const resourceOpenFocusState = {
-      view: applicationStore.getState().navigation.view,
-      detailHidden: els.tmResourceDetail.classList.contains("hidden"),
-      activeAction: document.activeElement?.dataset?.resourceAction || "",
-      activeKey: document.activeElement?.dataset?.resourceKey || "",
-      expectedKey: workflowTmOpenButton?.dataset?.resourceKey || "",
-      controllerType: resourcesController?.getState?.().type || "",
-      controllerOpenKey: resourcesController?.getState?.().openKey || ""
-    };
     assert(
-      resourceOpenFocusState.view === "resources" &&
-        !resourceOpenFocusState.detailHidden &&
-        document.activeElement === els.tmResourceDetail.querySelector('[data-resource-action="close-detail"]'),
-      `checked Resources controller owns navigation, dashboard open intent, detail rendering, and initial focus (${JSON.stringify(resourceOpenFocusState)})`
+      Boolean(workflowTmOpenButton) && applicationStore.getState().navigation.view === "resources" &&
+        resourceEditorLaunches.some((launch) => new URL(launch.url).hash === `#resource/tm/${encodeURIComponent(workflowTmOpenButton.dataset.resourceId)}`) &&
+        !resourcesController.getState().openKey,
+      "compact resource library launches the stable resource ID in a dedicated editor while preserving library navigation"
     );
-    els.tmResourceDetail.querySelector('[data-resource-action="close-detail"]').click();
-    await applicationImportProgressController.yieldToUi();
-    const resourceCloseFocusState = {
-      detailHidden: els.tmResourceDetail.classList.contains("hidden"),
-      activeAction: document.activeElement?.dataset?.resourceAction || "",
-      activeKey: document.activeElement?.dataset?.resourceKey || "",
-      expectedKey: workflowTmOpenButton.dataset.resourceKey,
-      availableKeys: Array.from(els.tmResourceDashboard.querySelectorAll('[data-resource-action="open"]')).map(
-        (button) => button.dataset.resourceKey || ""
-      )
-    };
     assert(
-      resourceCloseFocusState.detailHidden &&
-        resourceCloseFocusState.activeAction === "open" &&
-        resourceCloseFocusState.activeKey === resourceCloseFocusState.expectedKey,
-      `Resources detail close restores focus to the originating resource card action (${JSON.stringify(resourceCloseFocusState)})`
+      Boolean(els.tmResourceDashboard.querySelector(".resource-library-table")) &&
+        !els.tmResourceDetail.querySelector("[data-resource-row]"),
+      "resource catalog uses a compact table without appending entry forms below the library"
     );
     els.tmResourceTab.focus();
     els.tmResourceTab.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
@@ -5600,14 +5602,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "linked TM resource import normalizes friendly language labels before memory lookup"
     );
     workspaceDirtyStateController.clearAll();
-    const linkedTmRow = await waitFor(() => Array.from(els.tmResourceDetail.querySelectorAll("[data-resource-row]")).find(
-      (row) => row.dataset.resourceId === linkedTmEntry.id
-    ), "linked TM page loaded");
-    assert(Boolean(linkedTmRow), "linked TM resource edit renders through the Resources controller detail root");
-    linkedTmRow.querySelector('[data-field="target"]').value = "Linked resource TM target updated";
-    linkedTmRow.querySelector('[data-resource-action="save-entry"]').click();
-    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TM row save dirty marker");
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TM resource row save marks linked project package dirty");
+    await updateTmEntry({ ...linkedTmEntry, target: "Linked resource TM target updated" });
+    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TM committed-change dirty marker");
+    assert(
+      (await storageApi.get("tmEntries", linkedTmEntry.id)).target === "Linked resource TM target updated" &&
+        state.workspaceDirtyProjectIds.has(project.id),
+      "resource repository TM edit marks linked project package dirty through committed-change propagation"
+    );
 
     workspaceDirtyStateController.clearAll();
     els.tbResourceNameInput.value = "Workflow TB";
@@ -5658,14 +5659,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     const linkedCsvTerms = await listTerms({ sourceLang: "en", targetLang: "tr", termBaseNames: ["Workflow TB"] });
     assert(linkedCsvTerms.some((term) => term.sourceTerm === "linked csv term") && linkedCsvTerms.some((term) => term.sourceTerm === "linked forbidden csv term" && term.isForbidden), "CSV term resource import creates editable approved and forbidden terms");
     workspaceDirtyStateController.clearAll();
-    const linkedTermRow = await waitFor(() => Array.from(els.tbResourceDetail.querySelectorAll("[data-resource-row]")).find(
-      (row) => row.dataset.resourceId === linkedTerm.id
-    ), "linked termbase page loaded");
-    assert(Boolean(linkedTermRow), "linked term resource edit renders through the Resources controller detail root");
-    linkedTermRow.querySelector('[data-field="targetTerm"]').value = "guncel bagli kaynak terimi";
-    linkedTermRow.querySelector('[data-resource-action="save-entry"]').click();
-    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TB row save dirty marker");
-    assert(state.workspaceDirtyProjectIds.has(project.id), "TB resource row save marks linked project package dirty");
+    await updateTerm({ ...linkedTerm, targetTerm: "guncel bagli kaynak terimi" });
+    await waitFor(() => state.workspaceDirtyProjectIds.has(project.id), "linked TB committed-change dirty marker");
+    assert(
+      (await storageApi.get("terms", linkedTerm.id)).targetTerm === "guncel bagli kaynak terimi" &&
+        state.workspaceDirtyProjectIds.has(project.id),
+      "resource repository term edit marks linked project package dirty through committed-change propagation"
+    );
 
     await projectOpenController.open(project.id);
     await projectDocumentOpenController.open(documentInfo.id);
@@ -6573,6 +6573,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
   } catch (error) {
     publish(false, error);
   } finally {
+    window.open = originalResourceWindowOpen;
     aiConsentObserver.disconnect();
   }
 } : async function runAppWorkflowTestDisabled() {};

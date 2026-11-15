@@ -335,7 +335,7 @@ function xliff12NodeContent(node) {
   if (name === "source" || name === "target" || name === "seg-source" || name === "mrk") return children;
   if (name === "g") {
     const semantic = semanticTagForXliffElement(node);
-    if (semantic) return `<${semantic}>${children}</${semantic}>`;
+    if (semantic) return `${xliff12SemanticOpening(node, semantic)}${children}</${semantic}>`;
     const id = attr(node, "id");
     return id ? `<g id="${id}">${children}</g>` : children;
   }
@@ -346,6 +346,14 @@ function xliff12NodeContent(node) {
     return `<${name} id="${id}"/>`;
   }
   return children;
+}
+
+function xliff12SemanticOpening(node, semantic) {
+  let container = node.parentElement;
+  while (container?.parentElement && !["source", "target", "seg-source"].includes(localName(container))) container = container.parentElement;
+  const peers = descendantsByName(container, "g").filter((peer) => semanticTagForXliffElement(peer) === semantic);
+  // Repeated semantic tags need identity so reordering cannot swap native codes.
+  return peers.length > 1 && attr(node, "id") ? `<${semantic} id="${esc(attr(node, "id"))}">` : `<${semantic}>`;
 }
 
 function inlineKey(node, counters) {
@@ -418,33 +426,48 @@ function transUnitSegments(xml) {
       });
     });
   });
-  return descendantsByName(xml, "trans-unit").map((unit, index) => {
-    const sourceElement = firstChildByName(unit, "source") || firstChildByName(firstChildByName(unit, "seg-source"), "mrk");
-    const targetElement = firstChildByName(unit, "target");
-    const source = xliff12NodeContent(sourceElement).trim();
-    const target = xliff12NodeContent(targetElement).trim();
-    const notes = directChildrenByName(unit, "note").map((note) => (note.textContent || "").trim()).filter(Boolean);
-    const fileInfo = fileOriginalByUnit.get(unit) || {};
-    return {
-      text: source,
-      target,
-      key: attr(unit, "id") || `trans-unit-${index + 1}`,
-      status: statusForXliff12Target(targetElement, target),
-      tags: detectTags(source),
-      comment: notes.join("\n"),
-      structure: {
-        format: "xliff",
-        version: "1.2",
-        namespace: xml.documentElement?.namespaceURI || XLIFF_12_NAMESPACE,
-        unitId: attr(unit, "id") || "",
-        unitIndex: index,
-        fileOriginal: fileInfo.original || "",
-        fileIndex: fileInfo.fileIndex ?? 0,
-        sourceLang: fileInfo.sourceLang || "",
-        targetLang: fileInfo.targetLang || ""
-      }
-    };
-  }).filter((unit) => unit.text);
+  return descendantsByName(xml, "trans-unit").flatMap((unit, index) => {
+    if (effectiveAttribute(unit, "translate", "yes").toLowerCase() === "no") return [];
+    const segmentedSource = firstChildByName(unit, "seg-source");
+    const markers = descendantsByName(segmentedSource, "mrk").filter((node) => attr(node, "mtype") === "seg");
+    const targetContainer = firstChildByName(unit, "target");
+    for (const list of [markers, descendantsByName(targetContainer, "mrk").filter((node) => attr(node, "mtype") === "seg")]) {
+      const ids = list.map((node) => attr(node, "mid"));
+      if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error("Segmented XLIFF 1.2 markers require unique mid values.");
+    }
+    const sourceElements = markers.length ? markers : [firstChildByName(unit, "source")];
+    return sourceElements.map((sourceElement) => {
+      const segmentMid = markers.length ? attr(sourceElement, "mid") : "";
+      if (markers.length && !segmentMid) throw new Error("Segmented XLIFF 1.2 markers require a mid.");
+      const targetElement = markers.length
+        ? descendantsByName(targetContainer, "mrk").find((node) => attr(node, "mtype") === "seg" && attr(node, "mid") === segmentMid)
+        : targetContainer;
+      const source = xliff12NodeContent(sourceElement);
+      const target = xliff12NodeContent(targetElement);
+      const notes = directChildrenByName(unit, "note").map((note) => (note.textContent || "").trim()).filter(Boolean);
+      const fileInfo = fileOriginalByUnit.get(unit) || {};
+      return {
+        text: source,
+        target,
+        key: `${attr(unit, "id") || `trans-unit-${index + 1}`}${segmentMid ? `:${segmentMid}` : ""}`,
+        status: statusForXliff12Target(targetContainer, target),
+        tags: detectTags(source),
+        comment: notes.join("\n"),
+        structure: {
+          format: "xliff",
+          version: "1.2",
+          namespace: xml.documentElement?.namespaceURI || XLIFF_12_NAMESPACE,
+          unitId: attr(unit, "id") || "",
+          unitIndex: index,
+          segmentMid,
+          fileOriginal: fileInfo.original || "",
+          fileIndex: fileInfo.fileIndex ?? 0,
+          sourceLang: fileInfo.sourceLang || "",
+          targetLang: fileInfo.targetLang || ""
+        }
+      };
+    });
+  }).filter((unit) => unit.text.trim());
 }
 
 function groupPathForUnit(unit) {
@@ -748,8 +771,8 @@ function sameStructureIndex(segment, index, field = "unitIndex") {
 function findSegmentForTransUnit(segments, unit, index) {
   const unitId = attr(unit, "id");
   return segments.find((segment) => sameStructureIndex(segment, index, "unitIndex"))
-    || (unitId ? segments.find((segment) => segment.structure?.unitId === unitId) : null)
-    || segments[index]
+    || (unitId ? segments.find((segment) => segment.structure?.unitIndex == null && segment.structure?.unitId === unitId) : null)
+    || (segments.every((segment) => !segment.structure) ? segments[index] : null)
     || null;
 }
 
@@ -766,18 +789,93 @@ function findSegmentForXliff2(segments, file, unit, segmentElement, unitIndex, s
     : null) || null;
 }
 
-function updateXliff12TargetElement(xml, targetElement, segment) {
-  targetElement.setAttribute("state", stateForXliff12(segment));
-  appendInlineFragment(xml, targetElement, xliffInlineContent(segment.target || ""));
+function xliff12ReconstructedContent(value, sourceElement, targetElement) {
+  const templates = new Map();
+  const serializer = new XMLSerializer();
+  // Map the editor's short tokens back to the original inline XML. Rebuilding
+  // them as generic <g>/<ph> codes loses vendor IDs, rid links and native data.
+  for (const container of [sourceElement, targetElement].filter(Boolean)) {
+    const localTemplates = new Map();
+    const add = (token, xmlText) => {
+      if (!token) return;
+      if (!localTemplates.has(token)) localTemplates.set(token, []);
+      localTemplates.get(token).push(xmlText);
+    };
+    const visit = (node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const name = localName(node);
+      if (["ph", "x", "bx", "ex", "bpt", "ept", "it"].includes(name)) {
+        add(xliff12NodeContent(node), serializer.serializeToString(node));
+        return;
+      }
+      if (name === "g") {
+        const semantic = semanticTagForXliffElement(node);
+        const token = semantic ? xliff12SemanticOpening(node, semantic) : attr(node, "id") ? `<g id="${attr(node, "id")}">` : "";
+        const opening = serializer.serializeToString(node.cloneNode(false)).replace(/\/>$/, ">");
+        add(token, opening);
+        Array.from(node.childNodes).forEach(visit);
+        add(semantic ? `</${semantic}>` : token ? "</g>" : "", `</${node.nodeName}>`);
+        return;
+      }
+      Array.from(node.childNodes).forEach(visit);
+    };
+    Array.from(container.childNodes).forEach(visit);
+    for (const [token, values] of localTemplates) {
+      const existing = templates.get(token) || [];
+      templates.set(token, values.concat(existing.slice(values.length)));
+    }
+  }
+  if (!templates.size) return escText(value);
+  const escaped = [...templates.keys()].sort((a, b) => b.length - a.length).map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(escaped.join("|"), "g");
+  const counts = new Map();
+  let output = "", cursor = 0, match;
+  while ((match = pattern.exec(String(value || "")))) {
+    output += escText(String(value || "").slice(cursor, match.index));
+    const index = counts.get(match[0]) || 0;
+    const template = templates.get(match[0])[index];
+    if (template == null) throw new Error("XLIFF 1.2 target contains duplicated inline codes.");
+    counts.set(match[0], index + 1);
+    output += template;
+    cursor = match.index + match[0].length;
+  }
+  return output + escText(String(value || "").slice(cursor));
+}
+
+function updateXliff12TargetElement(xml, targetElement, segment, sourceElement) {
+  const content = xliff12ReconstructedContent(segment.target || "", sourceElement, targetElement);
+  appendInlineFragment(xml, targetElement, content);
 }
 
 function updateXliff12Targets(xml, segments) {
   descendantsByName(xml, "trans-unit").forEach((unit, index) => {
+    if (effectiveAttribute(unit, "translate", "yes").toLowerCase() === "no") return;
+    const segmented = segments.filter((segment) => sameStructureIndex(segment, index) && segment.structure?.segmentMid);
+    if (segmented.length) {
+      const segmentedSource = firstChildByName(unit, "seg-source");
+      const sourceMarkers = descendantsByName(segmentedSource, "mrk").filter((node) => attr(node, "mtype") === "seg");
+      const target = ensureDirectChildAfter(xml, unit, "target", segmentedSource || firstChildByName(unit, "source"));
+      const targetMarkers = descendantsByName(target, "mrk").filter((node) => attr(node, "mtype") === "seg");
+      if (!targetMarkers.length) {
+        if ((target.textContent || "").trim()) throw new Error("Segmented XLIFF target is missing segment markers.");
+        Array.from(segmentedSource.childNodes).forEach((child) => target.appendChild(xml.importNode(child, true)));
+      }
+      for (const segment of segmented) {
+        const mid = segment.structure.segmentMid;
+        const source = sourceMarkers.find((node) => attr(node, "mid") === mid);
+        const marker = descendantsByName(target, "mrk").find((node) => attr(node, "mtype") === "seg" && attr(node, "mid") === mid);
+        if (!source || !marker) throw new Error(`XLIFF segment marker ${mid} is missing.`);
+        updateXliff12TargetElement(xml, marker, segment, source);
+      }
+      target.setAttribute("state", segmented.every((segment) => segment.status === "confirmed") ? "translated" : "needs-review-translation");
+      return;
+    }
     const segment = findSegmentForTransUnit(segments, unit, index);
     if (!segment) return;
     const sourceElement = firstChildByName(unit, "source") || firstChildByName(firstChildByName(unit, "seg-source"), "mrk");
     const targetElement = ensureDirectChildAfter(xml, unit, "target", sourceElement);
-    updateXliff12TargetElement(xml, targetElement, segment);
+    targetElement.setAttribute("state", stateForXliff12(segment));
+    updateXliff12TargetElement(xml, targetElement, segment, sourceElement);
   });
 }
 
