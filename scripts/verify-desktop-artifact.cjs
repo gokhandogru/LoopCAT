@@ -286,7 +286,9 @@ function verifyArchive(asarPath) {
   }
   if (
     !desktopMain.includes("isAllowedAppNavigationUrl(url)") ||
-    !desktopMain.includes('relativePath === "index.html"')
+    !desktopMain.includes('if (!resolveAppFile(shellUrl)) return false;') ||
+    !desktopMain.includes('if (parsed.protocol !== `${APP_SCHEME}:` || parsed.hostname !== APP_HOST) return false;') ||
+    !desktopMain.includes('if (!["", "/", "/index.html"].includes(parsed.pathname)) return false;')
   ) {
     fail(`${path.relative(root, asarPath)} desktop wrapper must restrict top-level app navigation to index.html.`);
   }

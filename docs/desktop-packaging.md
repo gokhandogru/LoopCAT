@@ -4,10 +4,10 @@ LoopCAT can run as a static browser app, an installable offline web app, or a bu
 
 ## Current Checkpoint State
 
-- The repository currently packages LoopCAT `0.0.4-dev.20260913` with Electron 43.3.0 and electron-builder 26.15.3.
-- The current Windows repository mirror is intentionally unsigned and is suitable for trusted prerelease testing, not production release qualification.
-- Native CI has completed the static-web and Linux AppImage/DEB build, sandboxed smoke, artifact, fuse, download-policy, and checksum gates. Windows and macOS reach the fail-closed signing-credential boundary; completed signed/notarized clean-machine evidence is still required.
-- The files under `downloads/` are regenerated from the current repository checkout. The binaries attached to the older `draft-0.0.3` GitHub prerelease tag are a historical tagged build and must not be silently replaced with binaries from a different commit.
+- The repository currently packages LoopCAT `0.0.4-dev.20261115.1` with Electron 43.3.0 and electron-builder 26.15.3.
+- The Windows development preview is intentionally unsigned and is suitable for trusted prerelease testing, not production release qualification.
+- The release workflow builds Windows, universal macOS, Linux x64 and static-web packages. Preview builds use unsigned Windows and ad-hoc signed, unnotarized Mac packages; production builds retain fail-closed signing checks. Native launch, artifact, fuse, file-format and checksum gates are required before release. Signed/notarized production qualification remains separate.
+- The latest packages are GitHub release assets linked from `downloads/`; its November 6 binary mirror is historical. The optional mirror procedure below regenerates files from a fingerprinted checkout. The binaries attached to the older `draft-0.0.3` GitHub prerelease tag are a historical tagged build and must not be silently replaced with binaries from a different commit.
 - Internal software reviews (`docs/loopcat-modern-software-review-*.md`) and planning prompts (`docs/loopcat-modernization-plan-prompt-*.md`) stay in the repository and are excluded from desktop staging and packaging. The artifact verifier rejects either document type in a desktop payload. Repository documentation uses relative paths rather than personal computer paths.
 
 ## Why Electron
