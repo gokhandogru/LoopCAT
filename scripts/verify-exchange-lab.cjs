@@ -165,14 +165,19 @@ async function main() {
   for (let i = 0; i < controls; i++) {
     const control = `${panel}.querySelectorAll('select')[${i}]`;
     await tabTo(control, "blind assessment field " + i);
-    // macOS opens a native popup; commit its choice before inspecting the select.
     if (process.platform === "darwin") {
-      await key("Space");
-      await key("Home");
+      // Arrow keys open a Cocoa menu outside webContents input routing. Use
+      // the select's built-in keyboard type-ahead, without changing its value.
+      const label = await js(`(${control}).options[2].textContent`);
+      for (const character of label) {
+        win.webContents.sendInputEvent({ type: "char", keyCode: character });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    } else {
+      await key("Down");
+      await key("Down");
     }
-    await key("Down");
-    await key("Down");
-    if (process.platform === "darwin") await key("Return");
+    console.log("Assessment keyboard field", i, await js(`JSON.stringify({index:(${control}).selectedIndex,value:(${control}).value,focused:document.activeElement===(${control})})`));
     await wait(`(${control}).selectedIndex===2`, "keyboard choice for field " + i);
   }
   await tabTo("document.querySelector('#exchangeRoot textarea')", "rationale");
