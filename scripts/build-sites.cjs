@@ -56,6 +56,12 @@ for (const relativePath of webDistributionAssets) {
   const destinationPath = path.join(clientDir, ...normalized.split("/"));
   fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
   fs.copyFileSync(sourcePath, destinationPath);
+  // Sites can serve static HTML before the Worker runs. Resolve social-image
+  // metadata at build time as well as in the Worker response path.
+  if (normalized.endsWith(".html")) {
+    const html = fs.readFileSync(destinationPath, "utf8");
+    fs.writeFileSync(destinationPath, html.replaceAll("__LOOPCAT_ORIGIN__", "https://loopcat.gokhan-dogru.chatgpt.site"), "utf8");
+  }
 }
 
 const workerSource = `const worker = {
