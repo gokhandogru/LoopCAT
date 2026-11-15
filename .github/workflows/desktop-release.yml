@@ -143,6 +143,16 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a pnpm run verify:exchange
 
+      - name: Verify localization file formats and Office/DTP formatting
+        if: runner.os != 'Linux'
+        run: pnpm run verify:file-formats
+
+      - name: Verify localization file formats and Office/DTP formatting (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm run verify:file-formats
+        env:
+          LOOPCAT_BROWSER_RUNNER_NO_SANDBOX: "1"
+
       - name: Run automated accessibility checks
         run: ${{ matrix.accessibilityCommand }}
 

@@ -15,3 +15,6 @@ dist-web-arabic/
 
 /output/
 /tmp/
+
+# Separately versioned Sites source checkout.
+/sites/

@@ -22315,8 +22315,8 @@ for (const snippet of [
   'return "text/tab-separated-values"',
   'return "application/xml"',
   'return "application/vnd.adobe.indesign-idml-package"',
-  'return "application/vnd.openxmlformats-officedocument"',
-  'return "application/vnd.oasis.opendocument"',
+  'docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"',
+  'odt: "application/vnd.oasis.opendocument.text"',
   'return "text/plain"',
   "return Object.freeze({ forExtension });"
 ]) {
@@ -24242,7 +24242,7 @@ assertIncludes(
 );
 assertIncludes(
   tbxJs,
-  '["context", "note", "definition", "explanation"].includes(descripType(node))',
+  '["context", "note", "explanation", "usagenote"].includes(node.type)',
   "tbx.js TBX import must preserve context-like termbase notes."
 );
 assertIncludes(
