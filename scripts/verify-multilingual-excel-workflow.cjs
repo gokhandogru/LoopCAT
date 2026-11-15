@@ -55,16 +55,21 @@ async function checkVisibleActions() {
     }
   });
 }
-const click = (selector, label) =>
-  run(
+const click = async (selector, label) => {
+  await wait(
+    `[...document.querySelectorAll(${JSON.stringify(`${selector} button`)})].some(button => button.textContent === ${JSON.stringify(label)} && !button.disabled && !button.closest('[inert]'))`,
+    "enabled button: " + label
+  );
+  return run(
     (scope, text) => {
       const button = [...document.querySelectorAll(`${scope} button`)].find((b) => b.textContent === text);
-      if (!button) throw Error("Missing button: " + text);
+      if (!button || button.disabled) throw Error("Missing or disabled button: " + text);
       button.click();
     },
     selector,
     label
   );
+};
 
 async function fixture(updated = false) {
   const ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
