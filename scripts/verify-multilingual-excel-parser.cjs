@@ -17,6 +17,7 @@ if (!process.versions.electron) {
 const { app, BrowserWindow } = require("electron");
 app.setPath("userData", path.join(root, "tmp", `multilingual-excel-parser-${process.pid}`));
 app.disableHardwareAcceleration();
+if (process.platform === "linux") app.commandLine.appendSwitch("disable-dev-shm-usage");
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("in-process-gpu");
 if (process.env.LOOPCAT_BROWSER_RUNNER_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");

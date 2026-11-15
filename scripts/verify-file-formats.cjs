@@ -16,7 +16,7 @@ const checks = [
 ];
 for (const args of checks) {
   console.log(`\nRunning ${args.join(" ")}`);
-  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit", env: process.env });
+  const result = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit", env: process.env, timeout: 300000 });
   if (result.error) console.error(result.error);
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
