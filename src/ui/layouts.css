@@ -1385,7 +1385,18 @@ html[lang^="es"] .liquid-glass-edition .coordinated-editor #segmentStatusFilter 
   flex: 1 1 240px;
 }
 
-.resources-upgraded .resource-tabs [role="status"] {
+.resources-upgraded .resource-tabs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.resources-upgraded .resource-tabs-row .resource-tabs {
+  margin-bottom: 0;
+}
+
+.resources-upgraded .resource-tabs-row [role="status"] {
   align-self: center;
   margin-inline-start: auto;
   padding-inline: var(--space-3);

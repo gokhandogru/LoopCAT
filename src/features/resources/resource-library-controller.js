@@ -332,8 +332,11 @@ export function createResourceLibraryController({
           run(() => openResourceImportDialog({ ui, transfer, storage, type: catalog.type, onComplete: refresh }))
         )
       );
-      root.querySelector(".resource-tabs").before(toolbar);
-      root.querySelector(".resource-tabs").append(resultCount);
+      const tabs = root.querySelector(".resource-tabs");
+      const tabsRow = document.createElement("div");
+      tabsRow.className = "resource-tabs-row";
+      tabs.before(toolbar, tabsRow);
+      tabsRow.append(tabs, resultCount);
       mounted = true;
     }
     const key = JSON.stringify(

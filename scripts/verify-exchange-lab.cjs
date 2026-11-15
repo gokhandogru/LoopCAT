@@ -68,6 +68,10 @@ async function main() {
     show: false,
     webPreferences: { session: s, sandbox: true, contextIsolation: true, nodeIntegration: false }
   });
+  if (process.platform === "darwin") {
+    win.show();
+    win.focus();
+  }
   const js = (code) => win.webContents.executeJavaScript(code, true);
   async function wait(code, label) {
     for (let i = 0; i < 150; i++) {
@@ -115,15 +119,16 @@ async function main() {
   }
   const localized = (name, values = {}) =>
     js(`window.CatHan.i18n.source(${JSON.stringify(name)},${JSON.stringify(values)})`);
-  function key(keyCode) {
+  async function key(keyCode) {
     win.webContents.sendInputEvent({ type: "keyDown", keyCode });
     win.webContents.sendInputEvent({ type: "keyUp", keyCode });
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
   async function tabTo(target, label) {
     await wait(`Boolean(${target})`, label);
     for (let i = 0; i < 40; i++) {
       if (await js(`document.activeElement===(${target})`)) return;
-      key("Tab");
+      await key("Tab");
     }
     throw Error(
       "Keyboard could not reach " + label + "; focused " + (await js("document.activeElement.outerHTML.slice(0,230)"))
@@ -131,7 +136,7 @@ async function main() {
   }
   async function keyboardButton(label) {
     await tabTo(button(label), label);
-    key("Space");
+    await key("Space");
   }
   await win.loadURL(base + "/index.html");
   await open();
@@ -160,8 +165,14 @@ async function main() {
   for (let i = 0; i < controls; i++) {
     const control = `${panel}.querySelectorAll('select')[${i}]`;
     await tabTo(control, "blind assessment field " + i);
-    key("Down");
-    key("Down");
+    // macOS opens a native popup; commit its choice before inspecting the select.
+    if (process.platform === "darwin") {
+      await key("Space");
+      await key("Home");
+    }
+    await key("Down");
+    await key("Down");
+    if (process.platform === "darwin") await key("Return");
     await wait(`(${control}).selectedIndex===2`, "keyboard choice for field " + i);
   }
   await tabTo("document.querySelector('#exchangeRoot textarea')", "rationale");
