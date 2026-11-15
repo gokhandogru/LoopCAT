@@ -2,6 +2,8 @@
 
 Use the [November 15 all-platform release](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261115.1) for current **Windows, universal macOS (Apple Silicon and Intel), Linux x64 and web** packages and `SHA256SUMS.txt`. [Release notes](../docs/releases/0.0.4-dev.20261115.1.md) · [Downloads website](https://loopcat-downloads.gokhan-dogru.chatgpt.site).
 
+The [current release manifest](latest-release.json) lists all 11 verified files, hashes and direct URLs. Read the [final verification report](verification.md) for platform, package and live website checks.
+
 The files and `release.json` below are retained as the historical November 6 Windows/web mirror. They do not contain the November 15 changes.
 
 ---

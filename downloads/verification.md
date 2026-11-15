@@ -1,3 +1,44 @@
+# LoopCAT 0.0.4-dev.20261115.1 release verification
+
+Verified and published on 15 November 2026.
+
+- [GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261115.1)
+- [Public downloads website](https://loopcat-downloads.gokhan-dogru.chatgpt.site)
+- [Release manifest: filenames, byte sizes, SHA-256 hashes and URLs](latest-release.json)
+- [Successful all-platform workflow](https://github.com/gokhandogru/LoopCAT/actions/runs/43723356019)
+
+## Source and downloadable files
+
+All packages were built from commit `e5d1f43e6b7a7eb574c40e0e397a7a22a1c95db8`. The release tag points to that exact revision. Later download-documentation commits do not change the packaged application source.
+
+Nine application packages are available: Windows installer EXE/ZIP and portable EXE/ZIP; universal macOS DMG/ZIP for Apple Silicon and Intel; Linux x64 AppImage/DEB; and the web ZIP. The release also includes the Mac installation guide and `SHA256SUMS.txt`.
+
+The combined CI bundle passed its artifact rules and nine package checksums. All 11 uploaded assets matched GitHub's stored SHA-256 digests and sizes. Every public download was then fetched in full and independently hashed: all 11 matched, including the checksum file and installation guide. The web build receipt also matched the release source commit and ZIP hash.
+
+## Platform and format checks
+
+All seven release jobs passed: Windows, macOS, Linux, static web, Apple Silicon launch, Intel Mac launch, and combined-bundle verification. Desktop jobs included static quality gates, 1,730 unit tests, the nine browser suites, Exchange, file-format and Office/DTP checks, automated accessibility, Resources workflows/native window lifecycle, packaged launch, artifact integrity, Electron fuses and checksums. Universal Mac archive signatures and both architectures were verified. Firefox and WebKit Resources checks passed in the web job.
+
+Release preparation corrected the Resources tablist/status accessibility structure and synchronized platform-specific test inputs. The artifact verifier now checks the current navigation guard while the behavioral desktop-wrapper tests continue to reject non-shell navigation.
+
+Native Word, Excel and PowerPoint fixture evidence and the IDML structural checks are documented in the [Office/DTP report](../docs/office-dtp-formatting-2026-11-15.md). The broader coverage and exclusions are in the [file-format review](../docs/file-format-review-2026-11-15.md).
+
+## Website review
+
+Sites version 6 was published from source commit `dc454c0621ac9c0bf77fa0376beac2d529147e22`, preserving its public audience. The live site was tested in Chrome at desktop and 390-pixel mobile widths, with the GitHub live feed deliberately unavailable to verify the bundled fallback.
+
+All nine package choices selected the November 15 release. Both Mac chip choices resolved to universal packages, and the guide-before-download flow worked. Checksum links, English/Arabic manuals, the Mac guide, release data and scripts returned successful responses. No JavaScript page errors, serious/critical automated accessibility violations or mobile horizontal overflow were found. Desktop and mobile screenshots were inspected.
+
+## Qualification limits
+
+This remains a development preview. Windows is unsigned; macOS is ad-hoc signed but not Developer ID-signed or notarized. Native InDesign rendering remains unverified. Longer translations can wrap or overset, and older ambiguous rich-text projects may require reimport. The Resources two-second cold-load target remains unmet on the reference Windows machine. Automated checks do not replace every manual accessibility, native Safari or production clean-machine qualification check.
+
+The versioned November 6 binary files and `release.json` retained in this directory are historical mirrors. Use `latest-release.json` and the linked GitHub release for current downloads.
+
+---
+
+## Historical November 6 verification
+
 # LoopCAT 0.0.4-dev.20261106.1 download verification
 
 The [desktop release workflow](https://github.com/gokhandogru/LoopCAT/actions/runs/42229298416) built the unsigned development preview from commit `fdcd3d2900e76f010bfa15917a1a4f19c7d7ec0c`. The Windows, macOS, Linux, web, and combined bundle jobs passed. The web job passed on its second attempt after Chrome timed out during startup on the first runner.

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "version": "0.0.4-dev.20261115.1",
+  "channel": "development-preview",
+  "releaseUrl": "https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261115.1",
+  "sourceCommit": "e5d1f43e6b7a7eb574c40e0e397a7a22a1c95db8",
+  "verificationRun": "https://github.com/gokhandogru/LoopCAT/actions/runs/43723356019",
+  "verifiedAt": "2026-11-15T14:32:38.445Z",
+  "artifacts": [
+    {
+      "name": "LoopCAT-0.0.4-dev.20261115.1-universal-mac.zip",
+      "bytes": 218640100,
+      "sha256": "747e705ac68a724d04c57c9dff2ca54387cc52e25aeed3ea657fa3c694b54595",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT-0.0.4-dev.20261115.1-universal-mac.zip"
+    },
+    {
+      "name": "LoopCAT-0.0.4-dev.20261115.1-universal.dmg",
+      "bytes": 218678618,
+      "sha256": "7dd59faa2303ab853bbeebbdca61a7fabf8bddd1458d4d3475eea14ce6c6d894",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT-0.0.4-dev.20261115.1-universal.dmg"
+    },
+    {
+      "name": "LoopCAT-0.0.4-dev.20261115.1.AppImage",
+      "bytes": 129537445,
+      "sha256": "c856d96eda6e0b2a9fb63578b73faffab0baee4d05ff5b7be244a386a6ff67eb",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT-0.0.4-dev.20261115.1.AppImage"
+    },
+    {
+      "name": "LoopCAT-macOS-INSTALL.txt",
+      "bytes": 4876,
+      "sha256": "660cc1edabf1d59609c46c39650badfbac334480edb2e87b97c6178f9df13e48",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT-macOS-INSTALL.txt"
+    },
+    {
+      "name": "LoopCAT.0.0.4-dev.20261115.1.exe",
+      "bytes": 100665413,
+      "sha256": "48b0b42e62346bbd35381f1eecb802bb8a136c29a0a41dfd7d07f67a5172ca30",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT.0.0.4-dev.20261115.1.exe"
+    },
+    {
+      "name": "LoopCAT.0.0.4-dev.20261115.1.Portable.zip",
+      "bytes": 100726136,
+      "sha256": "e8b2214217857a9716f8553554869b6903b97016be8b68a3e1300c7806800cca",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT.0.0.4-dev.20261115.1.Portable.zip"
+    },
+    {
+      "name": "LoopCAT.Setup.0.0.4-dev.20261115.1.exe",
+      "bytes": 100825750,
+      "sha256": "0d0f3f5a6d5e9d928de2c4fe83c479ca02f6edd0ed51ed5aa06ee0204feb7d79",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT.Setup.0.0.4-dev.20261115.1.exe"
+    },
+    {
+      "name": "LoopCAT.Web.0.0.4-dev.20261115.1.zip",
+      "bytes": 9116095,
+      "sha256": "085e716904ae24155ba1ea1d8fcac954e29cb36e375625c91d51554a23256b7e",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT.Web.0.0.4-dev.20261115.1.zip"
+    },
+    {
+      "name": "LoopCAT.Windows.Setup.0.0.4-dev.20261115.1.zip",
+      "bytes": 100880496,
+      "sha256": "23557f449df16f6c3362abae3fec9c5d8209732ba0d19aa412e833c04532596c",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/LoopCAT.Windows.Setup.0.0.4-dev.20261115.1.zip"
+    },
+    {
+      "name": "loopcat_0.0.4-dev.20261115.1_amd64.deb",
+      "bytes": 101565008,
+      "sha256": "b5246c1cc841b2835a56f5d5267abc61ee035dad1fbdcfadca88fa69d25306d5",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/loopcat_0.0.4-dev.20261115.1_amd64.deb"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 1051,
+      "sha256": "5b6f37ea99423569224ec60debd80d828ea4703d163793d7d5d813e430e54f90",
+      "url": "https://github.com/gokhandogru/LoopCAT/releases/download/preview-0.0.4-dev.20261115.1/SHA256SUMS.txt"
+    }
+  ]
+}
