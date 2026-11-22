@@ -783,6 +783,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
         toolbarActionsBounds.bottom <= progressBounds.top + 1,
       "responsive editor toolbar keeps every action above the progress panel"
     );
+    async function waitForMenuPanel(menu) {
+      const panel = menu.querySelector(":scope > .menu-panel");
+      await waitFor(
+        () => menu.open && panel?.checkVisibility() && (!panel.showPopover || panel.matches(":popover-open")),
+        `${menu.id} to finish opening its menu panel`
+      );
+    }
     async function openMenuAncestors(menu) {
       const ancestors = [];
       for (let parent = menu.parentElement?.closest("details.menu"); parent; parent = parent.parentElement?.closest("details.menu")) {
@@ -790,16 +797,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       }
       for (const parent of ancestors) {
         parent.open = true;
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        await new Promise((resolve) => requestAnimationFrame(resolve));
+        await waitForMenuPanel(parent);
       }
       return ancestors;
     }
     const editorImportMenu = document.querySelector("#editorImportMenu");
     const importAncestors = await openMenuAncestors(editorImportMenu);
     editorImportMenu.open = true;
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    await waitForMenuPanel(editorImportMenu);
     const editorImportPanelBounds = editorImportMenu.querySelector(":scope > .menu-panel")?.getBoundingClientRect();
     editorImportMenu.open = false;
     importAncestors.forEach((menu) => { menu.open = false; });
@@ -849,8 +854,7 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       const ancestors = await openMenuAncestors(menu);
       const opener = menu.querySelector("summary");
       opener.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await waitForMenuPanel(menu);
       control.focus();
       assert(menu.open && document.activeElement === control, `${menuId} exposes its controls to keyboard focus`);
       control.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
