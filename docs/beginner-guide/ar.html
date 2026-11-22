@@ -1,41 +1,13 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html class="system-theme" lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="دليل البدء باستخدام LoopCAT: التثبيت، وإنشاء المشاريع، والترجمة، وفحص الجودة، والتصدير، والنسخ الاحتياطي.">
   <title>دليل المبتدئين إلى LoopCAT</title>
-  <style>
-    :root { color-scheme:light; font-family:"Segoe UI",Tahoma,Arial,sans-serif; color:#173d37; background:#f5f7f5; line-height:1.9; }
-    * { box-sizing:border-box; }
-    body { margin:0; }
-    a { color:#076c5d; text-underline-offset:.2em; }
-    header { padding:3rem 1.5rem; background:#083f38; color:white; text-align:center; }
-    header img { width:84px; height:84px; }
-    h1 { font-size:clamp(2rem,5vw,3.5rem); line-height:1.5; margin:.4em 0; }
-    h2,h3 { line-height:1.6; }
-    header p { max-width:48rem; margin:auto; }
-    .layout { display:grid; grid-template-columns:14rem minmax(0,1fr); gap:1.5rem; max-width:76rem; padding:1.5rem; margin:auto; }
-    nav { align-self:start; position:sticky; top:1rem; padding:1rem; background:white; border-radius:1rem; }
-    nav a { display:block; padding:.4rem; }
-    main { min-width:0; }
-    section { background:white; border:1px solid #dce5e1; border-radius:1rem; padding:clamp(1rem,3vw,2rem); margin-bottom:1.5rem; scroll-margin-top:1rem; }
-    li { margin-block:.4rem; }
-    ul,ol { padding-inline-start:1.7rem; }
-    .note { background:#eef7f3; border-inline-start:4px solid #078271; padding:1rem; border-radius:.4rem; }
-    code,kbd,pre { direction:ltr; unicode-bidi:isolate; font-family:Consolas,monospace; }
-    code,kbd { display:inline-block; background:#edf2ef; padding:0 .3rem; border-radius:.3rem; overflow-wrap:anywhere; }
-    pre { white-space:pre-wrap; overflow-wrap:anywhere; padding:1rem; background:#edf2ef; }
-    table { width:100%; border-collapse:collapse; }
-    th,td { border-bottom:1px solid #dce5e1; padding:.6rem; text-align:start; vertical-align:top; overflow-wrap:anywhere; }
-    th { background:#edf5f1; }
-    footer { text-align:center; padding:1.5rem; }
-    .skip { position:absolute; inset-inline-start:-10000px; }
-    .skip:focus { inset-inline-start:1rem; top:1rem; background:white; padding:1rem; z-index:2; }
-    a:focus-visible { outline:3px solid #dc693e; outline-offset:3px; }
-    @media(max-width:850px) { .layout { grid-template-columns:1fr; } nav { position:static; } }
-    @media print { nav,.skip { display:none; } .layout { display:block; } section { break-inside:avoid; } header { color:#173d37; background:white; } }
-  </style>
+  <link rel="stylesheet" href="../../src/ui/tokens.css">
+  <link rel="stylesheet" href="./guide.css">
+  <link rel="stylesheet" href="../../src/ui/themes.css" media="screen and (prefers-color-scheme: dark)">
 </head>
 <body>
   <a class="skip" href="#main">الانتقال إلى محتوى الدليل</a>
@@ -68,6 +40,7 @@
         <h2>إنشاء أول مشروع واستيراد الملفات</h2>
         <ol><li>اختر <strong>مشروع جديد</strong> وأدخل اسمًا واضحًا، مثل «تحديث الموقع — الإنجليزية إلى العربية».</li><li>أضف اسم المنشئ والمجال إن رغبت؛ يساعدان في تنظيم العمل وسجلاته.</li><li>اختر لغتي المصدر والهدف بدقة. يمكنك كتابة الاسم العربي، مثل «العربية»، أو رمز اللغة، مثل <code>ar</code>. يؤثر زوج اللغات في مطابقة الموارد والتدقيق الإملائي والذكاء الاصطناعي.</li><li>افتح <strong>إعدادات الموارد الاختيارية</strong> لمراجعة الذاكرات وقواعد المصطلحات. تُنشئ الإعدادات الافتراضية ذاكرة رئيسية وقاعدة مصطلحات نشطة باسم المشروع. تبقى إعدادات التخزين والذكاء الاصطناعي في نافذة المشروع.</li><li>اختر <strong>إنشاء</strong> للانتقال إلى لوحة المشروع.</li><li>اختر <strong>استيراد الملفات</strong> وحدد ملفًا أو أكثر، ثم انتظر اكتمال المعالجة.</li><li>راجع اسم الملف وعدد كلماته ومقاطعه، ثم افتحه في المحرر. استخدم <strong>العودة إلى الملفات</strong> للرجوع.</li></ol>
         <p>تشمل الصيغ الشائعة <code>DOCX</code> و<code>XLIFF</code> و<code>HTML</code> و<code>Markdown</code> و<code>CSV/TSV</code> و<code>JSON</code> و<code>XML</code> و<code>SRT/VTT</code> و<code>TXT</code>. تختلف إمكانات إعادة البناء بحسب الصيغة وتعقيد الملف؛ افحص الملف المصدّر في تطبيقه النهائي.</p>
+        <p>انتقل من الشريط الجانبي إلى المشاريع أو الموارد أو التبادل. عند فتح مشروع تظهر فيه أيضًا روابط الملفات والمحرر والإحصاءات. في النوافذ الضيقة، افتح قائمة التنقل لرؤية هذه الروابط. يتيح لك المسار أعلى مساحة العمل العودة إلى المشروع أو ملفاته. وتجد سلة المحذوفات والإعدادات وخيارات الاسترداد في قائمة مساحة العمل.</p>
         <p>يمكنك عرض المشاريع والملفات والموارد كبطاقات أو قوائم. يحفظ LoopCAT اختيار كل فئة على حدة؛ وتعيد <strong>مساحة العمل ← إعادة ضبط التخطيط</strong> الإعدادات الافتراضية.</p>
       </section>
       <section id="editor">

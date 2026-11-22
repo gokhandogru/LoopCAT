@@ -5,7 +5,8 @@ export function createInspectorToggleController({
   layout,
   presentation,
   frame,
-  selection
+  selection,
+  sheet
 }) {
   if (!state?.getOpen || !state?.setOpen || !layout?.setOpen || !presentation?.renderEditor) {
     throw new TypeError("InspectorToggleController requires state, layout, and editor-presentation boundaries.");
@@ -20,6 +21,7 @@ export function createInspectorToggleController({
   let mounted = false;
 
   const toggleClickListener = () => {
+    if (sheet?.toggle()) return;
     state.setOpen(!state.getOpen());
     void layout.setOpen(state.getOpen());
     presentation.renderEditor();
@@ -30,6 +32,7 @@ export function createInspectorToggleController({
     }
   };
   const closeClickListener = () => {
+    if (sheet?.toggle()) return;
     if (state.getOpen()) toggleClickListener();
   };
 

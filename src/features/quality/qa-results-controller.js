@@ -1,4 +1,14 @@
 import { qaIsIncomplete } from "./qa-completeness.js";
+
+const QA_TYPE_LABELS = new Map([
+  ["empty", "Empty target"],
+  ["number", "Number mismatch"],
+  ["tag", "Missing tag"],
+  ["copy", "Copied source"],
+  ["punctuation", "Punctuation"],
+  ["forbidden-term", "Forbidden term"],
+  ["term", "Terminology"]
+]);
 /**
  * Owns QA summary/filter state, localized issue presentation, dynamic filter
  * and navigation actions, and safe results-root replacement. QA calculation,
@@ -56,8 +66,11 @@ export function createQaResultsController(options) {
   }
 
   let filter = "";
+  let completedChecks;
 
   function clear() {
+    // QA, delivery and report runs publish a new result array before resetting the filter.
+    completedChecks = session.getQaChecks();
     filter = "";
   }
 
@@ -77,44 +90,50 @@ export function createQaResultsController(options) {
     return check?.fixHint ? localization.source(check.fixHint, check.fixHintValues || {}) : "";
   }
 
-  function render() {
+  function render(focusFilter) {
     const root = getRoot();
     const qaChecks = session.getQaChecks();
     const checks = filter ? qaChecks.filter((check) => check.type === filter) : qaChecks;
     if (!qaChecks.length) {
-      root.textContent = localization.source(
-        qaIsIncomplete(qaChecks) ? "Required Exchange checks: Not evaluated." : "No QA issues found."
-      );
+      let status = "Run QA to check this file.";
+      if (qaIsIncomplete(qaChecks)) status = "Required Exchange checks: Not evaluated.";
+      else if (qaChecks === completedChecks) status = "No QA issues found.";
+      root.textContent = localization.source(status);
       root.classList.add("muted");
       return;
     }
     root.classList.remove("muted");
-    const counts = summary(qaChecks);
+    const typeCounts = new Map();
+    for (const { type } of qaChecks) {
+      if (type) typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+    }
     const fragment = dom.createDocumentFragment();
     const summaryWrap = dom.createElement("div");
     summaryWrap.className = "qa-summary";
     const allButton = dom.createElement("button");
     allButton.type = "button";
     allButton.className = filter ? "" : "active";
+    allButton.ariaPressed = String(!filter);
     allButton.textContent = localization.source("All {value1}", { value1: qaChecks.length });
     allButton.addEventListener("click", () => {
       filter = "";
-      render();
+      render("");
     });
     summaryWrap.append(allButton);
-    Object.entries(counts)
-      .filter(([type]) => !["error", "warning", "info"].includes(type))
-      .forEach(([type, count]) => {
-        const button = dom.createElement("button");
-        button.type = "button";
-        button.className = filter === type ? "active" : "";
-        button.textContent = `${localization.source(type)} ${count}`;
-        button.addEventListener("click", () => {
-          filter = filter === type ? "" : type;
-          render();
-        });
-        summaryWrap.append(button);
+    let nextFocus = focusFilter === "" ? allButton : null;
+    for (const [type, count] of typeCounts) {
+      const button = dom.createElement("button");
+      button.type = "button";
+      button.className = filter === type ? "active" : "";
+      button.ariaPressed = String(filter === type);
+      button.textContent = `${localization.source(QA_TYPE_LABELS.get(type) || type)} ${count}`;
+      button.addEventListener("click", () => {
+        filter = filter === type ? "" : type;
+        render(type);
       });
+      if (focusFilter === type) nextFocus = button;
+      summaryWrap.append(button);
+    }
     if (qaIsIncomplete(qaChecks)) {
       const notice = dom.createElement("p");
       notice.textContent = localization.source("Required Exchange checks: Not evaluated.");
@@ -127,11 +146,11 @@ export function createQaResultsController(options) {
       const hint = fixHint(check);
       replaceSafeHtml(
         card,
-        `<header><strong>${escapeHtml(localization.source(check.type))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(localization.source(check.severity || "info"))}</span><span>#${escapeHtml(check.label)}</span></header><p>${escapeHtml(message(check))}</p>${hint ? `<p class="muted">${escapeHtml(hint)}</p>` : ""}`
+        `<header><strong>${escapeHtml(message(check))}</strong><span class="severity-pill ${escapeHtml(check.severity || "info")}">${escapeHtml(localization.source(check.severity || "info"))}</span></header>${hint ? `<p class="muted">${escapeHtml(hint)}</p>` : ""}`
       );
       const button = dom.createElement("button");
       button.type = "button";
-      button.textContent = localization.label("go");
+      button.textContent = localization.source("Go to segment {value1}", { value1: check.label });
       button.addEventListener("click", async () => {
         const index = session.getSegments().findIndex((segment) => segment.id === check.segmentId);
         if (index !== -1) {
@@ -144,6 +163,7 @@ export function createQaResultsController(options) {
       fragment.append(card);
     });
     root.replaceChildren(fragment);
+    nextFocus?.focus?.({ preventScroll: true });
   }
 
   return Object.freeze({ clear, fixHint, message, render, summary });

@@ -70,6 +70,21 @@ function attachResourceEditorSmoke(mainWindow, { BrowserWindow, timeoutMs, runti
           evaluate(memory, "document.querySelector('#resourceEntryForm textarea[name=target]')?.value === 'İlk kayıt'"),
         "deep link selects entry in standalone editor"
       );
+      const surfacesReady = await evaluate(
+        memory,
+        `(() => {
+          const heading = document.querySelector(".resource-editor-heading");
+          const target = document.querySelector("#resourceEntryForm textarea[name=target]");
+          const hasToolsSheet = [...document.styleSheets].some(sheet =>
+            sheet.href && new URL(sheet.href).pathname.endsWith("/src/ui/workspace-tools.css")
+          );
+          return hasToolsSheet && getComputedStyle(heading).borderBlockStartStyle === "solid" &&
+            parseFloat(getComputedStyle(heading).borderBlockStartWidth) > 0 &&
+            target.getBoundingClientRect().width > 0 && document.documentElement.scrollWidth <= innerWidth;
+        })()`
+      );
+      if (!surfacesReady) throw new Error("The independent resource window did not load its workspace surfaces");
+      checks.push("standalone resource window loads the workspace stylesheet and visible entry form");
       if (memory.getParentWindow() || memory.webContents.session !== mainWindow.webContents.session)
         throw new Error("Resource window must be independent and share the library session");
       const prefs = memory.webContents.getLastWebPreferences();

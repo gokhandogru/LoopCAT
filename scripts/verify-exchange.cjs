@@ -162,7 +162,7 @@ async function verifyAiScopeControls(win) {
   );
   await run(win, () => {
     const critique = [...document.querySelectorAll("#exchangeRoot h4")].find(
-      (h) => h.textContent === "terminology-critique"
+      (h) => h.textContent === "Review terminology"
     ).nextElementSibling;
     [...critique.querySelectorAll("button")].find((b) => b.textContent === "Run workflow").click();
   });

@@ -147,10 +147,9 @@ test("RevisionHistoryPresentationService preserves exact safe card markup and de
     `
     <article class="revision-card">
       <header><strong>E[localized:Copy source]</strong><span>E[date:updated]</span></header>
-      <div class="revision-status">E[status:empty] -> E[status:confirmed]</div>
       <div class="revision-pair">
-        <div><span>HTML:before</span><p>&nbsp;</p></div>
-        <div><span>HTML:after</span><p>E[<after>]</p></div>
+        <div><span>HTML:before · E[status:empty]</span><p dir="auto"><em class="muted">E[localized:Empty target]</em></p></div>
+        <div><span>HTML:after · E[status:confirmed]</span><p dir="auto">E[<after>]</p></div>
       </div>
     </article>
   `
@@ -159,10 +158,10 @@ test("RevisionHistoryPresentationService preserves exact safe card markup and de
     harness.calls.filter(([name]) => ["formatDateTime", "statusLabel", "labelHtml"].includes(name)),
     [
       ["formatDateTime", "updated"],
-      ["statusLabel", "empty"],
-      ["statusLabel", "confirmed"],
       ["labelHtml", "before"],
-      ["labelHtml", "after"]
+      ["statusLabel", "empty"],
+      ["labelHtml", "after"],
+      ["statusLabel", "confirmed"]
     ]
   );
 });

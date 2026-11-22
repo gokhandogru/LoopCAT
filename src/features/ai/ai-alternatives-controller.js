@@ -184,7 +184,7 @@ export function createAiAlternativesController(options) {
       const variants = distinctVariants(result, segment);
       if (!variants.length) {
         presentation.renderOutput("AI did not propose alternatives different from the current target.", {
-          muted: false
+          uiMessage: true
         });
         status.set("AI did not propose different alternatives.", "saved");
         return true;

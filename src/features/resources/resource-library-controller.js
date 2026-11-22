@@ -98,6 +98,23 @@ export function createResourceLibraryController({
     ],
     state.density
   );
+  const columns = [
+    ["name", "Name"],
+    ["sourceLang", "Languages"],
+    ["entryCount", "Entries"],
+    ["linkedProjects", "Linked projects"],
+    ["updatedAt", "Updated"]
+  ];
+  const sortBy = select("Sort by", columns, state.sort);
+  const sortDirection = select(
+    "Sort direction",
+    [
+      ["asc", "Ascending"],
+      ["desc", "Descending"]
+    ],
+    state.direction
+  );
+  const filterSummary = node("summary", {}, t("Filters and display"));
   const resultCount = node("span", { className: "muted", role: "status", "aria-live": "polite" });
   function remember() {
     try {
@@ -127,6 +144,8 @@ export function createResourceLibraryController({
   bind(linkedProject, "project");
   bind(archive, "archive");
   bind(density, "density");
+  bind(sortBy, "sort");
+  bind(sortDirection, "direction");
   const run = (action) => void Promise.resolve().then(action).catch(reportError);
   function create() {
     const type = catalog.type;
@@ -206,28 +225,28 @@ export function createResourceLibraryController({
   }
   function renderTables() {
     root.dataset.density = state.density;
+    sortBy.value = state.sort;
+    sortDirection.value = state.direction;
+    const filterCount = [state.language, state.project, state.archive !== "active"].filter(Boolean).length;
+    filterSummary.textContent = [t("Filters and display"), filterCount || ""].filter(Boolean).join(" · ");
     let activeCount = 0;
     for (const type of ["tm", "tb"]) {
       const dashboard = root.querySelector(type === "tm" ? "#tmResourceDashboard" : "#tbResourceDashboard");
-      const resources = filterResourceLibrary(
-        catalog.resources.filter((item) => item.type === (type === "tm" ? "tm" : "termbase")),
-        state
-      );
+      const available = catalog.resources.filter((item) => item.type === (type === "tm" ? "tm" : "termbase"));
+      const resources = filterResourceLibrary(available, state);
       if (type === catalog.type) activeCount = resources.length;
       const table = node("table", {
         className: "resource-library-table",
+        role: "table",
         "aria-label": t(type === "tm" ? "Translation memories" : "Termbases")
       });
-      const heading = node("tr");
-      for (const [key, label] of [
-        ["name", "Name"],
-        ["sourceLang", "Languages"],
-        ["entryCount", "Entries"],
-        ["linkedProjects", "Linked projects"],
-        ["updatedAt", "Updated"]
-      ]) {
+      const heading = node("tr", { role: "row" });
+      for (const [key, label] of columns) {
         const th = node("th", {
           scope: "col",
+          role: "columnheader",
+          "aria-label": t(label),
+          "data-sort-key": key,
           "aria-sort": state.sort === key ? (state.direction === "asc" ? "ascending" : "descending") : "none"
         });
         th.append(
@@ -236,12 +255,13 @@ export function createResourceLibraryController({
             state.sort = key;
             remember();
             renderTables();
+            dashboard.querySelector(`th[data-sort-key="${key}"] button`)?.focus();
           })
         );
         heading.append(th);
       }
-      heading.append(node("th", { scope: "col" }, t("Actions")));
-      const body = node("tbody");
+      heading.append(node("th", { scope: "col", role: "columnheader" }, t("Actions")));
+      const body = node("tbody", { role: "rowgroup" });
       for (const resource of resources) {
         const actions = node(
           "details",
@@ -260,58 +280,91 @@ export function createResourceLibraryController({
         actions.append(menu);
         const row = node(
           "tr",
-          { "data-library-id": resource.id, className: state.selected === resource.id ? "selected" : "" },
+          { role: "row", "data-library-id": resource.id, className: state.selected === resource.id ? "selected" : "" },
           node(
             "th",
-            { scope: "row" },
-            action(resource.name, resource, type, "open", { className: "resource-name-link" }),
+            { scope: "row", role: "rowheader" },
+            action(resource.name, resource, type, "open", {
+              className: "resource-name-link",
+              dir: "auto",
+              "aria-current": state.selected === resource.id ? "true" : null
+            }),
             resource.archived ? node("span", { className: "resource-badge" }, t("Archived")) : null
           ),
-          node("td", {}, `${resource.sourceLang || "—"} → ${resource.targetLang || "—"}`),
-          node("td", {}, resource.catalogPending ? "…" : String(resource.entryCount ?? 0)),
           node(
             "td",
-            {},
+            { role: "cell" },
+            node("bdi", { dir: "ltr" }, `${resource.sourceLang || "—"} → ${resource.targetLang || "—"}`)
+          ),
+          node(
+            "td",
+            { role: "cell", "data-label": t("Entries") },
+            resource.catalogPending ? "…" : (resource.entryCount ?? 0).toLocaleString(i18n?.getLocale?.())
+          ),
+          node(
+            "td",
+            { role: "cell", "data-label": t("Linked projects") },
             button(String(resource.linkedProjects?.length || 0), () => linkedDetails(resource), {
-              "aria-label": `${t("Linked projects")}: ${safeMetadata(resource.name)}`
+              "aria-label": `${t("Linked projects")}: ${resource.linkedProjects?.length || 0} · ${safeMetadata(resource.name)}`
             })
           ),
           node(
             "td",
-            {},
+            { role: "cell", "data-label": t("Updated") },
             resource.updatedAt ? new Date(resource.updatedAt).toLocaleDateString(i18n?.getLocale?.()) : "—"
           ),
-          node("td", { className: "resource-library-actions" }, action("Open", resource, type, "open"), actions)
+          node(
+            "td",
+            { role: "cell", className: "resource-library-actions" },
+            action("Open", resource, type, "open"),
+            actions
+          )
         );
         row.addEventListener("click", () => {
           state.selected = resource.id;
           state.scrollPositions = scrollNodes().map((element) => element.scrollTop);
           remember();
-          for (const item of root.querySelectorAll("tr[data-library-id]"))
-            item.classList.toggle("selected", item.dataset.libraryId === resource.id);
+          for (const item of root.querySelectorAll("tr[data-library-id]")) {
+            const current = item.dataset.libraryId === resource.id;
+            item.classList.toggle("selected", current);
+            item.querySelector(".resource-name-link")?.setAttribute("aria-current", String(current));
+          }
         });
         body.append(row);
       }
-      table.append(node("thead", {}, heading), body);
+      table.append(node("thead", { role: "rowgroup" }, heading), body);
       dashboard.replaceChildren(
         resources.length
           ? table
-          : node(
-              "div",
-              { className: "resource-empty" },
-              node("h3", {}, t("No matching resources")),
-              node("p", {}, t("Clear the filters, create a resource, or import a file.")),
-              button("Clear filters", () => {
-                state = { ...state, search: "", language: "", project: "", archive: "active" };
-                search.value = language.value = linkedProject.value = "";
-                archive.value = "active";
-                remember();
-                renderTables();
-              })
-            )
+          : !available.length
+            ? node(
+                "div",
+                { className: "resource-empty" },
+                node("h3", {}, t(type === "tm" ? "No translation memories yet." : "No termbases yet.")),
+                button(type === "tm" ? "New translation memory" : "New termbase", () => run(create))
+              )
+            : node(
+                "div",
+                { className: "resource-empty" },
+                node("h3", {}, t("No matching resources")),
+                node("p", {}, t("Clear the filters, create a resource, or import a file.")),
+                button("Clear filters", () => {
+                  state = {
+                    ...state,
+                    search: "",
+                    language: "",
+                    project: "",
+                    archive: available.every((resource) => resource.archived) ? "all" : "active"
+                  };
+                  search.value = language.value = linkedProject.value = "";
+                  archive.value = state.archive;
+                  remember();
+                  renderTables();
+                })
+              )
       );
     }
-    resultCount.textContent = `${activeCount} ${t("resources")}`;
+    resultCount.textContent = `${t("Search results")} · ${activeCount.toLocaleString(i18n?.getLocale?.())}`;
   }
   function render(next) {
     catalog = next;
@@ -323,19 +376,40 @@ export function createResourceLibraryController({
         "div",
         { className: "resource-library-toolbar" },
         search,
-        language,
-        linkedProject,
-        archive,
-        density,
-        button("New", () => run(create), { className: "primary" }),
-        button("Import", () =>
-          run(() => openResourceImportDialog({ ui, transfer, storage, type: catalog.type, onComplete: refresh }))
+        node(
+          "details",
+          { className: "resource-library-filters" },
+          filterSummary,
+          node(
+            "div",
+            { className: "resource-filter-fields" },
+            field("Language", language),
+            field("Linked project", linkedProject),
+            field("Resource state", archive),
+            field("Row density", density),
+            node(
+              "div",
+              { className: "resource-library-mobile-sort" },
+              field("Sort by", sortBy),
+              field("Sort direction", sortDirection)
+            )
+          )
+        )
+      );
+      root.querySelector(".resources-header").append(
+        node(
+          "div",
+          { className: "resource-toolbar-actions" },
+          button("New", () => run(create), { className: "primary" }),
+          button("Import", () =>
+            run(() => openResourceImportDialog({ ui, transfer, storage, type: catalog.type, onComplete: refresh }))
+          )
         )
       );
       const tabs = root.querySelector(".resource-tabs");
       const tabsRow = document.createElement("div");
       tabsRow.className = "resource-tabs-row";
-      tabs.before(toolbar, tabsRow);
+      tabs.before(tabsRow, toolbar);
       tabsRow.append(tabs, resultCount);
       mounted = true;
     }

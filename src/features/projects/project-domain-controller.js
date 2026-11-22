@@ -4,7 +4,7 @@
  * status, cloning, and test-only failure policy remain injected boundaries.
  *
  * @param {{
- *   elements: { form: any, input: any },
+ *   elements: { form: any, input: any, error?: { hidden: boolean } },
  *   session: {
  *     getProject: () => any,
  *     getProjects: () => any[],
@@ -63,6 +63,7 @@ export function createProjectDomainController(options) {
 
   async function save() {
     if (!session.getProject()) return false;
+    if (elements.error) elements.error.hidden = true;
     const previousProject = clone(session.getProject());
     const previousProjects = session.getProjects().map((project) => clone(project));
     const domain = elements.input.value.trim();
@@ -76,7 +77,7 @@ export function createProjectDomainController(options) {
       );
       await presentation.refreshSummaries();
       presentation.renderAll();
-      elements.form.classList.toggle("hidden", Boolean((session.getProject().domain || "").trim()));
+      elements.form.classList.toggle("clean", true);
       workspace.markDirty();
       status.set("Project domain saved", "saved");
       return true;
@@ -84,6 +85,7 @@ export function createProjectDomainController(options) {
       session.replaceProject(previousProject);
       session.replaceProjects(previousProjects);
       elements.form.classList.toggle("clean", domain === (session.getProject().domain || ""));
+      if (elements.error) elements.error.hidden = false;
       status.set(error.message || "Project domain save failed", "dirty");
       return false;
     }

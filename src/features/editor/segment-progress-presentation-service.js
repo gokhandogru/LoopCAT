@@ -3,8 +3,8 @@
  * derivation/cache policy and localization remain behind injected boundaries.
  *
  * @param {{
- *   summary: { refresh: (options?: object) => { total: number, confirmed: number, words: number } },
- *   elements: { progressText: any, wordCountText: any, progressFill: { style: { width: string } } },
+ *   summary: { refresh: (options?: object) => { total: number, confirmed: number, words: number, countingComplete?: boolean } },
+ *   elements: { progressText: any, wordCountText: any, progressFill: { style: { width: string }, parentElement?: Element } },
  *   localization: { label: (key: string, values?: Record<string, unknown>) => string }
  * }} options
  */
@@ -31,7 +31,11 @@ export function createSegmentProgressPresentationService(options) {
     const open = total - confirmed;
     elements.progressText.textContent = localization.label("progressSummary", { confirmed, open, total });
     elements.wordCountText.textContent = localization.label("sourceWordCount", { count: words });
-    elements.progressFill.style.width = total ? `${Math.round((confirmed / total) * 100)}%` : "0";
+    if (progress.countingComplete === false)
+      elements.wordCountText.textContent = "≥ " + elements.wordCountText.textContent;
+    const percent = total ? Math.round((confirmed / total) * 100) : 0;
+    elements.progressFill.style.width = total ? `${percent}%` : "0";
+    elements.progressFill.parentElement?.setAttribute("aria-valuenow", String(percent));
   }
 
   return Object.freeze({ render });

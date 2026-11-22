@@ -74,7 +74,10 @@ app
       });
       const errors = [];
       win.webContents.on("console-message", (_event, _level, message) => {
-        if (/Uncaught|startup failed/i.test(message)) { errors.push(message); console.error(message); }
+        if (/Uncaught|startup failed/i.test(message)) {
+          errors.push(message);
+          console.error(message);
+        }
       });
       await win.loadURL(`http://127.0.0.1:${server.address().port}/index.html`);
       await wait("!!document.querySelector('#statisticsBtn')", "application initialized");
@@ -160,6 +163,10 @@ app
         "archived translation"
       );
       await clickText("#fileManagementDialog button", "Back to versions");
+      await wait(
+        "[...document.querySelectorAll('#fileManagementDialog button')].some(b=>b.textContent==='Restore this version…')",
+        "version list reloaded"
+      );
       await clickText("#fileManagementDialog button", "Restore this version…");
       await wait(
         "document.querySelector('#fileManagementTitle').textContent==='Review source update'",

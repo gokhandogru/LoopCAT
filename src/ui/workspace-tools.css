@@ -1,0 +1,1016 @@
+/* Shared reading surfaces for the resource workspace and contextual tools. */
+#projectsView .project-stats > div,
+#projectHomeView :is(.project-stats, .analysis-grid) > div {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+#projectHomeView .project-home-stats > div {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+#projectsView .language-badge {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+:is(#projectsView, #projectHomeView) .progress-bar {
+  background: var(--color-line);
+}
+
+:is(#projectsView, #projectHomeView) .progress-bar > div {
+  background: var(--color-accent);
+}
+
+#projectHomeView :is(.file-list-header, .analysis-panel) {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+#projectHomeView .file-list-header {
+  gap: var(--space-2) var(--space-3);
+  justify-content: flex-start;
+}
+
+#projectHomeView .file-list-header h3 {
+  margin-inline-end: 0;
+}
+
+#projectHomeView #fileCountText {
+  margin-inline-end: auto;
+  color: var(--color-text-muted);
+}
+
+#projectHomeView .file-card:has(.file-selection input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-selected-surface);
+}
+
+#projectHomeView .selection-bar:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-selected-surface);
+}
+
+#projectHomeView .selection-bar > span {
+  margin-inline-end: auto;
+  font-weight: 600;
+}
+
+:root[data-projects-view="list"] #projectsView .project-stats > div,
+:root[data-files-view="list"] #projectHomeView .project-stats > div {
+  border: 0;
+  background: transparent;
+}
+
+#resourceSettingsDialog .resource-settings-card {
+  gap: var(--space-3);
+  min-inline-size: 0;
+  background: var(--color-canvas);
+}
+
+#resourceSettingsDialog .resource-settings-tabs {
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-line);
+}
+
+#resourceSettingsDialog [role="tab"][aria-selected="true"] {
+  color: var(--color-accent);
+  background: var(--color-selected-surface);
+  border-color: var(--color-accent);
+}
+
+#resourceSettingsDialog .resource-policy-row {
+  min-inline-size: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+#resourceSettingsDialog .resource-policy-row:has(.resource-policy-identity input:checked) {
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-selected-surface);
+}
+
+#resourceSettingsDialog :is(.resource-create-row, .resource-policy-controls, .resource-settings-actions) {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+#fileManagementDialog,
+#batchImportDialog {
+  --file-dialog-gutter: clamp(var(--space-3), 2vw, var(--space-6));
+  padding: 0;
+  inline-size: min(60rem, calc(100% - 1.5rem));
+  max-block-size: calc(100dvh - 1.5rem);
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+
+#fileManagementDialog[data-layout="form"] {
+  inline-size: min(40rem, calc(100% - 1.5rem));
+}
+
+#fileManagementDialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#fileManagementDialog .statistics-heading,
+#batchImportDialog > h2 {
+  flex: none;
+  margin: 0;
+  padding: var(--space-3) var(--file-dialog-gutter);
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-line);
+}
+
+#fileManagementDialog :is(h2, h3, p, dl, dd) {
+  margin: 0;
+}
+
+#fileManagementDialog .statistics-heading h2 {
+  margin-inline-end: auto;
+}
+
+#fileManagementDialog .file-management-content {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) var(--file-dialog-gutter);
+}
+
+#fileManagementDialog .file-management-status:empty,
+#fileManagementDialog :is(.file-management-content, .file-update-row) > :is(p, div):empty,
+#fileManagementDialog footer:empty {
+  display: none;
+}
+
+#fileManagementDialog .file-management-status:not(:empty) {
+  margin: var(--space-3) var(--file-dialog-gutter) 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-selected-surface);
+}
+
+#fileManagementDialog .file-management-content > p:not(.file-context-name) {
+  color: var(--color-text-muted);
+}
+
+#fileManagementDialog .file-context-name {
+  font-weight: 650;
+}
+
+#fileManagementDialog label {
+  display: grid;
+  align-items: start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+#fileManagementDialog label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+
+#fileManagementDialog label > :is(input:not([type="checkbox"]), select) {
+  min-inline-size: 0;
+  inline-size: 100%;
+  max-inline-size: 100%;
+}
+
+#fileManagementDialog label > input:not([type="checkbox"]) {
+  padding: var(--space-2);
+  background: var(--color-surface);
+}
+
+#fileManagementDialog .file-update-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+#fileManagementDialog .file-update-row + .file-update-row {
+  margin-block-start: var(--space-2);
+}
+
+#fileManagementDialog .file-update-row > :is(h3, p, dl) {
+  flex: 1 0 100%;
+}
+
+#fileManagementDialog .file-update-row h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+}
+
+#fileManagementDialog .file-comparison-state {
+  padding: 0.12rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#fileManagementDialog
+  .file-comparison-state:is([data-state="changed"], [data-state="protected"], [data-state="ambiguous"]) {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+#fileManagementDialog .file-comparison-state[data-state="added"] {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.file-comparison-values,
+.file-comparison-counts {
+  display: grid;
+  gap: var(--space-2) var(--space-3);
+}
+
+.file-comparison-values {
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+}
+
+.file-comparison-values > div {
+  min-inline-size: 0;
+  padding-block: var(--space-2);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.file-comparison-values dt,
+.file-comparison-counts dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.file-comparison-values dd {
+  padding-block-start: var(--space-1);
+  white-space: pre-wrap;
+  line-height: var(--line-height-body);
+}
+
+.file-comparison-counts {
+  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr));
+}
+
+.file-comparison-counts > div {
+  min-inline-size: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.file-comparison-counts dd {
+  font-size: var(--font-size-lg);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+#fileManagementDialog footer,
+#batchImportDialog > .statistics-controls {
+  position: static;
+  flex: none;
+  justify-content: flex-end;
+  margin: 0;
+  padding: var(--space-3) var(--file-dialog-gutter);
+  border-block-start: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+#batchImportDialog > p,
+#batchImportDialog .statistics-table-wrap {
+  margin: var(--space-3) var(--file-dialog-gutter);
+}
+
+#batchImportDialog .statistics-table-wrap {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+#batchImportDialog :is(th, td) {
+  padding: var(--space-2) var(--space-3);
+}
+
+#batchImportDialog th {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+#trashDialog .trash-list {
+  min-inline-size: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+#trashDialog .trash-item {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+#validationReportPanel {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-inline-start: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+#validationReportPanel .validation-item {
+  padding-inline: var(--space-2) 0;
+  border-inline-start-color: var(--color-warning);
+  color: var(--color-text);
+}
+
+#exchangeDialog .exchange-nav button:not([aria-current="page"]) {
+  border-color: transparent;
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+#exchangeDialog .exchange-nav button:hover {
+  border-color: var(--color-line-strong);
+  color: var(--color-text);
+}
+
+#exchangeDialog .exchange-page details > summary {
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+}
+
+@media (width <= 42rem) {
+  #resourceSettingsDialog .resource-settings-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #resourceSettingsDialog .resource-settings-search {
+    inline-size: 100%;
+  }
+
+  #resourceSettingsDialog .resource-policy-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :root[data-files-view="list"] #projectHomeView .file-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3);
+  }
+
+  :root[data-files-view="list"] #projectHomeView .file-card > footer {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: start;
+  }
+
+  #projectHomeView .file-card h4 {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  #fileManagementDialog footer {
+    max-block-size: 35dvh;
+    overflow-y: auto;
+  }
+}
+
+#resourcesView.resources-upgraded {
+  min-inline-size: 0;
+  padding: clamp(1rem, 2vw, 2rem);
+  background: var(--color-canvas);
+}
+
+#resourcesView .resources-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-block: 0.25rem 1.2rem;
+  border-block-end: 1px solid var(--color-line);
+}
+
+#resourcesView .resources-header h2 {
+  font-size: clamp(1.6rem, 2.6vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+#resourcesView .resource-library-toolbar {
+  align-items: start;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+
+#resourcesView .resource-library-toolbar input[type="search"] {
+  flex: 0 1 24rem;
+  min-inline-size: min(12rem, 100%);
+}
+
+:is(#resourcesView, #resourceEditor) input[type="search"] {
+  min-block-size: 2.15rem;
+  padding-inline: 0.7rem;
+  border: 1px solid var(--color-control-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+#resourcesView .resource-dashboard {
+  overflow: visible;
+}
+
+#resourcesView .resource-library-table :is(td, th) {
+  padding-inline: clamp(0.5rem, 1.3vw, 1rem);
+}
+
+#resourcesView .resource-library-table thead button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  box-shadow: none;
+  min-block-size: 2rem;
+  padding: 0;
+}
+
+.resource-library-mobile-sort {
+  display: none;
+}
+
+:is(#resourcesView, #resourceEditor) .resource-empty {
+  text-align: center;
+  padding: clamp(1.5rem, 5vw, 4rem) var(--space-4);
+}
+
+:is(#resourcesView, #resourceEditor) .resource-empty :is(h2, h3) {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  font-size: 1.05rem;
+}
+
+:is(#resourcesView, #resourceEditor) .resource-empty p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters) {
+  margin: 0;
+  min-inline-size: 0;
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters) > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: fit-content;
+  min-block-size: 2.15rem;
+  padding: 0.38rem 0.7rem;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-control-line);
+  border-radius: var(--radius-sm);
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters) > summary::-webkit-details-marker {
+  display: none;
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters) > summary::before {
+  content: "";
+  inline-size: 0.45em;
+  block-size: 0.45em;
+  border-inline-end: 1.5px solid currentColor;
+  border-block-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters)[open] {
+  flex: 1 0 100%;
+  order: 1;
+}
+
+:is(.resource-library-filters, #resourceEditor .resource-editor-filters)[open] > summary::before {
+  transform: rotate(225deg);
+}
+
+:is(#resourcesView, #resourceEditor) .resource-filter-fields {
+  margin: var(--space-2) 0 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.resources-upgraded .resource-tabs-row .resource-tabs,
+.exchange-dialog .exchange-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+#resourcesView .resource-tabs-row .resource-tabs {
+  padding: 0.2rem;
+  margin: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.liquid-glass-edition .resources-upgraded [role="tab"] {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  box-shadow: none;
+}
+
+#resourcesView [role="tab"][aria-selected="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-selected-surface);
+  color: var(--color-accent);
+  font-weight: 650;
+}
+
+.resource-library-table th[aria-sort="ascending"] button::after,
+.resource-library-table th[aria-sort="descending"] button::after {
+  content: "";
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  inline-size: 0.4em;
+  block-size: 0.4em;
+  margin-inline-start: var(--space-2);
+  transform: rotate(-135deg);
+}
+
+.resource-library-table th[aria-sort="descending"] button::after {
+  transform: rotate(45deg);
+}
+
+.resource-library-table td,
+.resource-pagination,
+.statistics-metrics {
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-library-table tr.selected > :first-child,
+.resource-data-table tr.selected > :first-child {
+  border-inline-start: 3px solid var(--color-accent);
+}
+
+#resourcesView .resource-library-table tr.selected,
+#resourceEditor .resource-data-table tr.selected {
+  background: var(--color-selected-surface, var(--color-accent-soft));
+}
+
+#resourceEditor {
+  --resource-gutter: clamp(var(--space-3), 2vw, var(--space-6));
+}
+
+#resourceEditor .resource-editor-heading {
+  padding: var(--space-3) var(--resource-gutter);
+  border-block-start: 3px solid var(--color-accent);
+}
+
+#resourceEditor .resource-editor-heading > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+#resourceEditor .resource-eyebrow {
+  flex-basis: 100%;
+}
+
+#resourceEditor .resource-editor-heading h1 {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.2vw, 1.85rem);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+#resourceEditor .resource-editor-heading p {
+  display: flex;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+#resourceEditor .resource-editor-toolbar {
+  padding: var(--space-3) var(--resource-gutter) 0;
+}
+
+#resourceEditor .resource-editor-toolbar input[type="search"] {
+  flex: 1 1 14rem;
+  min-inline-size: 0;
+}
+
+#resourceEditor .resource-editor-toolbar .resource-field {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#resourceEditor .resource-editor-toolbar .resource-field:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+}
+
+#resourceEditor .resource-editor-split {
+  margin: var(--space-3) var(--resource-gutter) var(--resource-gutter);
+}
+
+#resourceEditor .resource-data-table :is(th, td) {
+  padding: 0.62rem 0.75rem;
+  vertical-align: middle;
+}
+
+#resourceEditor .resource-data-table thead {
+  font-size: var(--font-size-sm);
+}
+
+#resourceEditor .resource-results-scroll .resource-data-table th:last-child {
+  width: clamp(5rem, 9vw, 7rem);
+}
+
+#resourceEditor .resource-data-table .resource-entry-link {
+  font-weight: 550;
+}
+
+#resourceEditor .resource-data-table .resource-entry-link,
+#resourcesView .resource-library-table .resource-name-link {
+  background: transparent;
+}
+
+:is(#resourceEditor, #resourcesView) :is(.resource-entry-link, .resource-name-link):is(:hover, :focus-visible) {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+#resourceEditor .resource-badge.status-admitted {
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+#resourceEditor .resource-entry-fields {
+  gap: var(--space-3);
+}
+
+#resourceEditor .resource-entry-fields textarea {
+  min-block-size: 3.4rem;
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.45;
+}
+
+#resourceEditor .resource-entry-fields select {
+  padding-inline-start: var(--space-3);
+}
+
+#resourceEditor .resource-entry-fields > details {
+  padding-block: var(--space-2);
+  border-block: 1px solid var(--color-line);
+}
+
+#resourceEditor .resource-entry-fields > details > summary {
+  min-block-size: 2rem;
+  padding: 0.35rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+#resourceEditor .resource-entry-inspector h2 {
+  margin-block-end: var(--space-3);
+}
+
+@media (width >= 900px) {
+  #resourceEditor .resource-back-results {
+    display: none;
+  }
+}
+
+@media (width < 900px) {
+  #resourceEditor.entry-selected :is(.resource-editor-toolbar, .resource-filter-chips) {
+    display: none;
+  }
+
+  #resourceEditor .resource-back-results {
+    margin-block-end: var(--space-3);
+  }
+}
+
+.resource-editor-window .resource-save-state,
+.resource-editor-window .resource-badge,
+.exchange-dialog .exchange-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  padding: 0.2em 0.65em;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.resource-editor-window .resource-save-state {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.resource-editor-window .resource-save-state:empty {
+  display: none;
+}
+
+.resource-editor-window .resource-save-state[data-state="draft"] {
+  background: var(--color-warning-soft, var(--color-surface));
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.resource-editor-window .resource-entry-inspector {
+  background: var(--color-surface-subtle);
+}
+
+.resource-entry-inspector :is(input, textarea, select) {
+  background-color: var(--color-surface);
+}
+
+.resource-dialog .resource-import-preview,
+.resource-dialog .resource-dialog-body:has(.resource-data-table) {
+  min-inline-size: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.resource-dialog .resource-data-table,
+.resource-editor-window .resource-data-table {
+  overflow-wrap: anywhere;
+}
+
+#statisticsDialog .statistics-body,
+.exchange-dialog .exchange-page,
+#multilingualExcelImportDialog .excel-column-body {
+  background: var(--color-canvas);
+}
+
+#statisticsDialog :is(.statistics-scope-bar, .statistics-quote, .statistics-table-wrap),
+#multilingualExcelImportDialog .excel-column-preview {
+  background: var(--color-surface);
+}
+
+#statisticsDialog .statistics-scope-bar {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+#statisticsDialog .statistics-metric:not(.is-primary),
+.exchange-dialog .exchange-page .exchange-panel {
+  background: var(--color-surface);
+}
+
+#statisticsDialog .statistics-drilldown:has(:focus-visible),
+.resource-editor-window .resource-entry-inspector h2:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.exchange-dialog .exchange-heading,
+.exchange-dialog .exchange-nav {
+  background: var(--color-surface);
+}
+
+.exchange-dialog .exchange-page .exchange-card,
+.exchange-dialog .exchange-catalog-card {
+  padding: var(--space-4);
+  align-content: start;
+}
+
+#exchangeRoot .exchange-lab-candidate > p {
+  font-size: var(--font-size-md);
+  line-height: 1.65;
+}
+
+#exchangeRoot .exchange-lab-candidate.is-chosen {
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-selected-surface, var(--color-accent-soft));
+}
+
+#multilingualExcelImportDialog .excel-column-fields,
+#multilingualExcelImportDialog .excel-column-options {
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.liquid-glass-edition #protectionStatus,
+#aiProviderDialog .local-ai-provider-summary,
+#aiConsentDialog #aiConsentDescription {
+  padding: var(--space-3);
+  border-inline-start: 3px solid var(--color-line-strong);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+#aiConsentDialog #aiConsentDescription {
+  border-inline-start-color: var(--color-accent);
+}
+
+#aiProviderDialog .ai-provider-dialog-heading,
+.resource-dialog > header {
+  background: var(--color-surface);
+}
+
+#diagnosticsDialog .diagnostics-preview {
+  font: var(--font-size-xs) / var(--line-height-body) var(--font-mono);
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
+@media (width <= 42rem) {
+  #resourcesView .resource-library-toolbar input[type="search"] {
+    flex: 1 1 10rem;
+  }
+
+  #resourcesView .resource-tabs-row {
+    gap: var(--space-2);
+  }
+
+  #resourcesView .resource-tabs-row [role="status"] {
+    padding: 0;
+  }
+
+  #resourcesView .resource-library-mobile-sort {
+    display: contents;
+  }
+
+  #resourcesView .resource-library-table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  #resourcesView .resource-library-table thead button {
+    display: none;
+  }
+
+  #resourcesView .resource-library-table,
+  #resourcesView .resource-library-table tbody {
+    display: block;
+  }
+
+  #resourcesView .resource-library-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-items: start;
+    padding: var(--space-3);
+    border-block-end: 1px solid var(--color-line);
+    border-inline-start: 3px solid transparent;
+  }
+
+  #resourcesView .resource-library-table tbody tr.selected {
+    border-inline-start-color: var(--color-accent);
+  }
+
+  #resourcesView .resource-library-table tbody tr:last-child {
+    border-block-end: 0;
+  }
+
+  #resourcesView .resource-library-table tbody :is(th, td) {
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  #resourcesView .resource-library-table tbody th {
+    grid-column: 1 / 3;
+  }
+
+  #resourcesView .resource-library-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+  }
+
+  #resourcesView .resource-library-actions {
+    grid-column: 1 / -1;
+  }
+
+  #resourcesView .resource-action-menu {
+    inset-inline: 0 auto;
+  }
+
+  #resourceEditor .resource-editor-toolbar input[type="search"] {
+    flex-basis: 100%;
+  }
+
+  #resourceEditor .resource-data-table :is(th, td) {
+    padding-inline: 0.45rem;
+  }
+
+  #resourceEditor .resource-results-scroll .resource-data-table th:first-child {
+    width: 2.2rem;
+  }
+
+  #resourceEditor .resource-results-scroll .resource-data-table th:last-child {
+    width: 4.8rem;
+  }
+
+  .resource-editor-window .resource-editor-heading,
+  .resource-editor-window .resource-editor-toolbar {
+    padding-inline: var(--space-3);
+  }
+
+  .resource-editor-window .resource-entry-inspector {
+    min-inline-size: 0;
+    padding: var(--space-3);
+  }
+
+  #statisticsDialog .statistics-scope-bar > label,
+  #statisticsDialog .statistics-scope-bar select {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+
+  #statisticsDialog .statistics-scope-summary {
+    margin-inline-start: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .exchange-dialog .exchange-page .exchange-card,
+  .exchange-dialog .exchange-catalog-card {
+    padding: var(--space-3);
+  }
+
+  .liquid-glass-edition #diagnosticsDialog .diagnostics-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  #diagnosticsDialog .diagnostics-summary dd + dt {
+    margin-block-start: var(--space-2);
+  }
+}

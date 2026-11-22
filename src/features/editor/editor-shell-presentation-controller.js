@@ -109,6 +109,8 @@ export function createEditorShellPresentationController(options) {
     throw new TypeError("EditorShellPresentationController requires presentation boundaries.");
   }
 
+  let lastDomainProject;
+  let lastDomain;
   function render() {
     const navigation = application.getNavigation();
     application.syncLegacy({
@@ -147,7 +149,7 @@ export function createEditorShellPresentationController(options) {
       elements.editorView.classList.toggle("hidden", application.getNavigation().view !== "editor" || !hasProject);
     }
     focus.render();
-    if (elements.inspectorToggleButton) {
+    if (elements.inspectorToggleButton && !verticalFeatures?.inspector?.isSheetMode?.()) {
       elements.inspectorToggleButton.setAttribute("aria-expanded", String(application.getInspectorOpen()));
       elements.inspectorToggleButton.textContent = application.getInspectorOpen()
         ? localization.source("Hide inspector")
@@ -158,9 +160,14 @@ export function createEditorShellPresentationController(options) {
     const resourceSummary = resources.summary();
     elements.projectTitle.textContent = text.displaySafeText(session.getProject().name);
     elements.projectMeta.textContent = `${language.display()} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(localization.source(resourceSummary.tmLabel))} - ${text.displaySafeText(localization.source(resourceSummary.tbLabel))}`;
-    elements.projectDomainEditInput.value = session.getProject().domain || "";
-    elements.domainForm.classList.add("clean");
-    elements.domainForm.classList.toggle("hidden", Boolean((session.getProject().domain || "").trim()));
+    const project = session.getProject();
+    if (project.id !== lastDomainProject || project.domain !== lastDomain) {
+      elements.projectDomainEditInput.value = project.domain || "";
+      elements.domainForm.classList.add("clean");
+      if (elements.domainError) elements.domainError.hidden = true;
+      lastDomainProject = project.id;
+      lastDomain = project.domain;
+    }
     presentation.replaceSafeHtml(
       elements.projectInfo,
       `

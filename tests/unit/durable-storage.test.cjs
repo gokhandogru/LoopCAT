@@ -125,6 +125,88 @@ test("R14 duplicate DOCX migration requires a verified unchanged checkpoint and 
   (await storage.openDatabase()).close();
 });
 
+test("verified DOCX compaction allows an in-flight settings save but preserves a genuinely competing edit", async (t) => {
+  const db = new IDBFactory();
+  const storage = loadStorage(db);
+  const otherWindow = loadStorage(db);
+  t.after(async () => {
+    await storage.releaseProject("p");
+    (await storage.openDatabase()).close();
+    (await otherWindow.openDatabase()).close();
+  });
+  const structure = { docxPackageBase64: "UEsDBA==", mapping: [{ id: "original" }] };
+  const opened = await storage.put("projects", {
+    id: "p",
+    name: "Original",
+    documents: [{ id: "d", name: "source.docx", type: "docx" }],
+    docxStructure: structure,
+    docxStructures: { d: structuredClone(structure) }
+  });
+  const settings = { ...opened, aiSettings: { model: "offline-fixture" } };
+  const checkpoint = await storage.createCheckpoint();
+  assert.equal(await otherWindow.migrateCheckpointAssets(checkpoint.id, opened.id), null);
+  const compacted = await storage.migrateCheckpointAssets(checkpoint.id, opened.id);
+  assert.equal(compacted.storageVersion, opened.storageVersion);
+  assert.equal(await storage.getCommittedGeneration(), checkpoint.generation);
+  const saved = (await storage.writeStoresAtomically({ projects: [settings] })).projects[0];
+  assert.equal(saved.aiSettings.model, "offline-fixture");
+  assert.equal(saved.legacyDocxDocumentId, "d");
+  assert.equal(saved.docxStructure, undefined);
+  assert.deepEqual(structuredClone(saved.docxStructures.d), structure);
+  assert.equal((await storage.getAll("conflictCopies")).length, 0);
+  const winner = await storage.put("projects", { ...saved, name: "Concurrent rename" });
+  await assert.rejects(storage.writeStoresAtomically({ projects: [{ ...saved, name: "Pending rename" }] }), {
+    name: "StorageConflictError"
+  });
+  assert.equal((await storage.get("projects", "p")).name, winner.name);
+  assert.equal((await storage.getAll("conflictCopies"))[0].changes[0].value.name, "Pending rename");
+  assert.equal(await storage.migrateCheckpointAssets(checkpoint.id, "p"), null);
+});
+
+test("a foreground edit before compaction keeps its changed DOCX source and revision", async (t) => {
+  const storage = loadStorage();
+  t.after(async () => {
+    await storage.releaseProject("p");
+    (await storage.openDatabase()).close();
+  });
+  const d = { docxPackageBase64: "UEsDBA==" };
+  const original = await storage.put("projects", {
+    id: "p",
+    documents: [{ id: "d", name: "source.docx", type: "docx" }],
+    docxStructure: d,
+    docxStructures: { d }
+  });
+  const checkpoint = await storage.createCheckpoint();
+  const changed = { docxPackageBase64: "b3JpZ2luYWw=" };
+  const saved = await storage.put("projects", { ...original, docxStructure: changed });
+  assert.equal(await storage.migrateCheckpointAssets(checkpoint.id, "p"), null);
+  const current = await storage.get("projects", "p");
+  assert.equal(current.docxStructure.docxPackageBase64, changed.docxPackageBase64);
+  assert.equal(current.storageVersion, saved.storageVersion);
+  assert.equal((await storage.getAll("conflictCopies")).length, 0);
+});
+
+test("DOCX edits prepared before compaction keep independently changed original content", async (t) => {
+  const storage = loadStorage();
+  t.after(async () => {
+    await storage.releaseProject("p");
+    (await storage.openDatabase()).close();
+  });
+  const d = { docxPackageBase64: "UEsDBA==" };
+  const original = await storage.put("projects", {
+    id: "p",
+    documents: [{ id: "d", name: "source.docx", type: "docx" }],
+    docxStructure: d,
+    docxStructures: { d }
+  });
+  const checkpoint = await storage.createCheckpoint();
+  const pending = { ...original, docxStructure: { docxPackageBase64: "bmV3" } };
+  await storage.migrateCheckpointAssets(checkpoint.id, "p");
+  const saved = await storage.put("projects", pending);
+  assert.equal(saved.docxStructure.docxPackageBase64, "bmV3");
+  assert.equal(saved.docxStructures.d.docxPackageBase64, d.docxPackageBase64);
+});
+
 test("R5 JSON copy restore remaps record ownership without rewriting protected tag IDs or original JSON", async () => {
   const storage = loadStorage();
   const input = {

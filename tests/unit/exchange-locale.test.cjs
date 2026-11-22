@@ -40,12 +40,21 @@ test("compiled Exchange UI catalogs localize pack removal, scoped project names 
     assert.match(value, /Private Pack Name/);
     assert.match(value, /ABC & XYZ/);
     assert.ok(!value.includes("{"));
+    const count = i18n.source("{count} of {total} releases", { count: 3, total: 17 });
+    assert.match(count, /3/);
+    assert.match(count, /17/);
+    assert.ok(!count.includes("{"));
+    const direction = i18n.source("Translation from {from} into {to}", { from: "EN", to: "TR" });
+    assert.match(direction, /EN/);
+    assert.match(direction, /TR/);
     if (locale !== "en-US") {
       assert.notEqual(
         i18n.source("Trust this fingerprint for this session"),
         "Trust this fingerprint for this session"
       );
       assert.notEqual(i18n.source("QA pack"), "QA pack");
+      for (const label of ["Any", "Search catalog", "Generate a translation", "Pack details"])
+        assert.notEqual(i18n.source(label), label, locale + " " + label);
     }
   }
 });

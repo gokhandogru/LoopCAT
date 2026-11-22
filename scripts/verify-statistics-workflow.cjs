@@ -66,9 +66,10 @@ async function checkIncompleteReport() {
   return evaluate(`(async()=>{
     const {createStatisticsController}=await import('/src/features/statistics/statistics-controller.js');
     const doc=document.implementation.createHTMLDocument('Incomplete statistics fixture');
-    const project={id:'incomplete-project',name:'Incomplete fixture',sourceLang:'en',targetLang:'tr',documents:[{id:'incomplete-file',name:'fixture.txt'}],resourceLinks:[]};
+    const project={id:'incomplete-project',name:'Incomplete fixture',sourceLang:'en',targetLang:'tr',documents:[{id:'incomplete-file',name:'fixture.txt'}],resourceLinks:[{type:'tm',resourceId:'memory',name:'Fixture memory'}]};
     const segments=[{id:'incomplete-segment',projectId:project.id,documentId:'incomplete-file',index:0,source:'Known words',target:''}];
     const host=()=>{const element=doc.createElement('div');doc.body.append(element);return element;};
+    let unresolvedSource=true, holdLookup=null;
     const controller=createStatisticsController({
       document:doc,
       hosts:{projectStatistics:host(),statisticsMenu:host(),selectionHost:host(),selectAll:doc.createElement('input')},
@@ -79,14 +80,15 @@ async function checkIncompleteReport() {
       getVisibleSegments:()=>segments,
       refreshRows:()=>{},
       flush:async()=>{},
-      listResources:async()=>[],
-      listEntries:async()=>[],
+      listResources:async()=>[{id:'memory',name:'Fixture memory',storageVersion:1}],
+      listEntries:async()=>holdLookup ? holdLookup() : [],
       analyze:async(request)=>{
         const report=await globalThis.LoopCATStatistics.analyze(request);
         report.complete=false;
-        report.countingComplete=false;
-        report.unresolvedCountingSegments=1;
-        report.limitations=['One segment has unresolved markup.'];
+        report.countingComplete=!unresolvedSource;
+        report.unresolvedCountingSegments=unresolvedSource ? 1 : 0;
+        report.searchComplete=false;
+        report.limitations=unresolvedSource ? ['One segment has unresolved markup.'] : [];
         return report;
       },
       showDialog:(dialog)=>dialog.setAttribute('open',''),
@@ -105,9 +107,49 @@ async function checkIncompleteReport() {
       rate.value='0.1';rate.dispatchEvent(new Event('input',{bubbles:true}));
       if(!/provisional/i.test(dialog.textContent)||!/Known source words/.test(dialog.textContent))throw Error('Incomplete report lacks known-only count and provisional estimate labels');
       if(!save.disabled)throw Error('Repricing enables saving an incomplete report');
-      return {saveDisabled:true,partialExport:true,provisionalEstimate:true};
+      unresolvedSource=false;
+      await controller.calculate();
+      const count=()=>dialog.querySelector('[data-metric="source"]')?.textContent;
+      const status=dialog.querySelector('[role=status]');
+      if(count()!=='2'||!dialog.textContent.includes('Source count complete. Match analysis is incomplete.')||!save.disabled||exportButton.disabled)throw Error('Completed source count was hidden or marked provisional by incomplete matching');
+      let awaitingLookup, rejectLookup;
+      const lookupStarted=new Promise(resolve=>{awaitingLookup=resolve;});
+      holdLookup=()=>new Promise((_,reject)=>{awaitingLookup();rejectLookup=reject;});
+      const pending=controller.calculate();
+      await lookupStarted;
+      if(count()!=='2'||!save.disabled||!exportButton.disabled)throw Error('Source count vanished while waiting for a TM');
+      rejectLookup(Error('fixture memory unavailable'));
+      await pending;
+      if(count()!=='2'||!status.textContent.includes('fixture memory unavailable')||!save.disabled||!exportButton.disabled)throw Error('TM failure hid source count or enabled a stale quote');
+      if(dialog.querySelector('#statisticsCalculate').textContent!=='Retry analysis')throw Error('Match failure has no explicit Retry analysis action');
+      holdLookup=null;
+      await controller.calculate();
+      if(count()!=='2'||exportButton.disabled)throw Error('Could not recalculate after a matching failure');
+      let resumeLookup, signalStarted;
+      let started=new Promise(resolve=>{signalStarted=resolve});
+      holdLookup=()=>new Promise(resolve=>{signalStarted();resumeLookup=resolve});
+      const reopened=controller.calculate();
+      await started;
+      dialog.dispatchEvent(new Event('close'));
+      resumeLookup([]);await reopened;
+      if(dialog.querySelector('#statisticsCalculate').disabled||exportButton.disabled)throw Error('A queued native close event canceled a calculation after the dialog reopened');
+      started=new Promise(resolve=>{signalStarted=resolve});
+      const obsolete=controller.calculate();
+      await started;
+      const scope=dialog.querySelector('.statistics-scope-bar select');
+      scope.value='files';scope.dispatchEvent(new Event('change'));
+      const choice=dialog.querySelector('.statistics-file-choices input');
+      choice.checked=false;choice.dispatchEvent(new Event('change'));
+      resumeLookup([]);await obsolete;
+      const calculate=dialog.querySelector('#statisticsCalculate');
+      if(calculate.textContent!=='Recalculate')throw Error('Existing report has no explicit Recalculate action');
+      if(count()||!calculate.disabled||!exportButton.disabled||!status.textContent.includes('Select at least one file'))throw Error('Obsolete lookup published an empty selection as a result');
+      choice.checked=true;choice.dispatchEvent(new Event('change'));
+      if(count()!=='2'||calculate.disabled)throw Error('Selecting a file did not immediately restore the source count');
+      return {saveDisabled:true,partialExport:true,provisionalEstimate:true,sourceCountIndependent:true,failureRetry:true,lateLookupDiscarded:true};
     }finally{
-      doc.querySelector('#statisticsDialog')?.dispatchEvent(new Event('close'));
+      const dialog=doc.querySelector('#statisticsDialog');
+      dialog?.removeAttribute('open');dialog?.dispatchEvent(new Event('close'));
     }
   })()`);
 }
@@ -314,7 +356,7 @@ app
         rate.value='0.1';rate.dispatchEvent(new Event('input',{bubbles:true}));
         scope.value='project';scope.dispatchEvent(new Event('change',{bubbles:true}));
       })()`);
-      await clickText("#statisticsDialog button", "Calculate");
+      await clickText("#statisticsDialog button", "Recalculate");
       await wait(
         "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete')",
         "recalculated scope"
@@ -372,6 +414,98 @@ app
         "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete')",
         "updated statistics"
       );
+      const scoped = await evaluate(`(()=>{
+        const dialog=document.querySelector('#statisticsDialog');
+        return {scope:dialog.querySelector('.statistics-scope-bar select').value,words:dialog.querySelector('[data-metric="source"]').textContent,files:dialog.querySelectorAll('.statistics-file-choices input:checked').length};
+      })()`);
+      if (scoped.scope !== "files" || scoped.words !== "3" || scoped.files !== 1)
+        throw Error("Second batch statistics included unrelated files: " + JSON.stringify(scoped));
+      await clickText("#statisticsDialog button", "Close");
+      await evaluate("document.querySelector('#shellFilesBtn').click()");
+      await wait(
+        "document.querySelectorAll('#projectHomeView .file-selection input').length===21",
+        "project file checkboxes"
+      );
+      await evaluate(`(()=>{
+        const files=[...document.querySelectorAll('#projectHomeView .file-selection input')];
+        for(const name of ['after-error.txt','sample-0.html']) {
+          const input=files.find(check=>check.getAttribute('aria-label').endsWith(' '+name));
+          if(!input)throw Error('Fixture file missing: '+name);
+          input.click();
+        }
+      })()`);
+      await clickText("#projectHomeView button", "Selected file statistics");
+      await wait(
+        "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete') && document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='7'",
+        "selected files total"
+      );
+      await clickText("#statisticsDialog button", "Close");
+      await evaluate("document.querySelector('#shellStatsBtn').click()");
+      await wait(
+        "document.querySelector('#statisticsDialog').open && document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='7' && document.querySelector('.statistics-scope-bar select').value==='files' && document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete')",
+        "rail honors checked files"
+      );
+      await evaluate(`(()=>{
+        const saved=document.querySelector('#statisticsDialog .statistics-saved-row:last-child');
+        saved.closest('details').open=true;
+        saved.querySelector('button').click();
+      })()`);
+      await wait(
+        "document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='80' && document.querySelectorAll('.statistics-file-choices input:checked').length===20 && document.querySelector('#statisticsDialog [role=status]').textContent.includes('Saved snapshot')",
+        "snapshot restores its actual file scope"
+      );
+      await clickText("#statisticsDialog button", "Close");
+      await evaluate(`(()=>{
+        const check=[...document.querySelectorAll('#projectHomeView .file-selection input')].find(c=>c.getAttribute('aria-label').endsWith(' after-error.txt'));
+        const card=check.closest('.file-card');
+        card.querySelector('button.file-open').click();
+      })()`);
+      await wait(
+        "!document.querySelector('#workspace').classList.contains('hidden') && document.querySelector('#shellEditorBtn').getAttribute('aria-current')==='page'",
+        "current editor file"
+      );
+      await evaluate("document.querySelector('#shellStatsBtn').click()");
+      await wait(
+        "document.querySelector('.statistics-scope-bar select').value==='file' && document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='3' && document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete')",
+        "rail honors active editor file"
+      );
+      await evaluate(
+        `(()=>{const scope=document.querySelector('.statistics-scope-bar select');scope.value='project';scope.dispatchEvent(new Event('change'));})()`
+      );
+      await wait(
+        "document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='83'",
+        "project source words before matching"
+      );
+      await clickText("#statisticsDialog button", "Recalculate");
+      await wait(
+        "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete') && document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='83'",
+        "whole-project recalculation"
+      );
+      await evaluate(`(async()=>{
+        const [project]=await window.CatHan.storage.getAll('projects');
+        const link=project.resourceLinks.find(r=>r.type==='tm' && r.lookup!==false);
+        await window.CatHan.tm.saveTmEntry({source:'Additional unique words',target:'Ek özgün sözcükler',sourceLang:project.sourceLang,targetLang:project.targetLang,projectName:project.name,tmName:link.name,resourceId:link.resourceId});
+      })()`);
+      await clickText("#statisticsDialog button", "Save snapshot");
+      await wait(
+        "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Out of date') && document.querySelector('#statisticsDialog [data-metric=source]')?.textContent==='83'",
+        "edited memory invalidates the quote and preserves source count"
+      );
+      if (await evaluate("window.CatHan.storage.getAll('projects').then(p=>p[0].statisticsSnapshots.length!==2)"))
+        throw Error("A stale quote was saved after a TM entry changed");
+      await clickText("#statisticsDialog button", "Recalculate");
+      await wait(
+        "document.querySelector('#statisticsDialog [role=status]').textContent.includes('Complete')",
+        "recalculate after a real memory edit"
+      );
+      await evaluate("document.querySelector('#statisticsExportFormat').value='json'");
+      await clickText("#statisticsDialog button", "Export");
+      await wait("window.statisticsExports.length===4", "export refreshed memory match");
+      const updatedMatch = await evaluate(`(()=>{
+        const report=JSON.parse(window.statisticsExports.at(-1).content);
+        return report.totals.words===83 && report.memories.some(m=>m.words===3 && m.segments===1) && report.rows.some(r=>r.words===3 && ['exact','context'].includes(r.band));
+      })()`);
+      if (!updatedMatch) throw Error("Recalculation omitted the new exact memory entry");
       const unchanged = await evaluate(
         "window.CatHan.storage.getAll('projects').then(p=>p[0].statisticsSnapshots[0].totals.words)"
       );
@@ -401,6 +535,8 @@ app
           immutableBaseline: true,
           livePricing: true,
           staleScope: true,
+          scopedSourceWords: { currentFile: 3, checkedFiles: 7, project: 83 },
+          refreshedMemoryMatch: updatedMatch,
           darkTheme: true,
           narrowRtl: true
         })

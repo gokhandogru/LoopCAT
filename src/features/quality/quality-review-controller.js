@@ -1,4 +1,5 @@
 import { KEYBOARD_SHORTCUTS, matchesShortcut } from "../../app/keyboard-shortcuts.js";
+import { qualityReasonText } from "./quality-presentation-service.js";
 
 function requireElement(value, name) {
   if (!value?.addEventListener) throw new TypeError(`QualityReviewController requires ${name}.`);
@@ -82,6 +83,7 @@ export function createQualityReviewController(options) {
   const ownerDocument =
     reviewForm.ownerDocument || qualityForm.ownerDocument || qualityRiskList.ownerDocument || globalThis.document;
   const source = typeof options?.source === "function" ? options.source : (text) => String(text || "");
+  const reasonText = (reason) => qualityReasonText(reason, source, ownerDocument?.documentElement?.lang || "en-US");
   const label = typeof options?.label === "function" ? options.label : (key) => String(key || "");
   const profileLabel =
     typeof options?.profileLabel === "function" ? options.profileLabel : (value) => String(value || "");
@@ -95,6 +97,8 @@ export function createQualityReviewController(options) {
   const listeners = [];
   let mounted = false;
   let reviewSegmentId = "";
+  let savedReviewState = "";
+  let savedReviewNote = "";
   /** @type {Readonly<{ projectId: string, segmentId: string, riskCount: number }>} */
   let currentState = Object.freeze({ projectId: "", segmentId: "", riskCount: 0 });
 
@@ -154,11 +158,16 @@ export function createQualityReviewController(options) {
 
   function renderReview({ segment = null, force = false } = {}) {
     const nextSegmentId = String(segment?.id || "");
+    if (nextSegmentId !== reviewSegmentId) {
+      if (elements.reviewSaveError) elements.reviewSaveError.hidden = true;
+      if (elements.reviewNoteDetails) elements.reviewNoteDetails.open = Boolean(segment?.reviewNote);
+    }
     if (!segment) {
       reviewStateSelect.value = "";
       reviewNoteInput.value = "";
       reviewCommentInput.value = "";
-      reviewCommentsList.replaceChildren();
+      reviewCommentsList.textContent = source("No active segment.");
+      reviewCommentsList.classList.add("muted");
       reviewForm.classList.add("empty-review");
       reviewSegmentId = "";
       currentState = Object.freeze({ ...currentState, segmentId: "" });
@@ -166,32 +175,42 @@ export function createQualityReviewController(options) {
     }
 
     reviewForm.classList.remove("empty-review");
+    const hasDraft =
+      reviewStateSelect.value !== savedReviewState ||
+      reviewNoteInput.value !== savedReviewNote ||
+      reviewCommentInput.value;
     const editingCurrentSegment =
-      !force && reviewSegmentId === nextSegmentId && reviewForm.contains(ownerDocument?.activeElement);
+      !force && reviewSegmentId === nextSegmentId && (hasDraft || reviewForm.contains(ownerDocument?.activeElement));
     if (!editingCurrentSegment) {
       reviewStateSelect.value = segment.reviewState || "";
       reviewNoteInput.value = segment.reviewNote || "";
       reviewCommentInput.value = "";
     }
     reviewSegmentId = nextSegmentId;
+    savedReviewState = segment.reviewState || "";
+    savedReviewNote = segment.reviewNote || "";
     currentState = Object.freeze({ ...currentState, segmentId: nextSegmentId });
 
     const comments = Array.isArray(segment.comments) ? segment.comments : [];
     if (!comments.length) {
-      reviewCommentsList.replaceChildren(
-        createElement(ownerDocument, "div", { className: "muted", text: label("noStructuredComments") })
-      );
+      reviewCommentsList.textContent = source("No comments yet.");
+      reviewCommentsList.classList.add("muted");
       return;
     }
     const fragment = ownerDocument.createDocumentFragment();
+    reviewCommentsList.classList.remove("muted");
     comments.forEach((comment) => {
       const card = createElement(ownerDocument, "article", { className: "comment-card" });
       const header = createElement(ownerDocument, "header");
       header.append(
-        createElement(ownerDocument, "strong", { text: source(comment.state || "open") }),
+        createElement(ownerDocument, "strong", {
+          text: source(!comment.state || comment.state === "open" ? "Open comment" : comment.state)
+        }),
         createElement(ownerDocument, "span", { text: formatDate(comment.updatedAt || comment.createdAt) })
       );
-      card.append(header, createElement(ownerDocument, "div", { text: comment.body || "" }));
+      const body = createElement(ownerDocument, "div", { text: comment.body || "" });
+      body.dir = "auto";
+      card.append(header, body);
       fragment.append(card);
     });
     reviewCommentsList.replaceChildren(fragment);
@@ -249,7 +268,9 @@ export function createQualityReviewController(options) {
     if (reasons.length) {
       const list = createElement(ownerDocument, "ul");
       reasons.forEach((reason) => {
-        list.append(createElement(ownerDocument, "li", { text: `${categoryLabel(reason.category)}: ${reason.label}` }));
+        list.append(
+          createElement(ownerDocument, "li", { text: `${categoryLabel(reason.category)}: ${reasonText(reason)}` })
+        );
       });
       fragment.append(list);
     } else {
@@ -346,10 +367,7 @@ export function createQualityReviewController(options) {
           .map(([category]) => categoryLabel(category))
           .slice(0, 3)
           .join(", ") || categoryLabel(item.category);
-      const reasonText = (item.reasons || [])
-        .slice(0, 2)
-        .map((reason) => reason.label)
-        .join(" ");
+      const signals = (item.reasons || []).slice(0, 2).map(reasonText).join(" ");
       const button = createElement(ownerDocument, "button", { text: label("go") });
       button.type = "button";
       button.dataset.qualityRiskSegmentId = String(item.segmentId || "");
@@ -358,7 +376,7 @@ export function createQualityReviewController(options) {
         createElement(ownerDocument, "p", { text: item.documentName || label("document") }),
         createElement(ownerDocument, "p", {
           className: "muted",
-          text: `${categoryText}: ${reasonText || label("riskSignalRecorded")}`
+          text: `${categoryText}: ${signals || label("riskSignalRecorded")}`
         }),
         button
       );

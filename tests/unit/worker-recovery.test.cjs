@@ -4,6 +4,44 @@ const vm = require("node:vm");
 const fs = require("node:fs");
 const path = require("node:path");
 
+test("Statistics falls back to the shared cancelable analyzer when its worker is unavailable or cannot start", async () => {
+  class BlockedWorker {
+    constructor() {
+      throw Error("worker blocked at startup");
+    }
+  }
+  for (const Worker of [undefined, BlockedWorker]) {
+    const context = vm.createContext({
+      window: { location: { protocol: "https:" } },
+      Worker,
+      DOMException,
+      setTimeout,
+      clearTimeout,
+      structuredClone
+    });
+    for (const file of ["linguistic-core.js", "statistics-core.js", "worker-client.js"])
+      vm.runInContext(fs.readFileSync(path.join(__dirname, "../..", file), "utf8"), context);
+    const request = {
+      project: { id: "p", sourceLang: "en", targetLang: "tr", documents: [{ id: "a" }] },
+      segments: [
+        { id: "1", projectId: "p", documentId: "a", source: "<p>Two words</p>", index: 0 },
+        { id: "2", projectId: "p", documentId: "a", source: "<p>Two words</p>", index: 1 }
+      ]
+    };
+    const progress = [];
+    const api = context.window.CatHan.workerClient;
+    const fallback = await api.analyzeTm({ request, onProgress: (p) => progress.push(p) });
+    assert.equal(fallback.complete, true);
+    assert.equal(fallback.totals.words, 4);
+    assert.equal(fallback.rows[1].band, "repetition");
+    assert.equal(progress.at(-1).scanned, 2);
+    const controller = new AbortController();
+    await assert.rejects(api.analyzeTm({ request, signal: controller.signal, onProgress: () => controller.abort() }), {
+      name: "AbortError"
+    });
+  }
+});
+
 test("R10 timeout terminates the worker, rejects queued work and never invokes a large renderer fallback", async () => {
   const workers = [];
   const timers = new Map();

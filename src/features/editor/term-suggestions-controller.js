@@ -158,9 +158,13 @@ export function createTermSuggestionsController(options) {
         return contextMenu.open({ event, anchor: card, items });
       }
       card.addEventListener("dblclick", insert);
+      card.addEventListener("click", (event) => {
+        if (event.pointerType === "touch") openMenu(event);
+        else if (event.detail === 0 && !event.pointerType) insert();
+      });
       card.addEventListener("contextmenu", openMenu);
       card.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && !event.repeat) {
+        if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
           event.preventDefault();
           insert();
         } else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {

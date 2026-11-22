@@ -11,8 +11,18 @@ export const fileVersionId = (projectId, document) =>
 export const compareSourceUpdate = (...args) => globalThis.LoopCATSourceUpdate.compareSourceUpdate(...args);
 
 /** Owns journaled file lifecycle. UI and parsing are injected; historical rows never enter live queries. */
-export function createFileLifecycleService({ storage, prepare, validate, compare = compareSourceUpdate }) {
+export function createFileLifecycleService({
+  storage,
+  prepare,
+  validate,
+  compare = compareSourceUpdate,
+  resegment = null
+}) {
   const previews = new Map();
+  function validatePreviewSize(prepared) {
+    if (JSON.stringify(prepared).length * 2 > 150 * 1024 * 1024)
+      throw Error("The reviewed source exceeds the 150 MiB in-memory limit.");
+  }
   async function state(projectId, documentId) {
     const project = await storage.get("projects", projectId);
     const document = project?.documents?.find((d) => d.id === documentId);
@@ -122,8 +132,7 @@ export function createFileLifecycleService({ storage, prepare, validate, compare
     const before = await state(projectId, documentId);
     options.signal?.throwIfAborted();
     const prepared = options.prepared || (await prepare(file, { ...before.document.importOptions, ...options }));
-    if (JSON.stringify(prepared).length * 2 > 150 * 1024 * 1024)
-      throw Error("The reviewed source exceeds the 150 MiB in-memory limit.");
+    validatePreviewSize(prepared);
     const family = (type) => (["html", "htm"].includes(type) ? "html" : ["xlf", "xliff"].includes(type) ? "xlf" : type);
     if (family(prepared.documentType) !== family(before.document.type))
       throw Error("An update must use the same file format. Import another format as a new file.");
@@ -169,6 +178,30 @@ export function createFileLifecycleService({ storage, prepare, validate, compare
     previews.set(result.id, result);
     return result;
   }
+  async function previewResegmentation(projectId, documentId, signal = undefined) {
+    previews.clear();
+    const before = await state(projectId, documentId);
+    signal?.throwIfAborted();
+    const result = await resegment(before);
+    signal?.throwIfAborted();
+    if (!result) return null;
+    const { prepared, parentRows } = result;
+    validatePreviewSize(prepared);
+    const incoming = prepared.segments.map((row) => ({ ...row, source: row.text }));
+    await validate(prepared, incoming);
+    signal?.throwIfAborted();
+    const preview = {
+      id: id("review"),
+      before,
+      prepared,
+      parentRows,
+      incoming,
+      createdAt: Date.now(),
+      restoredFromVersionId: ""
+    };
+    previews.set(preview.id, preview);
+    return preview;
+  }
   async function commit(previewId, choices = {}, requestId = id("update")) {
     const prior = await storage.get("fileLifecycleReceipts", requestId);
     if (prior) {
@@ -184,6 +217,40 @@ export function createFileLifecycleService({ storage, prepare, validate, compare
     const versionId = id("version"),
       createdAt = new Date().toISOString();
     const nextSegments = p.incoming.map((incoming, index) => {
+      if (p.parentRows) {
+        const parent = p.parentRows[index];
+        const part = incoming.structure.xliffPart;
+        const target = incoming.target || "";
+        return {
+          ...plain(parent),
+          id: id("segment"),
+          sourceVersionId: versionId,
+          index,
+          documentIndex: index,
+          updatedAt: createdAt,
+          source: incoming.source,
+          target,
+          structure: incoming.structure,
+          tags: incoming.tags,
+          ...(part
+            ? {
+                status: target ? parent.status : "empty",
+                aiSuggestions: [],
+                targetHistory: [],
+                history: [],
+                previousTranslation: null,
+                comment: part.index === 0 ? parent.comment : "",
+                comments: part.index === 0 ? parent.comments || [] : [],
+                reviewNote: part.index === 0 ? parent.reviewNote || "" : ""
+              }
+            : {}),
+          sourceCarryover: {
+            previousSegmentId: parent.id,
+            previousVersionId: fileVersionId(project.id, document),
+            disposition: part ? "split" : "unchanged"
+          }
+        };
+      }
       const row = p.rows[index];
       const choice = choices[index] || choices.all;
       if (row.conflict && !["current", "incoming"].includes(choice))
@@ -402,6 +469,7 @@ export function createFileLifecycleService({ storage, prepare, validate, compare
     state,
     rename,
     preview,
+    previewResegmentation,
     commit,
     versions,
     versionSegments,

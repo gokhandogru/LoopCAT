@@ -1,3 +1,5 @@
+import { isXliffFilename, xliffSegmentationSelect } from "./xliff-segmentation-options.js";
+
 export const BATCH_IMPORT_LIMITS = Object.freeze({ files: 50, bytes: 100 * 1024 * 1024 });
 const EXCEL_EXTENSIONS = new Set(["xlsx", "xlsm", "xltx", "xltm"]);
 
@@ -43,6 +45,9 @@ export function createBatchImportController(options) {
   summary.setAttribute("aria-live", "polite");
   const queue = node("div", "", dialog);
   queue.className = "statistics-table-wrap";
+  queue.setAttribute("role", "region");
+  queue.setAttribute("aria-labelledby", "batchImportTitle");
+  queue.tabIndex = 0;
   const actions = node("div", "", dialog);
   actions.className = "statistics-controls";
   const button = (text, action) => {
@@ -67,6 +72,7 @@ export function createBatchImportController(options) {
     configuring = false,
     canceled = false;
   const start = button("Import ready files", () => run());
+  start.className = "primary";
   const retry = button("Retry failed files", () => run(true));
   retry.hidden = true;
   const cancel = button("Cancel", () => {
@@ -76,8 +82,14 @@ export function createBatchImportController(options) {
     } else dialog.close();
   });
   const stats = button("View statistics", () => {
+    const project = session.getProject();
+    if (project?.id !== projectId) throw Error(t("Project changed during import."));
+    const imported = new Set(rows.filter((row) => row.state === "imported").map((row) => `${batchId}:${row.id}`));
+    const documentIds = (project.importReceipts || [])
+      .filter((receipt) => imported.has(receipt.importKey))
+      .map((receipt) => receipt.documentId);
     dialog.close();
-    options.openStatistics();
+    return options.openStatistics(documentIds);
   });
   stats.hidden = true;
   dialog.addEventListener("cancel", (event) => {
@@ -91,6 +103,7 @@ export function createBatchImportController(options) {
     const table = node("table", "", queue),
       header = node("tr", "", node("thead", "", table));
     const hasTmx = rows.some((row) => row.extension === "tmx");
+    const hasXliff = rows.some((row) => isXliffFilename(row.file.name));
     const hasExcel =
       typeof options.configureMultilingualExcel === "function" &&
       rows.some((row) => EXCEL_EXTENSIONS.has(row.extension));
@@ -100,6 +113,7 @@ export function createBatchImportController(options) {
       "File",
       "Format / size",
       "Encoding",
+      ...(hasXliff ? ["XLIFF segmentation"] : []),
       ...(hasExcel ? ["Excel columns"] : []),
       ...(hasTmx ? ["Existing translations"] : []),
       "Result"
@@ -116,7 +130,10 @@ export function createBatchImportController(options) {
       check.addEventListener("change", () => {
         row.include = check.checked;
       });
-      node("td", row.file.name, tr);
+      const filename = node("td", "", tr);
+      filename.dir = "auto";
+      filename.setAttribute("data-i18n-skip", "");
+      filename.textContent = row.file.name;
       node("td", `${row.extension.toUpperCase()} · ${(row.file.size / 1024).toFixed(1)} KiB`, tr);
       const select = node("select", "", node("td", "", tr));
       select.setAttribute("aria-label", t("Encoding for ") + row.file.name);
@@ -131,6 +148,17 @@ export function createBatchImportController(options) {
         row.encoding = select.value;
         row.state = "ready";
       });
+      if (hasXliff) {
+        const cell = node("td", "", tr);
+        if (isXliffFilename(row.file.name)) {
+          const mode = xliffSegmentationSelect(node, cell, t, row.splitBilingualBlocks);
+          mode.setAttribute("aria-label", t("XLIFF segmentation") + " · " + row.file.name);
+          mode.disabled = running || reviewing || configuring || row.state === "imported";
+          mode.addEventListener("change", () => {
+            row.splitBilingualBlocks = mode.value === "split";
+          });
+        } else cell.textContent = "—";
+      }
       if (hasExcel) {
         const cell = node("td", "", tr);
         if (EXCEL_EXTENSIONS.has(row.extension)) {
@@ -244,6 +272,7 @@ export function createBatchImportController(options) {
                 rowId: row.id,
                 fingerprint,
                 encoding: row.encoding,
+                ...(isXliffFilename(row.file.name) ? { splitBilingualBlocks: row.splitBilingualBlocks } : {}),
                 ...(row.multilingualExcel ? { multilingualExcel: row.multilingualExcel } : {}),
                 ...(row.extension === "tmx" ? { importedTranslationStatus: row.importedTranslationStatus } : {}),
                 acceptDuplicate: true,
@@ -318,6 +347,7 @@ export function createBatchImportController(options) {
         extension,
         id: crypto.randomUUID(),
         encoding: "auto",
+        splitBilingualBlocks: true,
         importedTranslationStatus: "draft",
         include: supported && !duplicate,
         state: supported ? "ready" : "unsupported",

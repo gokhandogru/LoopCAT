@@ -10,7 +10,7 @@
  *   mutation: { touch: (segment: any) => unknown, restore: (segment: any, snapshot: any) => void, prepareHistory: (segment: any) => unknown },
  *   persistence: { clearPending: (segment: any) => unknown, save: (segment: any) => Promise<unknown> },
  *   activity: { log: (segment: any) => Promise<unknown> | unknown },
- *   presentation: { renderReview: (options?: { force?: boolean }) => void, updateRow: (index: number) => void, renderHistory: () => void },
+ *   presentation: { renderReview: (options?: { force?: boolean }) => void, updateRow: (index: number) => void, renderHistory: () => void, showError?: (segmentId: string, failed: boolean) => void },
  *   workspace: { markDirty: () => void },
  *   status: { set: (message: string, mode?: string) => void },
  *   ids?: { comment?: () => string },
@@ -93,6 +93,7 @@ export function createReviewMetadataController(options) {
     if (!segment) return undefined;
     const snapshot = structuredClone(segment);
     try {
+      presentation.showError?.(segment.id, false);
       applyValues(segment, values);
       mutation.touch(segment);
       persistence.clearPending(segment);
@@ -110,7 +111,8 @@ export function createReviewMetadataController(options) {
     } catch (error) {
       mutation.restore(segment, snapshot);
       mutation.prepareHistory(segment);
-      presentation.renderReview({ force: true });
+      presentation.renderReview({ force: false });
+      presentation.showError?.(segment.id, true);
       presentation.updateRow(selection.getActiveIndex());
       presentation.renderHistory();
       status.set(error?.message || "Review save failed", "dirty");

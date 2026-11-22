@@ -23,7 +23,11 @@ test("AI context controller separates administration from inspectable contextual
   const adminMount = mountPoint();
   const suggestionMount = mountPoint();
   const outputMount = mountPoint();
-  const contextualStatus = { textContent: "" };
+  const contextualStatus = { textContent: "", dataset: {} };
+  const providerStatusText = {
+    textContent: "Connected to local model",
+    parentElement: { classList: { contains: (state) => state === "connected" } }
+  };
   const controller = createAiContextController({
     adminSection,
     adminMount,
@@ -31,7 +35,7 @@ test("AI context controller separates administration from inspectable contextual
     suggestionMount,
     outputDrawer,
     outputMount,
-    providerStatusText: { textContent: "Connected to local model" },
+    providerStatusText,
     contextualStatus
   });
   controller.mount();
@@ -39,4 +43,10 @@ test("AI context controller separates administration from inspectable contextual
   assert.equal(suggestionMount.children[0], suggestionList);
   assert.equal(outputMount.children[0], outputDrawer);
   assert.equal(contextualStatus.textContent, "Connected to local model");
+  assert.equal(contextualStatus.dataset.connection, "connected");
+  providerStatusText.textContent = "Disconnected";
+  providerStatusText.parentElement.classList.contains = () => false;
+  controller.syncProviderStatus();
+  assert.equal(contextualStatus.textContent, "Disconnected");
+  assert.equal(contextualStatus.dataset.connection, "disconnected");
 });

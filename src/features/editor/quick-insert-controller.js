@@ -147,9 +147,11 @@ export function createQuickInsertController(options) {
       heading.append(label, resultMeta);
       const source = ownerDocument.createElement("span");
       source.className = "quick-insert-source";
+      source.dir = "auto";
       source.textContent = result.source;
       const target = ownerDocument.createElement("span");
       target.className = "quick-insert-target";
+      target.dir = "auto";
       target.textContent = result.target;
       button.append(number, heading, source, target);
       button.addEventListener("pointermove", () => {

@@ -145,8 +145,44 @@ app
         if (layout.editorWidth >= 1100 && layout.headerHeight > 150)
           throw Error(name + " header too tall: " + layout.headerHeight);
       }
+      win.setContentSize(1366, 768);
+      win.webContents.setZoomFactor(1);
+      for (const expanded of [true, false]) {
+        await evaluate(`(() => {
+          const toggle = document.querySelector('#inspectorToggleBtn');
+          if (toggle.getAttribute('aria-expanded') !== String(${expanded})) toggle.click();
+        })()`);
+        await capture(expanded ? "reading-open" : "reading-closed");
+        const reading = await evaluate(`(() => {
+          const columns = ['editorSourceColumn', 'editorTargetColumn'].map(id => document.getElementById(id).getBoundingClientRect().width);
+          const width = columns[0] + columns[1];
+          const workspaceWidth = document.getElementById('workspace').getBoundingClientRect().width;
+          return { viewport: innerWidth, workspaceWidth, sourceAndTargetWidth: width, viewportShare: width / innerWidth, workspaceShare: width / workspaceWidth };
+        })()`);
+        if (reading.workspaceShare < (expanded ? 0.55 : 0.7)) throw Error("Insufficient reading width: " + JSON.stringify(reading));
+        results.push({ name: expanded ? "reading-open" : "reading-closed", ...reading });
+      }
+      await evaluate("document.querySelector('#inspectorToggleBtn').click()");
+      win.setSize(480, 820);
+      win.webContents.setZoomFactor(1);
+      await wait("matchMedia('(max-width: 999px)').matches && document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded')==='false'", "narrow inspector starts closed");
+      await evaluate("document.querySelector('#inspectorToggleBtn').focus();document.querySelector('#inspectorToggleBtn').click()");
+      await wait("document.querySelector('#inspectorSheet').matches(':modal') && document.activeElement.matches('[role=tab][aria-selected=true]')", "inspector sheet and tab focus");
+      if (!(await evaluate("document.querySelector('#inspectorSheet').contains(document.querySelector('#editorInspector')) && document.querySelectorAll('#editorInspector').length===1"))) throw Error("Narrow sheet must reuse the live inspector.");
+      win.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+      win.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+      await wait("!document.querySelector('#inspectorSheet').open && document.activeElement.id==='inspectorToggleBtn'", "sheet Escape and focus return");
+      const stacked = await evaluate(`(() => {
+        const row = document.querySelector('#segmentBody tr[data-index]');
+        const source = row.querySelector('.source-cell').getBoundingClientRect();
+        const target = row.querySelector('.target-cell').getBoundingClientRect();
+        return getComputedStyle(row).display === 'grid' && target.top >= source.bottom - 1 && Math.abs(target.left - source.left) < 2 && document.documentElement.scrollWidth <= innerWidth;
+      })()`);
+      if (!stacked) throw Error("Narrow grid did not stack the bilingual reading pair inside the viewport.");
+      await capture("stacked-mobile");
       win.setSize(1920, 1080);
       win.webContents.setZoomFactor(1);
+      await wait("document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded')==='true'", "desktop inspector preference restored");
       await evaluate("document.querySelector('#editorStatisticsMenu').open=true");
       await new Promise((r) => setTimeout(r, 100));
       await capture("statistics-menu");

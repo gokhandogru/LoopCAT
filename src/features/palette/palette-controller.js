@@ -54,7 +54,14 @@ export function createPaletteController({
 
   function render() {
     const query = input.value.trim();
-    visibleCommands = searchCommands(getCommands(), query, recentCommandIds);
+    const commands = getCommands().map((command) => ({
+      ...command,
+      label: translate(command.label),
+      keywords: [command.label, ...(Array.isArray(command.keywords) ? command.keywords : [command.keywords || ""])]
+    }));
+    const matches = searchCommands(commands, query, recentCommandIds);
+    const groups = groupCommandResults(matches, recentCommandIds, Boolean(query));
+    visibleCommands = groups.flatMap((group) => group.commands);
     activeIndex = 0;
     if (!visibleCommands.length) {
       const empty = document.createElement("div");
@@ -67,7 +74,6 @@ export function createPaletteController({
     }
 
     const fragment = document.createDocumentFragment();
-    const groups = groupCommandResults(visibleCommands, recentCommandIds, Boolean(query));
     let optionIndex = 0;
     for (const group of groups) {
       const section = document.createElement("section");
@@ -90,7 +96,7 @@ export function createPaletteController({
         option.disabled = !command.enabled;
         const label = document.createElement("span");
         label.className = "command-label";
-        label.textContent = translate(command.label);
+        label.textContent = command.label;
         option.append(label);
         if (command.shortcut) {
           const shortcutElement = document.createElement("kbd");
@@ -103,6 +109,7 @@ export function createPaletteController({
         }
         const currentIndex = optionIndex;
         option.addEventListener("pointermove", () => {
+          if (currentIndex === activeIndex) return;
           activeIndex = currentIndex;
           syncActiveOption();
         });
@@ -176,7 +183,7 @@ export function createPaletteController({
   }
 
   function handleInputKeydown(event) {
-    if (!visibleCommands.length && event.key !== "Escape") return;
+    if (event.isComposing || !visibleCommands.length) return;
     if (event.key === "ArrowDown") activeIndex = (activeIndex + 1) % visibleCommands.length;
     else if (event.key === "ArrowUp") activeIndex = (activeIndex - 1 + visibleCommands.length) % visibleCommands.length;
     else if (event.key === "Home") activeIndex = 0;
@@ -184,10 +191,6 @@ export function createPaletteController({
     else if (event.key === "Enter") {
       event.preventDefault();
       void execute();
-      return;
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      close();
       return;
     } else return;
     event.preventDefault();
@@ -200,6 +203,12 @@ export function createPaletteController({
     input.addEventListener("input", render);
     input.addEventListener("keydown", handleInputKeydown);
     closeButton?.addEventListener("click", close);
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    });
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) close();
     });

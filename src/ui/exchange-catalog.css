@@ -1,0 +1,177 @@
+.exchange-catalog {
+  color: var(--color-text);
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.exchange-catalog p,
+.exchange-catalog h3,
+.exchange-catalog h4 {
+  margin: 0;
+}
+
+.exchange-catalog-intro,
+.exchange-catalog-source,
+.exchange-catalog-private,
+.exchange-catalog-filters,
+.exchange-catalog-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.exchange-catalog-intro > p,
+.exchange-catalog-source > p,
+.exchange-catalog-private > p,
+.exchange-catalog-count,
+.exchange-catalog-compatibility {
+  color: var(--color-text-muted);
+}
+
+.exchange-catalog-source,
+.exchange-catalog-card {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.exchange-catalog-source {
+  background: var(--color-surface-subtle);
+}
+
+.exchange-catalog-private summary,
+.exchange-catalog-refine summary,
+.exchange-catalog-card summary {
+  padding-block: var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exchange-catalog-private[open] > :not(summary) {
+  margin-block-end: var(--space-3);
+}
+
+.exchange-catalog-field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.exchange-catalog-field :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.exchange-catalog-field input[type="file"] {
+  display: block;
+}
+
+.exchange-catalog button {
+  justify-self: start;
+}
+
+.exchange-catalog-facets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.exchange-catalog-check,
+.exchange-catalog-summary,
+.exchange-catalog-card-title,
+.exchange-catalog-compatibility {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.exchange-catalog-check input[type="checkbox"] {
+  width: auto;
+}
+
+.exchange-catalog-card-title {
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.exchange-catalog-version {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.exchange-catalog-fingerprint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.exchange-catalog-summary {
+  border-inline-start: 3px solid var(--color-accent);
+  padding: var(--space-3);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.exchange-catalog-summary > strong,
+.exchange-catalog-summary > p {
+  flex-basis: 100%;
+}
+
+.exchange-catalog-results {
+  display: grid;
+  gap: var(--space-4);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.exchange-catalog-sample {
+  padding: var(--space-3);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+}
+
+.exchange-catalog-metadata {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(0, 3fr);
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.exchange-catalog-metadata dt {
+  color: var(--color-text-muted);
+}
+
+.exchange-catalog-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.exchange-catalog-status,
+.exchange-catalog-empty {
+  padding-block: var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.exchange-catalog-status:empty {
+  display: none;
+}
+
+.exchange-catalog-status.is-error,
+.exchange-catalog-withdrawn {
+  color: var(--color-danger);
+}
+
+.exchange-catalog [hidden] {
+  display: none;
+}
+
+@media (max-width: 30rem) {
+  .exchange-catalog-metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

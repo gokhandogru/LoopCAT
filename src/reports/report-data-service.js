@@ -142,17 +142,17 @@ export function createReportDataService(options) {
       activityByType: countBy(reportActivityEvents, (event) => event.type),
       tmEntryCount: scopedTm.length,
       termCount: terms.length,
-      forbiddenTermCount: terms.filter((term) => term.isForbidden).length,
+      forbiddenTermCount: terms.filter((term) => term.isForbidden ?? term.forbidden).length,
       revisionCount: session
         .getSegments()
         .reduce((sum, segment) => sum + (Array.isArray(segment.targetHistory) ? segment.targetHistory.length : 0), 0),
       terms: terms
         .map((term) => ({
-          sourceTerm: term.sourceTerm || "",
-          targetTerm: term.targetTerm || "",
+          sourceTerm: term.sourceTerm || term.source || "",
+          targetTerm: term.targetTerm || term.target || "",
           termBaseName: term.termBaseName || "",
           notes: redactSensitiveText(term.notes || "").trim(),
-          isForbidden: Boolean(term.isForbidden)
+          isForbidden: Boolean(term.isForbidden ?? term.forbidden)
         }))
         .sort((a, b) => a.termBaseName.localeCompare(b.termBaseName) || a.sourceTerm.localeCompare(b.sourceTerm))
     };

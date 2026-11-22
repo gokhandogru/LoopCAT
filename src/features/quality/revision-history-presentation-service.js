@@ -9,7 +9,7 @@
  *     classList: { add: (name: string) => unknown, remove: (name: string) => unknown }
  *   } | null,
  *   getSegment: () => any,
- *   localization: { source: (text: string) => string, labelHtml: (key: string) => string },
+ *   localization: { source: (text: string, values?: object) => string, labelHtml: (key: string) => string },
  *   statusLabel: (status: string) => string,
  *   formatDateTime: (value: unknown) => string,
  *   escapeHtml: (value: unknown) => string,
@@ -75,23 +75,29 @@ export function createRevisionHistoryPresentationService(options) {
       return;
     }
     list.classList.remove("muted");
+    const visible = history.slice(0, 8);
+    const note =
+      visible.length < history.length
+        ? `<p class="muted">${escapeHtml(localization.source("Showing the latest {value1} of {value2} revisions.", { value1: visible.length, value2: history.length }))}</p>`
+        : "";
+    const target = (value) =>
+      value ? escapeHtml(value) : `<em class="muted">${escapeHtml(localization.source("Empty target"))}</em>`;
     replaceSafeHtml(
       list,
-      history
-        .slice(0, 8)
-        .map(
-          (entry) => `
+      note +
+        visible
+          .map(
+            (entry) => `
     <article class="revision-card">
       <header><strong>${escapeHtml(reasonLabel(entry.reason))}</strong><span>${escapeHtml(formatDateTime(entry.updatedAt || entry.createdAt))}</span></header>
-      <div class="revision-status">${escapeHtml(statusLabel(entry.fromStatus || "empty"))} -> ${escapeHtml(statusLabel(entry.toStatus || "empty"))}</div>
       <div class="revision-pair">
-        <div><span>${localization.labelHtml("before")}</span><p>${escapeHtml(entry.fromTarget || "") || "&nbsp;"}</p></div>
-        <div><span>${localization.labelHtml("after")}</span><p>${escapeHtml(entry.toTarget || "") || "&nbsp;"}</p></div>
+        <div><span>${localization.labelHtml("before")} · ${escapeHtml(statusLabel(entry.fromStatus || "empty"))}</span><p dir="auto">${target(entry.fromTarget)}</p></div>
+        <div><span>${localization.labelHtml("after")} · ${escapeHtml(statusLabel(entry.toStatus || "empty"))}</span><p dir="auto">${target(entry.toTarget)}</p></div>
       </div>
     </article>
   `
-        )
-        .join("")
+          )
+          .join("")
     );
   }
 

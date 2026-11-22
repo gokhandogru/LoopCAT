@@ -44,8 +44,9 @@ function xliffProjectMetadata(project = {}) {
   };
 }
 
+/** @param {Record<string, any>} segment @returns {Record<string, any>} */
 function xliffSegmentRecord(segment = {}, index = 0) {
-  const source = requiredText(segment.source, `XLIFF segment ${index + 1} source text is required.`);
+  const source = segment.literalContent ? String(segment.source ?? "") : requiredText(segment.source, `XLIFF segment ${index + 1} source text is required.`);
   return {
     ...segment,
     source,
@@ -413,7 +414,132 @@ function statusForXliff2Segment(segmentElement, targetText) {
   return { status: "draft", reviewState: "" };
 }
 
-function transUnitSegments(xml) {
+const HTML_BLOCK_NAMES = new Set("address article aside blockquote dd div dl dt figcaption footer h1 h2 h3 h4 h5 h6 header li main ol p section td th tr ul".split(" "));
+const HTML_INLINE_NAMES = new Set("a abbr b bdi bdo cite code del em i ins kbd mark q s samp small span strong sub sup time u var".split(" "));
+
+function characterContent(element) {
+  return Array.from(element?.childNodes || []).every((node) => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE);
+}
+
+// Use offsets in the original literal payload. Parsing HTML into a DOM and serializing
+// it would normalize quotes, spaces, malformed markup, and the translator's target HTML.
+function literalLayout(text) {
+  const slots = [];
+  const boundaries = [];
+  const blocks = [];
+  const inline = [];
+  const tokens = /<!--[\s\S]*?-->|<\/?([a-z][\w:-]*)(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>|\r\n|[\n\r\u2028\u2029]/gi;
+  let start = 0;
+  let textInSlot = false;
+  let cursor = 0;
+  function slot(end) {
+    const raw = text.slice(start, end);
+    const leading = raw.length - raw.trimStart().length;
+    const value = raw.trim();
+    slots.push({ start: start + leading, end: start + leading + value.length, value, role: blocks.at(-1) || "", visible: textInSlot });
+    textInSlot = false;
+  }
+  for (const match of text.matchAll(tokens)) {
+    const [token, rawName] = match;
+    const name = (rawName || "").toLowerCase();
+    if (text.slice(cursor, match.index).trim()) textInSlot = true;
+    cursor = match.index + token.length;
+    if (token.startsWith("<!--") || ["pre", "script", "style", "textarea"].includes(name)) return null;
+    const closing = token.startsWith("</");
+    if (HTML_INLINE_NAMES.has(name)) {
+      if (closing && inline.pop() !== name) return null;
+      if (!closing && !/\/\s*>$/.test(token)) inline.push(name);
+      continue;
+    }
+    if (!(HTML_BLOCK_NAMES.has(name) || name === "br" || name === "hr")) continue;
+    // Crossing a native formatting pair would hand the editor an unmatched tag.
+    if (inline.length) continue;
+    slot(match.index);
+    start = cursor;
+    boundaries.push(name ? (closing ? "/" : "") + name : "\n");
+    if (HTML_BLOCK_NAMES.has(name)) {
+      if (closing) {
+        const depth = blocks.lastIndexOf(name);
+        if (depth !== -1) blocks.length = depth;
+      } else if (!/\/\s*>$/.test(token)) blocks.push(name);
+    }
+  }
+  if (inline.length) return null;
+  if (text.slice(cursor).trim()) textInSlot = true;
+  slot(text.length);
+  return { slots, signature: boundaries.join("|") };
+}
+
+function bilingualLayout(source, target) {
+  function hardLines(text) {
+    const spans = [];
+    let start = 0;
+    for (const delimiter of text.matchAll(/\r\n|[\n\r]/g)) {
+      spans.push({ start, end: delimiter.index, value: text.slice(start, delimiter.index) });
+      start = delimiter.index + delimiter[0].length;
+    }
+    spans.push({ start, end: text.length, value: text.slice(start) });
+    return spans;
+  }
+  if (/[\n\r]/.test(source)) {
+    const sourceRows = hardLines(source);
+    const targetRows = hardLines(target);
+    if (targetRows.length === sourceRows.length) return { sourceRows, targetRows, template: target, empty: false, physical: true };
+    if (!target.trim()) return { sourceRows, targetRows: sourceRows, template: source, empty: true, physical: true };
+  }
+  // A single physical line can still contain several explicit HTML blocks.
+  // Use them only when their translated counterparts can be paired.
+  const htmlBlocks = /<\/?(?:address|article|aside|blockquote|br|dd|div|dl|dt|figcaption|footer|h[1-6]|header|hr|li|main|ol|p|section|td|th|tr|ul)(?=[\s/>])/i;
+  if (!htmlBlocks.test(source)) return null;
+  const left = literalLayout(source);
+  if (!left) return null;
+  const sourceRows = left.slots.filter((slot) => slot.visible);
+  if (sourceRows.length < 2) return null;
+  if (!target.trim()) return { sourceRows, targetRows: sourceRows, template: source, empty: true };
+  const right = literalLayout(target);
+  if (!right) return null;
+  let targetRows;
+  if (left.signature === right.signature) {
+    if (left.slots.some((slot, i) => !slot.visible && right.slots[i].visible)) return null;
+    targetRows = right.slots.filter((_, i) => left.slots[i].visible);
+  } else {
+    // A translator can change the number of blank lines between the same blocks.
+    // Never place a translation by position when its block roles or counts differ.
+    const collapseBreaks = (signature) => signature.replace(/\bbr(?:\|br)+\b/g, "br");
+    if (collapseBreaks(left.signature) !== collapseBreaks(right.signature)) return null;
+    targetRows = right.slots.filter((slot) => slot.visible);
+    if (targetRows.length !== sourceRows.length || targetRows.some((slot, i) => slot.role !== sourceRows[i].role)) return null;
+  }
+  return { sourceRows, targetRows, template: target, empty: false };
+}
+
+function xliffPartKind(value) {
+  if (!value.trim()) return "blank";
+  const visible = value.replace(/<!--[\s\S]*?-->|<\/?[a-z][\w:-]*(?=[\s/>])(?:[^<>"']|"[^"]*"|'[^']*')*>/gi, "");
+  return visible.trim() ? "text" : "markup";
+}
+
+function splitBilingualRow(row, sourceElement, targetElement, options) {
+  if (!characterContent(sourceElement) || !characterContent(targetElement)) return [row];
+  row.structure.literalContent = true;
+  if (options.splitBilingualBlocks === false || effectiveAttribute(sourceElement, "canResegment", "yes").toLowerCase() === "no") return [row];
+  const layout = bilingualLayout(row.text, row.target);
+  if (!layout) return [row];
+  return layout.sourceRows.map((span, index) => {
+    const target = layout.empty ? "" : layout.targetRows[index].value;
+    return {
+      ...row,
+      key: row.key + ":part-" + (index + 1),
+      text: span.value,
+      target,
+      status: target ? row.status : "empty",
+      tags: detectTags(span.value),
+      structure: { ...row.structure, xliffPart: { index, count: layout.sourceRows.length, kind: xliffPartKind(span.value), lineBreakAfter: Boolean(layout.physical && index + 1 < layout.sourceRows.length) } }
+    };
+  });
+}
+
+function transUnitSegments(xml, options) {
   const files = descendantsByName(xml, "file");
   const fileOriginalByUnit = new Map();
   files.forEach((file, fileIndex) => {
@@ -431,22 +557,26 @@ function transUnitSegments(xml) {
     const segmentedSource = firstChildByName(unit, "seg-source");
     const markers = descendantsByName(segmentedSource, "mrk").filter((node) => attr(node, "mtype") === "seg");
     const targetContainer = firstChildByName(unit, "target");
-    for (const list of [markers, descendantsByName(targetContainer, "mrk").filter((node) => attr(node, "mtype") === "seg")]) {
+    const targetMarkers = descendantsByName(targetContainer, "mrk").filter((node) => attr(node, "mtype") === "seg");
+    for (const list of [markers, targetMarkers]) {
       const ids = list.map((node) => attr(node, "mid"));
       if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error("Segmented XLIFF 1.2 markers require unique mid values.");
     }
-    const sourceElements = markers.length ? markers : [firstChildByName(unit, "source")];
-    return sourceElements.map((sourceElement) => {
-      const segmentMid = markers.length ? attr(sourceElement, "mid") : "";
-      if (markers.length && !segmentMid) throw new Error("Segmented XLIFF 1.2 markers require a mid.");
-      const targetElement = markers.length
-        ? descendantsByName(targetContainer, "mrk").find((node) => attr(node, "mtype") === "seg" && attr(node, "mid") === segmentMid)
-        : targetContainer;
+    const targetByMid = new Map(targetMarkers.map((node) => [attr(node, "mid"), node]));
+    const unmatchedTarget = markers.length > 0 && Boolean(targetMarkers.length || xliff12NodeContent(targetContainer).trim()) &&
+      (targetByMid.size !== markers.length || markers.some((node) => !targetByMid.has(attr(node, "mid"))));
+    // A segmented source does not establish where an unmarked target translation
+    // belongs. Keep all original target material visible in one native unit.
+    const byMid = markers.length > 0 && !unmatchedTarget;
+    const sourceElements = byMid ? markers : [firstChildByName(unit, "source") || segmentedSource];
+    return sourceElements.flatMap((sourceElement) => {
+      const segmentMid = byMid ? attr(sourceElement, "mid") : "";
+      const targetElement = byMid ? targetByMid.get(segmentMid) : targetContainer;
       const source = xliff12NodeContent(sourceElement);
       const target = xliff12NodeContent(targetElement);
       const notes = directChildrenByName(unit, "note").map((note) => (note.textContent || "").trim()).filter(Boolean);
       const fileInfo = fileOriginalByUnit.get(unit) || {};
-      return {
+      return splitBilingualRow({
         text: source,
         target,
         key: `${attr(unit, "id") || `trans-unit-${index + 1}`}${segmentMid ? `:${segmentMid}` : ""}`,
@@ -460,14 +590,15 @@ function transUnitSegments(xml) {
           unitId: attr(unit, "id") || "",
           unitIndex: index,
           segmentMid,
+          ...(unmatchedTarget && targetMarkers.length ? { unmappedTargetMarkers: true } : {}),
           fileOriginal: fileInfo.original || "",
           fileIndex: fileInfo.fileIndex ?? 0,
           sourceLang: fileInfo.sourceLang || "",
           targetLang: fileInfo.targetLang || ""
         }
-      };
+      }, sourceElement, targetElement, unmatchedTarget ? { splitBilingualBlocks: false } : options);
     });
-  }).filter((unit) => unit.text.trim());
+  }).filter((unit) => unit.structure?.xliffPart || unit.text.trim());
 }
 
 function groupPathForUnit(unit) {
@@ -491,7 +622,7 @@ function notesForXliff2Segment(unit, segmentElement) {
   }).map((note) => (note.textContent || "").trim()).filter(Boolean);
 }
 
-function xliff2Segments(xml, profile) {
+function xliff2Segments(xml, profile, options) {
   validateXliff2Document(xml, profile);
   const root = xml.documentElement;
   const files = directChildrenByName(root, "file", profile.namespace);
@@ -500,14 +631,14 @@ function xliff2Segments(xml, profile) {
   return units.flatMap((unit, unitIndex) => {
     if (effectiveAttribute(unit, "translate", "yes").toLowerCase() === "no") return [];
     const file = ancestorByName(unit, "file");
-    return directChildrenByName(unit, "segment", profile.namespace).map((segmentElement, segmentIndex) => {
+    return directChildrenByName(unit, "segment", profile.namespace).flatMap((segmentElement, segmentIndex) => {
       const sourceElement = firstChildByName(segmentElement, "source", profile.namespace);
       const targetElement = firstChildByName(segmentElement, "target", profile.namespace);
       const source = xliff2NodeContent(sourceElement, { counters: new Map() });
       const target = xliff2NodeContent(targetElement, { counters: new Map() });
       const state = statusForXliff2Segment(segmentElement, target);
       const notes = notesForXliff2Segment(unit, segmentElement);
-      return {
+      return splitBilingualRow({
         text: source,
         target,
         key: `${attr(file, "id")}:${attr(unit, "id")}:${attr(segmentElement, "id") || segmentIndex + 1}`,
@@ -533,15 +664,15 @@ function xliff2Segments(xml, profile) {
           originalState: attr(segmentElement, "state"),
           originalSubState: attr(segmentElement, "subState")
         }
-      };
+      }, sourceElement, targetElement, options);
     });
-  }).filter((unit) => String(unit.text || "").trim());
+  }).filter((unit) => unit.structure?.xliffPart || String(unit.text || "").trim());
 }
 
-function parseXliffText(text, fileName = "file.xlf") {
+function parseXliffText(text, fileName = "file.xlf", options = {}) {
   const xml = parseXml(text);
   const profile = detectXliffProfile(xml);
-  const segments = profile.family === "2" ? xliff2Segments(xml, profile) : transUnitSegments(xml);
+  const segments = profile.family === "2" ? xliff2Segments(xml, profile, options) : transUnitSegments(xml, options);
   if (!segments.length) throw new Error("No translatable XLIFF units were found.");
   const ext = fileName.split(".").pop().toLowerCase() || "xlf";
   return {
@@ -564,7 +695,7 @@ async function parseXliffFile(file, options = {}) {
   const decoded = window.CatHan.encoding
     ? await window.CatHan.encoding.decodeTextFile(file, options)
     : { text: await file.text(), encoding: "utf-8", detectedFrom: "fallback" };
-  const parsed = parseXliffText(decoded.text, file.name);
+  const parsed = parseXliffText(decoded.text, file.name, options);
   parsed.structure = {
     ...parsed.structure,
     sourceEncoding: {
@@ -590,13 +721,56 @@ function stateForXliff2(segment) {
   return "initial";
 }
 
+function genericBilingualRows(project, segments) {
+  const groups = new Map();
+  const ordered = [];
+  for (const segment of segments || []) {
+    if (!segment.structure?.xliffPart) {
+      ordered.push([{ ...segment, literalContent: Boolean(segment.structure?.literalContent) }]);
+      continue;
+    }
+    const key = JSON.stringify([segment.documentId || "", nativeRowKey(segment.structure)]);
+    if (!groups.has(key)) { groups.set(key, []); ordered.push(groups.get(key)); }
+    groups.get(key).push(segment);
+  }
+  const sources = new Map();
+  return ordered.flatMap((rows) => {
+    if (!rows[0].structure?.xliffPart) return rows;
+    rows.sort((a,b) => a.structure.xliffPart.index - b.structure.xliffPart.index);
+    const first = rows[0];
+    const complete = rows.length === first.structure.xliffPart.count && rows.every((row,index) => row.structure.xliffPart.index === index);
+    if (complete) {
+      const document = project?.localizationStructures?.[first.documentId];
+      let source, target;
+      if (document?.source) {
+        if (!sources.has(document)) {
+          const xml = parseXml(document.source), profile = detectXliffProfile(xml);
+          const documentRows = (segments || []).filter((row) => row.documentId === first.documentId && row.structure?.xliffPart);
+          sources.set(document, new Map(assembleBilingualRows(documentRows, xml, profile).map((row) => [nativeRowKey(row.structure), row])));
+        }
+        const native = sources.get(document).get(nativeRowKey(first.structure));
+        source = native?.text;
+        target = native?.target;
+      } else if (rows.some((row) => row.structure.xliffPart.lineBreakAfter)) {
+        source = rows.map((row) => row.source ?? row.text ?? "").join("\n");
+        target = rows.map((row) => row.target || "").join("\n");
+      }
+      if (source != null) {
+        const translatable = rows.filter((row) => row.structure.xliffPart.kind === "text");
+        return [{ ...first, source, target, literalContent: true, status: translatable.every((row) => row.status === "confirmed") ? "confirmed" : target.trim() ? "draft" : "empty" }];
+      }
+    }
+    return rows.map((row) => ({ ...row, source: row.source ?? row.text, literalContent: true }));
+  });
+}
+
 function buildXliff(project, segments) {
   const metadata = xliffProjectMetadata(project);
-  const units = (segments || [])
+  const units = genericBilingualRows(project, segments)
     .map((segment, index) => xliffSegmentRecord(segment, index))
     .map((segment, index) => `      <trans-unit id="${esc(segment.id || index + 1)}" resname="${index + 1}">
-        <source>${xliffInlineContent(segment.source)}</source>
-        <target state="${stateForXliff12(segment)}">${xliffInlineContent(segment.target || "")}</target>
+        <source>${segment.literalContent ? escText(segment.source) : xliffInlineContent(segment.source)}</source>
+        <target state="${stateForXliff12(segment)}">${segment.literalContent ? escText(segment.target) : xliffInlineContent(segment.target || "")}</target>
         <note>LoopCAT segment ${index + 1}</note>
       </trans-unit>`)
     .join("\n");
@@ -715,11 +889,11 @@ function originalDataXml(descriptors) {
 
 function buildXliff22(project, segments) {
   const metadata = xliffProjectMetadata(project);
-  const units = (segments || [])
+  const units = genericBilingualRows(project, segments)
     .map((segment, index) => xliffSegmentRecord(segment, index))
     .map((segment, index) => {
-      const sourceInline = compileGenericXliff22Inline(segment.source);
-      const targetInline = compileGenericXliff22Inline(segment.target || "", sourceInline.plan);
+      const sourceInline = segment.literalContent ? { output: escText(segment.source), data: [] } : compileGenericXliff22Inline(segment.source);
+      const targetInline = segment.literalContent ? { output: escText(segment.target) } : compileGenericXliff22Inline(segment.target || "", sourceInline.plan);
       const target = `\n        <target>${targetInline.output}</target>`;
       return `    <unit id="u${index + 1}" name="${esc(segment.id || `segment-${index + 1}`)}">
       <notes>
@@ -789,6 +963,132 @@ function findSegmentForXliff2(segments, file, unit, segmentElement, unitIndex, s
     : null) || null;
 }
 
+function nativeRowKey(structure) {
+  return JSON.stringify([structure?.unitIndex, structure?.segmentIndex ?? null, structure?.segmentMid || ""]);
+}
+
+function preserveLineWrapper(original, edited) {
+  if (!edited.trim() || /<\/?[a-z][\w:-]*(?=[\s/>])/i.test(edited)) return edited;
+  // Pasting plain text into a heading/paragraph should keep its authored
+  // enclosure and attributes. Inline markup inside a sentence belongs to the edit.
+  const wrapped = /^(\s*)(<([a-z][\w:-]*)(?=[\s>])(?:[^<>"']|"[^"]*"|'[^']*')*>)([\s\S]*)(<\/\3\s*>)(\s*)$/i.exec(original);
+  if (!wrapped || !HTML_BLOCK_NAMES.has(wrapped[3].toLowerCase()) || /<\/?[a-z]/i.test(wrapped[4])) return edited;
+  return wrapped[1] + wrapped[2] + edited + wrapped[5] + wrapped[6];
+}
+
+function assembleBilingualRows(segments, xml, profile) {
+  const groups = new Map();
+  const combined = [];
+  for (const segment of segments) {
+    if (!segment.structure?.xliffPart) { combined.push(segment); continue; }
+    const key = nativeRowKey(segment.structure);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(segment);
+  }
+  if (!groups.size) return combined;
+  const options = { splitBilingualBlocks: false };
+  const nativeRows = profile.family === "2" ? xliff2Segments(xml, profile, options) : transUnitSegments(xml, options);
+  for (const native of nativeRows) {
+    const key = nativeRowKey(native.structure);
+    const parts = groups.get(key);
+    if (!parts) continue;
+    groups.delete(key);
+    const layout = bilingualLayout(native.text, native.target);
+    const byIndex = new Map(parts.map((row) => [row.structure.xliffPart.index, row]));
+    if (!layout || byIndex.size !== parts.length || parts.some(({ structure: { xliffPart: part } }) =>
+      !Number.isInteger(part.index) || part.index < 0 || part.index >= layout.sourceRows.length || part.count !== layout.sourceRows.length)) {
+      throw new Error("XLIFF row boundaries do not match the original bilingual unit.");
+    }
+    let targetChanged = false, statusChanged = false, allConfirmed = true, allReviewed = true;
+    const replacements = layout.targetRows.map((span, index) => {
+      const original = layout.empty ? "" : span.value;
+      const row = byIndex.get(index);
+      const target = row ? String(row.target ?? "") : original;
+      const originalStatus = original ? native.status : "empty";
+      targetChanged ||= original !== target;
+      statusChanged ||= Boolean(row?.status && row.status !== originalStatus) || (row?.reviewState != null && (row.reviewState === "reviewed") !== (native.reviewState === "reviewed"));
+      const sourceValue = layout.sourceRows[index].value;
+      const kind = xliffPartKind(sourceValue);
+      if (kind === "text") {
+        allConfirmed &&= (row?.status || originalStatus) === "confirmed";
+        allReviewed &&= (row?.reviewState ?? native.reviewState) === "reviewed";
+      }
+      const value = layout.empty && kind !== "text" && !target ? sourceValue : preserveLineWrapper(layout.empty ? sourceValue : original, target);
+      return { start: span.start, end: span.end, value };
+    });
+    let target = native.target;
+    if (targetChanged) {
+      let cursor = 0;
+      const chunks = [];
+      for (const edit of replacements) {
+        chunks.push(layout.template.slice(cursor, edit.start), edit.value);
+        cursor = edit.end;
+      }
+      chunks.push(layout.template.slice(cursor));
+      target = chunks.join("");
+    }
+    combined.push({
+      ...native, target,
+      status: statusChanged ? (allConfirmed ? "confirmed" : target.trim() ? "draft" : "empty") : native.status,
+      reviewState: statusChanged ? (allReviewed ? "reviewed" : "") : native.reviewState,
+      literalEdits: targetChanged ? { template: layout.template, replacements } : null
+    });
+  }
+  if (groups.size) throw new Error("An original XLIFF unit for these rows is missing.");
+  return combined;
+}
+
+function writeCharacterValue(node, value) {
+  if (node.nodeType !== Node.CDATA_SECTION_NODE || !value.includes("]]>")) { node.data = value; return; }
+  // XML forbids a literal CDATA terminator inside one CDATA section.
+  const pieces = value.split("]]>");
+  node.data = pieces[0] + "]]";
+  let previous = node;
+  for (let i = 1; i < pieces.length; i++) {
+    const next = node.ownerDocument.createCDATASection(">" + pieces[i] + (i < pieces.length - 1 ? "]]" : ""));
+    previous.after(next);
+    previous = next;
+  }
+}
+
+function replaceCharacterRange(element, first, last, value) {
+  let offset = 0, inserted = false;
+  for (const node of Array.from(element.childNodes)) {
+    const end = offset + node.length;
+    if (offset <= last && end >= first) {
+      const a = Math.max(0, first - offset), b = Math.min(node.length, last - offset);
+      const updated = node.data.slice(0, a) + (inserted ? "" : value) + node.data.slice(b);
+      if (updated !== node.data) writeCharacterValue(node, updated);
+      inserted = true;
+    }
+    offset = end;
+  }
+}
+
+function updateLiteralTarget(xml, target, source, segment) {
+  const value = String(segment.target ?? "");
+  if (target.textContent === value) return;
+  const plan = segment.literalEdits;
+  if (!target.hasChildNodes() || (plan && target.textContent !== plan.template && source.textContent === plan.template)) {
+    removeChildren(target);
+    if (plan && source.textContent === plan.template) {
+      for (const child of source.childNodes) target.appendChild(xml.importNode(child, true));
+    } else target.appendChild(source.firstChild?.nodeType === Node.CDATA_SECTION_NODE ? xml.createCDATASection("") : xml.createTextNode(""));
+  }
+  if (plan && target.textContent === plan.template) {
+    for (let i = plan.replacements.length - 1; i >= 0; i--) {
+      const { start, end, value: replacement } = plan.replacements[i];
+      if (plan.template.slice(start, end) !== replacement) replaceCharacterRange(target, start, end, replacement);
+    }
+  } else {
+    const original = target.textContent;
+    let a = 0, b = original.length, c = value.length;
+    while (a < b && a < c && original[a] === value[a]) a++;
+    while (b > a && c > a && original[b - 1] === value[c - 1]) { b--; c--; }
+    replaceCharacterRange(target, a, b, value.slice(a, c));
+  }
+}
+
 function xliff12ReconstructedContent(value, sourceElement, targetElement) {
   const templates = new Map();
   const serializer = new XMLSerializer();
@@ -843,6 +1143,31 @@ function xliff12ReconstructedContent(value, sourceElement, targetElement) {
 }
 
 function updateXliff12TargetElement(xml, targetElement, segment, sourceElement) {
+  if (segment.structure?.unmappedTargetMarkers) {
+    // An edit contained in one text node has an unambiguous owner, even when
+    // the target producer's mids differ. Never flatten or guess across markers.
+    const value = String(segment.target ?? ""), original = xliff12NodeContent(targetElement);
+    if (value === original) return;
+    let start = 0, oldEnd = original.length, newEnd = value.length;
+    while (start < oldEnd && start < newEnd && original[start] === value[start]) start++;
+    while (oldEnd > start && newEnd > start && original[oldEnd - 1] === value[newEnd - 1]) { oldEnd--; newEnd--; }
+    if (targetElement.textContent === original) {
+      const walker = xml.createTreeWalker(targetElement, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_CDATA_SECTION);
+      let offset = 0, node;
+      while ((node = walker.nextNode())) {
+        if (start >= offset && oldEnd <= offset + node.length) {
+          writeCharacterValue(node, node.data.slice(0, start - offset) + value.slice(start, newEnd) + node.data.slice(oldEnd - offset));
+          return;
+        }
+        offset += node.length;
+      }
+    }
+    throw new Error("The edited target spans unmatched XLIFF segment markers.");
+  }
+  if (characterContent(sourceElement) && characterContent(targetElement)) {
+    updateLiteralTarget(xml, targetElement, sourceElement, segment);
+    return;
+  }
   const content = xliff12ReconstructedContent(segment.target || "", sourceElement, targetElement);
   appendInlineFragment(xml, targetElement, content);
 }
@@ -854,28 +1179,41 @@ function updateXliff12Targets(xml, segments) {
     if (segmented.length) {
       const segmentedSource = firstChildByName(unit, "seg-source");
       const sourceMarkers = descendantsByName(segmentedSource, "mrk").filter((node) => attr(node, "mtype") === "seg");
-      const target = ensureDirectChildAfter(xml, unit, "target", segmentedSource || firstChildByName(unit, "source"));
+      const existing = firstChildByName(unit, "target");
+      if (!existing && segmented.every((segment) => !segment.target)) return;
+      const target = existing || ensureDirectChildAfter(xml, unit, "target", segmentedSource || firstChildByName(unit, "source"));
       const targetMarkers = descendantsByName(target, "mrk").filter((node) => attr(node, "mtype") === "seg");
       if (!targetMarkers.length) {
+        if (segmented.every((segment) => !segment.target)) return;
         if ((target.textContent || "").trim()) throw new Error("Segmented XLIFF target is missing segment markers.");
         Array.from(segmentedSource.childNodes).forEach((child) => target.appendChild(xml.importNode(child, true)));
+        descendantsByName(target, "mrk").filter((node) => attr(node, "mtype") === "seg").forEach(removeChildren);
       }
+      let stateChanged = false;
       for (const segment of segmented) {
         const mid = segment.structure.segmentMid;
         const source = sourceMarkers.find((node) => attr(node, "mid") === mid);
         const marker = descendantsByName(target, "mrk").find((node) => attr(node, "mtype") === "seg" && attr(node, "mid") === mid);
+        if (!marker && !segment.target) continue;
         if (!source || !marker) throw new Error(`XLIFF segment marker ${mid} is missing.`);
-        updateXliff12TargetElement(xml, marker, segment, source);
+        const originalValue = xliff12NodeContent(marker);
+        stateChanged ||= Boolean(segment.status && segment.status !== statusForXliff12Target(target, originalValue));
+        if (originalValue !== String(segment.target ?? "")) updateXliff12TargetElement(xml, marker, segment, source);
       }
-      target.setAttribute("state", segmented.every((segment) => segment.status === "confirmed") ? "translated" : "needs-review-translation");
+      if (stateChanged || !existing) target.setAttribute("state", segmented.every((segment) => segment.status === "confirmed") ? "translated" : "needs-review-translation");
       return;
     }
     const segment = findSegmentForTransUnit(segments, unit, index);
     if (!segment) return;
     const sourceElement = firstChildByName(unit, "source") || firstChildByName(firstChildByName(unit, "seg-source"), "mrk");
-    const targetElement = ensureDirectChildAfter(xml, unit, "target", sourceElement);
-    targetElement.setAttribute("state", stateForXliff12(segment));
-    updateXliff12TargetElement(xml, targetElement, segment, sourceElement);
+    const existing = firstChildByName(unit, "target");
+    const originalValue = xliff12NodeContent(existing);
+    const contentChanged = originalValue !== String(segment.target ?? "");
+    const stateChanged = segment.status && segment.status !== statusForXliff12Target(existing, originalValue);
+    if (!contentChanged && !stateChanged) return;
+    const targetElement = existing || ensureDirectChildAfter(xml, unit, "target", sourceElement);
+    if (stateChanged || !existing) targetElement.setAttribute("state", stateForXliff12(segment));
+    if (contentChanged) updateXliff12TargetElement(xml, targetElement, segment, sourceElement);
   });
 }
 
@@ -944,8 +1282,6 @@ function appendXliff2InlineContent(xml, targetElement, content, segmentElement) 
 
 function updateXliff2Targets(xml, segments, project) {
   const root = xml.documentElement;
-  const targetLang = cleanText(project?.targetLang) || attr(root, "trgLang");
-  if (targetLang) root.setAttribute("trgLang", targetLang);
   const namespace = root.namespaceURI;
   const files = directChildrenByName(root, "file", namespace);
   const units = files.flatMap((file) => descendantsByName(file, "unit", namespace).filter((unit) => ancestorByName(unit, "file") === file));
@@ -955,21 +1291,113 @@ function updateXliff2Targets(xml, segments, project) {
       const segment = findSegmentForXliff2(segments, file, unit, segmentElement, unitIndex, segmentIndex);
       if (!segment) return;
       const sourceElement = firstChildByName(segmentElement, "source", namespace);
-      const targetElement = ensureDirectChildAfter(xml, segmentElement, "target", sourceElement);
-      targetElement.removeAttribute("state");
-      targetElement.removeAttribute("state-qualifier");
-      segmentElement.setAttribute("state", stateForXliff2(segment));
-      segmentElement.removeAttribute("subState");
-      appendXliff2InlineContent(xml, targetElement, segment.target || "", segmentElement);
+      const existing = firstChildByName(segmentElement, "target", namespace);
+      const originalValue = xliff2NodeContent(existing);
+      const originalState = statusForXliff2Segment(segmentElement, originalValue);
+      const contentChanged = originalValue !== String(segment.target ?? "");
+      const stateChanged = (segment.status && segment.status !== originalState.status) ||
+        (segment.reviewState != null && (segment.reviewState === "reviewed") !== (originalState.reviewState === "reviewed"));
+      if (!contentChanged && !stateChanged) return;
+      if (stateChanged || (!existing && contentChanged)) {
+        const state = stateForXliff2(segment);
+        if (attr(segmentElement, "state") !== state) {
+          segmentElement.setAttribute("state", state);
+          segmentElement.removeAttribute("subState");
+        }
+      }
+      if (!contentChanged) return;
+      const targetElement = existing || ensureDirectChildAfter(xml, segmentElement, "target", sourceElement);
+      if (!attr(root, "trgLang") && cleanText(project?.targetLang)) root.setAttribute("trgLang", cleanText(project.targetLang));
+      if (characterContent(sourceElement) && characterContent(targetElement)) updateLiteralTarget(xml, targetElement, sourceElement, segment);
+      else appendXliff2InlineContent(xml, targetElement, segment.target || "", segmentElement);
     });
   });
 }
 
+// The DOM normalizes declarations, entity spellings and physical newlines. For
+// text-only edits splice the changed character range into the original XML.
+function originalTextExport(input, before, after) {
+  if (/<!DOCTYPE\b/i.test(input)) return null;
+  const changes = new Map();
+  const pending = [[before.documentElement, after.documentElement]];
+  while (pending.length) {
+    const [a, b] = pending.pop();
+    if (a.nodeType !== b.nodeType || a.nodeName !== b.nodeName) return null;
+    if (a.nodeType === Node.TEXT_NODE || a.nodeType === Node.CDATA_SECTION_NODE) {
+      if (a.data !== b.data) changes.set(a, b.data);
+    } else if (a.nodeType === Node.ELEMENT_NODE) {
+      if (!a.cloneNode(false).isEqualNode(b.cloneNode(false)) || a.childNodes.length !== b.childNodes.length) return null;
+      for (let i = 0; i < a.childNodes.length; i++) pending.push([a.childNodes[i], b.childNodes[i]]);
+    } else if (!a.isEqualNode(b)) return null;
+  }
+  if (!changes.size) return input;
+  const elements = Array.from(before.getElementsByTagName("*"));
+  const stack = [];
+  const patches = [];
+  let elementIndex = 0;
+  const tokens = /<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/[^>]*>|<(?:[^<>"']|"[^"]*"|'[^']*')+>|[^<]+/g;
+  for (const { 0: token, index } of input.matchAll(tokens)) {
+    if (token.startsWith("<?") || token.startsWith("<!--")) continue;
+    if (token.startsWith("</")) { stack.pop(); continue; }
+    const cdata = token.startsWith("<![CDATA[");
+    if (token[0] === "<" && !cdata) {
+      const element = elements[elementIndex++];
+      if (!element) return null;
+      if (!token.endsWith("/>")) stack.push({ nodes: Array.from(element.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.CDATA_SECTION_NODE), cursor: 0 });
+      continue;
+    }
+    const frame = stack.at(-1);
+    if (!frame) continue;
+    const node = frame.nodes[frame.cursor++];
+    if (!node || !changes.has(node)) continue;
+    const raw = cdata ? token.slice(9, -3) : token;
+    const value = changes.get(node);
+    let prefix = 0, suffix = 0;
+    while (prefix < value.length && prefix < node.length && node.data[prefix] === value[prefix]) prefix++;
+    while (suffix < value.length - prefix && suffix < node.length - prefix && node.data[node.length - 1 - suffix] === value[value.length - 1 - suffix]) suffix++;
+    let logical = 0, start = -1, end = -1;
+    // Walk Unicode code points and XML references together. An entity or
+    // surrogate pair is never cut in half, even when a translated emoji changes.
+    const atoms = cdata ? /\r\n?|[\s\S]/gu : /&(?:#x[\da-f]+|#\d+|amp|lt|gt|apos|quot);|\r\n?|[\s\S]/giu;
+    const decoded = [];
+    for (const { 0: atom, index: offset } of raw.matchAll(atoms)) {
+      let char = atom;
+      if (atom[0] === "\r") char = "\n";
+      else if (!cdata && atom[0] === "&" && atom.length > 1) {
+        if (atom[1] === "#") char = String.fromCodePoint(atom[2].toLowerCase() === "x" ? parseInt(atom.slice(3), 16) : parseInt(atom.slice(2), 10));
+        else char = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" }[atom];
+      }
+      if (logical <= prefix) start = offset;
+      if (logical === node.length - suffix) end = offset;
+      if (logical < prefix && logical + char.length > prefix) prefix = logical;
+      if (logical < node.length - suffix && logical + char.length > node.length - suffix) suffix = node.length - logical - char.length;
+      decoded.push(char); logical += char.length;
+    }
+    if (logical === prefix) start = raw.length;
+    if (logical === node.length - suffix) end = raw.length;
+    if (start < 0 || end < start || decoded.join("") !== node.data) return null;
+    const replacement = value.slice(prefix, value.length - suffix);
+    if (cdata && (raw.slice(0, start) + replacement + raw.slice(end)).includes("]]>")) return null;
+    const base = index + (cdata ? 9 : 0);
+    patches.push({ start: base + start, end: base + end, value: cdata ? replacement : escText(replacement) });
+    changes.delete(node);
+  }
+  if (changes.size) return null;
+  let cursor = 0;
+  const result = [];
+  for (const patch of patches) {
+    result.push(input.slice(cursor, patch.start), patch.value);
+    cursor = patch.end;
+  }
+  return result.join("") + input.slice(cursor);
+}
+
 function buildTargetXliff(project, segments, structure = null) {
   if (!structure?.source) throw new Error("XLIFF reconstruction source data is missing.");
-  const targetSegments = Array.isArray(segments) ? segments : [];
   const xml = parseXml(structure.source);
   const profile = detectXliffProfile(xml);
+  const targetSegments = assembleBilingualRows(Array.isArray(segments) ? segments : [], xml, profile);
+  const original = xml.cloneNode(true);
   if (profile.family === "2") {
     validateXliff2Document(xml, profile);
     updateXliff2Targets(xml, targetSegments, project);
@@ -977,7 +1405,8 @@ function buildTargetXliff(project, segments, structure = null) {
   } else {
     updateXliff12Targets(xml, targetSegments);
   }
-  return serializeXml(xml);
+  if (xml.isEqualNode(original)) return structure.source;
+  return originalTextExport(structure.source, original, xml) ?? serializeXml(xml);
 }
 
 function xliffMimeType(version = "1.2") {

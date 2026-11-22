@@ -262,11 +262,13 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       "dialog lifecycle controller restores the visible Diagnostics menu trigger after close"
     );
 
+    els.workspaceMenuSummary.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     els.trashBtn.focus();
-    const trashOpenResult = await applicationTrashController.open();
+    els.trashBtn.click();
+    await waitFor(() => els.trashDialog.open && document.activeElement === els.closeTrashBtn, "Workspace opens Trash");
     assert(
-      trashOpenResult &&
-        els.trashDialog.open &&
+      els.trashDialog.open &&
         document.activeElement === els.closeTrashBtn &&
         Boolean(els.trashList.textContent.trim()),
       "dialog lifecycle controller prepares Trash before opening with contained focus"
@@ -275,9 +277,12 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.trashDialog.close();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     assert(
-      !els.trashDialog.open && document.activeElement === els.trashBtn,
-      "dialog lifecycle controller restores the Trash opener after cancel and close"
+      !els.trashDialog.open && document.activeElement === els.workspaceMenuSummary,
+      "dialog lifecycle controller restores the visible Workspace trigger after closing Trash"
     );
+    assert(await applicationTrashController.open(), "command opens Trash without expanding Workspace");
+    els.closeTrashBtn.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
 
     const project = await createProject({
       name: `Workflow ${Date.now()}`,
@@ -893,10 +898,14 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       activeTargetEditor?.getAttribute("aria-label") === uiLocalizationService.source("Target translation for segment {value1}", { value1: segmentIndex + 1 }),
       "segment target editors expose a segment-specific accessible name"
     );
+    els.workspaceMenuSummary.click();
+    els.projectList.closest("details").querySelector("summary").click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     assert(
-      els.projectList.closest(".project-rail").scrollWidth <= els.projectList.closest(".project-rail").clientWidth + 2,
-      "project navigation labels wrap without horizontal scrolling"
+      els.projectList.clientWidth > 0 && els.projectList.scrollWidth <= els.projectList.clientWidth + 2,
+      "project switcher names wrap inside the Workspace menu"
     );
+    els.workspaceMenuSummary.click();
     assert(Boolean(els.focusModeBtn && els.exitFocusModeBtn), "focus view controls are available in the editor");
     focusModeController.set(true);
     assert(

@@ -1,5 +1,11 @@
+import { linguistics } from "../linguistics/core.js";
+
 export function eligibleForTmUpdate(segment) {
-  return segment.status === "confirmed" && Boolean(segment.source?.trim() && segment.target?.trim());
+  return (
+    segment.status === "confirmed" &&
+    Boolean(segment.source?.trim() && segment.target?.trim()) &&
+    !linguistics.isPreservedXliffLayout(segment)
+  );
 }
 
 export function tmUpdateLanguageMatches(segment, project) {

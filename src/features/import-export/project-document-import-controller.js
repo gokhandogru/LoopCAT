@@ -85,6 +85,10 @@ export function createProjectDocumentImportController(options) {
   }
 
   function append(project, segments, documentOptions) {
+    const segmentationOptions =
+      project.localizationStructures?.[documentOptions.documentId]?.format === "xliff"
+        ? { splitBilingualBlocks: importContext?.splitBilingualBlocks !== false }
+        : {};
     project = {
       ...project,
       documents: project.documents.map((document) =>
@@ -95,6 +99,7 @@ export function createProjectDocumentImportController(options) {
               originalFilename: document.name,
               importOptions: {
                 encoding: importContext?.encoding || formats.decodingOptions()?.encoding || "auto",
+                ...segmentationOptions,
                 ...(project.localizationStructures?.[document.id]?.multilingualExcel
                   ? { multilingualExcel: excelMapping(project.localizationStructures[document.id].multilingualExcel) }
                   : {}),
@@ -119,6 +124,7 @@ export function createProjectDocumentImportController(options) {
           fingerprint: importContext.fingerprint,
           encoding: importContext.encoding,
           allowLanguageMismatch: !!importContext.allowLanguageMismatch,
+          ...segmentationOptions,
           ...(importContext.multilingualExcel
             ? { multilingualExcel: excelMapping(importContext.multilingualExcel) }
             : {}),
@@ -288,10 +294,12 @@ export function createProjectDocumentImportController(options) {
   async function importXliff(file) {
     files.assertSize(file, "Project file", files.maxBytes);
     await progress.report("Parsing XLIFF", file);
-    const result = await formats.parseXliff(
-      file,
-      importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()
-    );
+    const result = await formats.parseXliff(file, {
+      ...(importContext?.encoding ? { encoding: importContext.encoding } : formats.decodingOptions()),
+      ...(typeof importContext?.splitBilingualBlocks === "boolean"
+        ? { splitBilingualBlocks: importContext.splitBilingualBlocks }
+        : {})
+    });
     const project = session.getProject();
     const metadata = [result.structure, ...result.segments.map((segment) => segment.structure)].filter(Boolean);
     if (
@@ -358,6 +366,8 @@ export function createProjectDocumentImportController(options) {
         receipt.fingerprint !== importOptions.fingerprint ||
         receipt.encoding !== importOptions.encoding ||
         receipt.name !== file.name ||
+        (typeof receipt.splitBilingualBlocks === "boolean" &&
+          receipt.splitBilingualBlocks !== (importOptions.splitBilingualBlocks !== false)) ||
         !!receipt.allowLanguageMismatch !== !!importOptions.allowLanguageMismatch ||
         JSON.stringify(excelMapping(receipt.multilingualExcel)) !==
           JSON.stringify(excelMapping(importOptions.multilingualExcel)) ||

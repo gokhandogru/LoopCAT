@@ -167,7 +167,7 @@ export function createAiTagRepairController(options) {
     try {
       const result = await domain.repairSegmentTags(providerRequest({ provider, project, segment, settings, config }));
       if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-        presentation.renderOutput("AI did not propose a different tag repair.", { muted: false });
+        presentation.renderOutput("AI did not propose a different tag repair.", { uiMessage: true });
         status.set("AI did not propose a different tag repair.", "saved");
         return true;
       }

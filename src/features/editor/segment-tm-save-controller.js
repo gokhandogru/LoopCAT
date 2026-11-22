@@ -36,7 +36,14 @@ export function createSegmentTmSaveController(options) {
   const beforeSave = typeof options.testHooks?.beforeSave === "function" ? options.testHooks.beforeSave : () => {};
 
   async function save(segment, project = session.getProject()) {
-    if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null;
+    if (
+      !segment ||
+      !project ||
+      !segment.source.trim() ||
+      !segment.target.trim() ||
+      linguistics.isPreservedXliffLayout(segment)
+    )
+      return null;
     beforeSave(segment);
     const resourceId = tm.mainLink?.(project)?.resourceId || "";
     const entry = await tm.saveEntry({
@@ -56,7 +63,14 @@ export function createSegmentTmSaveController(options) {
   async function saveActive(saveOptions = {}) {
     const { reportStatus = true } = saveOptions || {};
     const segment = selection.getActiveSegment();
-    if (!segment || !session.getProject() || !segment.source.trim() || !segment.target.trim()) return null;
+    if (
+      !segment ||
+      !session.getProject() ||
+      !segment.source.trim() ||
+      !segment.target.trim() ||
+      linguistics.isPreservedXliffLayout(segment)
+    )
+      return null;
     try {
       const entry = await save(segment, session.getProject());
       await tm.refreshMatches();

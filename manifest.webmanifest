@@ -1,13 +1,13 @@
 {
   "name": "LoopCAT",
   "short_name": "LoopCAT",
-  "version": "0.0.4-dev.20261115.1",
+  "version": "0.0.4-dev.20261122.1",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#FBF7EF",
-  "theme_color": "#0B756D",
+  "background_color": "#f7f7f2",
+  "theme_color": "#f7f7f2",
   "orientation": "any",
   "icons": [
     {

@@ -16,7 +16,11 @@ export function createAiContextController({
 
   function syncProviderStatus() {
     if (!contextualStatus) return;
-    contextualStatus.textContent = providerStatusText?.textContent?.trim() || "Provider not connected";
+    const text = providerStatusText?.textContent?.trim();
+    if (text && contextualStatus.textContent !== text) contextualStatus.textContent = text;
+    const status = providerStatusText?.parentElement?.classList;
+    contextualStatus.dataset.connection =
+      ["connected", "checking", "error"].find((state) => status?.contains(state)) || "disconnected";
   }
 
   function mount() {

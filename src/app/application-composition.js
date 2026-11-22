@@ -6,12 +6,15 @@ import { createResourceTransferService } from "../features/resources/resource-tr
 import { createResourceUi } from "../features/resources/resource-ui.js";
 import { SENSITIVE_TEXT_VALUE_PATTERN } from "../security/sensitive-value-pattern.js";
 import { installSourceTermContextMenu } from "../features/editor/source-term-context-menu.js";
+import { createInspectorSegmentInfo } from "../features/editor/inspector-segment-info.js";
 import { createMatchContextMenu } from "../ui/match-context-menu.js";
 import { createAiConsentDialog } from "../ui/ai-consent-dialog.js";
 import { createTmBulkUpdateController } from "../features/editor/tm-bulk-update-controller.js";
 import { createFileLifecycleService } from "../features/projects/file-lifecycle-service.js";
+import { prepareXliffResegmentation } from "../features/import-export/resegment-xliff.js";
 import { createFileManagementController } from "../features/projects/file-management-controller.js";
 import { createWorkspaceToolbarController } from "../ui/workspace-toolbar-controller.js";
+import { installWorkspaceShell } from "../ui/workspace-shell-controller.js";
 import { linguistics } from "../features/linguistics/core.js";
 import { createBatchImportController } from "../features/import-export/batch-import-controller.js";
 import { createMultilingualExcelImportDialog } from "../features/import-export/multilingual-excel-import-dialog.js";
@@ -247,6 +250,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     localization: uiLocalizationService,
     baseCategoryLabel: baseQualityCategoryLabel
   });
+  function focusQualityFinding() {
+    verticalFeatureState?.inspector?.closeForNavigation();
+    targetEditController.focusActive();
+  }
   const qaResultsController = appRuntime.featureFactories.createQaResultsController({
     session: {
       getQaChecks: () => editorSessionStore.getQaChecks(),
@@ -262,7 +269,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args),
     navigation: { select: (index) => segmentNavigationController.select(index) },
     presentation: { renderSegments: (...args) => segmentGridPresentationController.render(...args) },
-    focus: { target: () => targetEditController.focusActive() }
+    focus: { target: focusQualityFinding }
   });
   const reportPresentationService = appRuntime.featureFactories.createReportPresentationService({
     localization: uiLocalizationService,
@@ -751,6 +758,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     termNotesInput: document.querySelector("#termNotesInput"),
     termForbiddenInput: document.querySelector("#termForbiddenInput"),
     domainForm: document.querySelector("#domainForm"),
+    domainSaveError: document.querySelector("#domainSaveError"),
+    reviewSaveError: document.querySelector("#reviewSaveError"),
+    reviewNoteDetails: document.querySelector("#reviewNoteDetails"),
     projectDomainEditInput: document.querySelector("#projectDomainEditInput"),
     revisionHistoryList: document.querySelector("#revisionHistoryList"),
     reviewForm: document.querySelector("#reviewForm"),
@@ -905,6 +915,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   els.dismissSaveStatusBtn.addEventListener("click", applicationSaveStatusController.dismiss);
   applicationStore.subscribe((next, previous) => {
     applicationSaveStatusController.navigationChanged(next.navigation, previous.navigation);
+    if (
+      next.navigation.projectId !== previous.navigation.projectId ||
+      next.navigation.documentId !== previous.navigation.documentId
+    ) {
+      editorSessionStore.replaceQaChecks([]);
+      editorSessionStore.replaceQualityRiskQueue(null);
+      qaResultsController.render();
+    }
   });
   const dialogLifecycleController = appRuntime?.featureFactories?.createDialogController?.({
     focusController,
@@ -1320,6 +1338,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       projectMeta: els.projectMeta,
       projectDomainEditInput: els.projectDomainEditInput,
       domainForm: els.domainForm,
+      domainError: els.domainSaveError,
       projectInfo: els.projectInfo
     },
     application: {
@@ -1755,14 +1774,20 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     const card = event.target.closest?.("[data-match-id]");
     if (!card || !els.tmMatches.contains(card)) return;
     const match = tmMatchesController.getResults().find((item) => item.id === card.dataset.matchId);
-    if (!match || match.id === "previous-source-version") return;
+    if (!match) return;
     event.preventDefault();
     matchContextMenu.open({
       event,
       anchor: card,
       items: [
         {
+          label: uiLocalizationService.source("Insert"),
+          disabled: match.safeToApply === false,
+          action: () => tmMatchesController.insertMatch(match)
+        },
+        {
           label: uiLocalizationService.source("View / edit TM entry"),
+          disabled: match.id === "previous-source-version",
           action: async () => {
             const record = await storageApi.get("tmEntries", match.id);
             if (!record?.resourceId) throw new Error("Resource entry is no longer available.");
@@ -1777,6 +1802,9 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     });
   };
   els.tmMatches.addEventListener("contextmenu", openTmResourceMenu);
+  els.tmMatches.addEventListener("click", (event) => {
+    if (event.pointerType === "touch") openTmResourceMenu(event);
+  });
   els.tmMatches.addEventListener("keydown", (event) => {
     if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) openTmResourceMenu(event);
   });
@@ -2034,7 +2062,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
 
   const projectDomainController = appRuntime.featureFactories.createProjectDomainController({
-    elements: { form: els.domainForm, input: els.projectDomainEditInput },
+    elements: { form: els.domainForm, input: els.projectDomainEditInput, error: els.domainSaveError },
     session: {
       getProject: editorSessionStore.getProject,
       getProjects: editorSessionStore.getProjects,
@@ -2095,7 +2123,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const projectDocumentStatisticsService = appRuntime.featureFactories.createProjectDocumentStatisticsService({
     getDocuments: projectDocumentCatalogService.list,
     getSegments: () => editorSessionStore.getSegments(),
-    sourceWordCount: segmentProgressService.sourceWordCount
+    sourceWordCount: segmentProgressService.sourceWordCount,
+    sourceWordMetrics: segmentProgressService.sourceWordMetrics
   });
 
   const aiContextController = appRuntime?.featureFactories?.createAiContextController?.({
@@ -2247,6 +2276,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       filters: editorFilterStore,
       inspector: factories.createInspectorController({
         root: els.sidebar,
+        getActiveIndex: () => applicationStore.getState().navigation.activeIndex,
+        translate: uiLocalizationService.source,
+        refreshInfo: () =>
+          renderSegmentInfo({
+            project: editorSessionStore.getProject(),
+            segment: applicationActiveSegmentService.get(),
+            evidence: qualityWorkbenchController.evidence()
+          }),
         preferencesRepository: appRuntime.preferencesRepository
       }),
       projects: factories.createProjectsController({ root: els.projectDashboard }),
@@ -2393,6 +2430,14 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const reportDataService = lazyReportServices.data;
   let qualityReviewController;
   let projectQaController;
+  const renderSegmentInfo = createInspectorSegmentInfo({
+    list: document.querySelector("#segmentInfo"),
+    empty: document.querySelector("#segmentInfoEmpty"),
+    segmentLabels: segmentLabelService,
+    riskLevel: qualityPresentationService.riskLevel,
+    dateTime: applicationDateTimeService.dateTime,
+    localization: uiLocalizationService
+  });
   const qualityWorkbenchController = appRuntime.featureFactories.createQualityWorkbenchController({
     session: {
       getProject: editorSessionStore.getProject,
@@ -2428,9 +2473,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     navigation: { select: (index) => segmentNavigationController.select(index) },
     presentation: {
       renderSegments: segmentGridPresentationController.render,
-      renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)
+      renderWorkbench: (viewModel) => {
+        qualityReviewController?.renderQuality?.(viewModel);
+        renderSegmentInfo(viewModel);
+      }
     },
-    focus: { target: () => targetEditController.focusActive() },
+    focus: { target: focusQualityFinding },
     status: { set: applicationSaveStatusController.set }
   });
   projectQaController = appRuntime.featureFactories.createProjectQaController({
@@ -2763,6 +2811,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   void predictiveTypingController.mount();
   quickTermCaptureController = appRuntime.featureFactories.createQuickTermCaptureController({
     elements: {
+      openButton: document.querySelector("#matchesCaptureTermBtn"),
       dialog: els.quickTermCaptureDialog,
       form: els.quickTermCaptureForm,
       source: els.quickTermSourceInput,
@@ -2790,6 +2839,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     },
     resources: { links: projectResourceContextService.links },
     repository: { savePair: saveTermPair },
+    source: uiLocalizationService.source,
     selection: {
       targetEditor: () =>
         verticalFeatureState.segmentGrid.findTargetEditor(
@@ -2862,6 +2912,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   targetProducerController.mount();
   const concordanceController = appRuntime.featureFactories.createConcordanceController({
     elements: {
+      openButton: document.querySelector("#matchesConcordanceBtn"),
       overlay: els.concordanceOverlay,
       closeButton: els.closeConcordanceBtn,
       meta: els.concordanceMeta,
@@ -4349,6 +4400,15 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     }
   });
 
+  function openInspectorTab(tab) {
+    if (!verticalFeatureState?.inspector?.isSheetMode?.()) {
+      state.inspectorOpen = true;
+      void workspaceLayoutController?.setInspectorOpen?.(true);
+    }
+    verticalFeatureState?.inspector?.setContext?.({ tab });
+    editorShellPresentationController.render();
+  }
+
   const filterPresetController = appRuntime?.featureFactories?.createFilterPresetController?.({
     select: els.filterPresetSelect,
     preferencesRepository: appRuntime.preferencesRepository,
@@ -4363,12 +4423,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       const first = segmentFilterService.firstVisible();
       if (first !== -1) await segmentNavigationController.select(first);
     },
-    setInspectorTab: (tab) => {
-      state.inspectorOpen = true;
-      void workspaceLayoutController?.setInspectorOpen?.(true);
-      verticalFeatureState?.inspector?.setContext?.({ tab });
-      editorShellPresentationController.render();
-    }
+    setInspectorTab: openInspectorTab
   });
   const filterPresetReady = filterPresetController?.initialize?.() || Promise.resolve();
 
@@ -4573,10 +4628,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     els.segmentSearchInput.select?.();
   };
   const openReviewComment = () => {
-    state.inspectorOpen = true;
-    void workspaceLayoutController?.setInspectorOpen?.(true);
-    verticalFeatureState?.inspector?.setContext?.({ tab: "review" });
-    editorShellPresentationController.render();
+    openInspectorTab("review");
     requestAnimationFrame(() => els.reviewCommentInput.focus());
   };
   const globalKeyboardController = appRuntime.featureFactories.createGlobalKeyboardController({
@@ -4653,6 +4705,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   });
   const inspectorToggleController = appRuntime.featureFactories.createInspectorToggleController({
     element: els.inspectorToggleBtn,
+    sheet: { toggle: () => verticalFeatureState?.inspector?.toggleSheet?.() },
     closeElement: document.querySelector("#inspectorCloseBtn"),
     state: {
       getOpen: () => state.inspectorOpen,
@@ -4679,9 +4732,12 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     localization: { translate: (value) => uiLocalizationService.source(value) },
     inspector: {
       setOpen: (inspectorOpen) => {
-        state.inspectorOpen = inspectorOpen;
+        if (!verticalFeatureState?.inspector?.isSheetMode?.()) state.inspectorOpen = inspectorOpen;
       },
-      persistOpen: (inspectorOpen) => workspaceLayoutController?.setInspectorOpen?.(inspectorOpen),
+      persistOpen: (inspectorOpen) => {
+        if (!verticalFeatureState?.inspector?.isSheetMode?.())
+          return workspaceLayoutController?.setInspectorOpen?.(inspectorOpen);
+      },
       setContext: (context) => verticalFeatureState?.inspector?.setContext(context)
     }
   });
@@ -5308,7 +5364,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     finishBatch: projectDocumentImportController.finishBatch,
     showDialog: (dialog, initialFocus) =>
       focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement }),
-    openStatistics: () => window.dispatchEvent(new CustomEvent("loopcat:statistics"))
+    openStatistics: (documentIds) => statisticsController.open("files", documentIds)
   });
   importExportController = appRuntime?.featureFactories?.createImportExportController?.({
     elements: {
@@ -5896,6 +5952,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     elements: {
       reviewForm: els.reviewForm,
       reviewStateSelect: els.reviewStateSelect,
+      reviewSaveError: els.reviewSaveError,
+      reviewNoteDetails: els.reviewNoteDetails,
       reviewNoteInput: els.reviewNoteInput,
       reviewCommentInput: els.reviewCommentInput,
       reviewCommentsList: els.reviewCommentsList,
@@ -5996,7 +6054,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
           force: Boolean(options.force)
         }),
       updateRow: segmentRowPresentationService.update,
-      renderHistory: revisionHistoryPresentationService.render
+      renderHistory: revisionHistoryPresentationService.render,
+      showError: (segmentId, failed) => {
+        if (qualityReviewController?.getState().segmentId === segmentId) els.reviewSaveError.hidden = !failed;
+      }
     },
     workspace: { markDirty: workspaceDirtyStateController.mark },
     status: { set: applicationSaveStatusController.set },
@@ -6162,6 +6223,8 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const reliabilityControls = createReliabilityControls({
     window,
     document,
+    translate: uiLocalizationService.source,
+    locale: uiLocalizationService.locale,
     storage: storageApi,
     saveState: appRuntime.status.save,
     session: editorSessionStore,
@@ -6192,6 +6255,13 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     selection: segmentSelection,
     translate: uiLocalizationService.source,
     getDocumentId: () => applicationStore.getState().navigation.documentId,
+    defaultScope: () => {
+      const navigation = applicationStore.getState().navigation;
+      if (navigation.view === "editor" && navigation.documentId) return { kind: "file" };
+      const documentIds = navigation.view === "project" ? fileManagementController.selectedFileIds() : [];
+      return documentIds.length ? { kind: "files", documentIds } : { kind: "project" };
+    },
+    getVisibleIndexes: segmentFilterService.visibleIndexes,
     getVisibleSegments: () =>
       segmentFilterService
         .visibleIndexes()
@@ -6217,9 +6287,19 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       targetEditController.focusActive();
     },
     flush: () => autosaveService.flush(),
-    listResources: () => getAll("resources"),
-    listEntries: (project) =>
-      getAllByIndex("tmEntries", "languagePair", project.sourceLang + "::" + project.targetLang),
+    listResources: async (ids) => {
+      const [records, revisions] = await Promise.all([
+        storageApi.getMany("resources", ids),
+        storageApi.getMany(
+          "appMeta",
+          ids.map((id) => `resource-generation:${id}`)
+        )
+      ]);
+      return records.flatMap((record, i) =>
+        record ? [{ ...record, storageVersion: Math.max(record.storageVersion || 0, revisions[i]?.value || 0) }] : []
+      );
+    },
+    listEntries: async (_project, ids) => (await storageApi.getAllByIndexMany("tmEntries", "resourceId", ids)).flat(),
     analyze: (request, signal, onProgress) => workerClient.analyzeTm({ request, signal, onProgress }),
     showDialog: (dialog, initialFocus) =>
       focusController.showModal(dialog, { initialFocus, returnTarget: document.activeElement }),
@@ -6232,7 +6312,10 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       if (reports.length >= 20 || JSON.stringify([...reports, snapshot]).length > 10000000)
         throw new Error("Snapshot storage limit reached. Export or delete a saved snapshot first.");
       const updated = await updateProject({ ...project, statisticsSnapshots: [...reports, snapshot] });
-      editorSessionStore.replaceProject(updated);
+      if (editorSessionStore.getProject()?.id === updated.id) editorSessionStore.replaceProject(updated);
+      editorSessionStore.replaceProjects(
+        editorSessionStore.getProjects().map((item) => (item.id === updated.id ? updated : item))
+      );
       workspaceDirtyStateController.mark(project.id);
     },
     removeSnapshot: async (id) => {
@@ -6241,12 +6324,16 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         ...project,
         statisticsSnapshots: (project.statisticsSnapshots || []).filter((r) => r.id !== id)
       });
-      editorSessionStore.replaceProject(updated);
+      if (editorSessionStore.getProject()?.id === updated.id) editorSessionStore.replaceProject(updated);
+      editorSessionStore.replaceProjects(
+        editorSessionStore.getProjects().map((item) => (item.id === updated.id ? updated : item))
+      );
       workspaceDirtyStateController.mark(project.id);
     }
   });
   const fileLifecycleService = createFileLifecycleService({
     storage: storageApi,
+    resegment: (before) => prepareXliffResegmentation(before, xliffApi),
     compare: (previous, incoming, locale, signal) =>
       workerClient.analyzeTm({ sourceUpdate: { previous, incoming, locale }, signal }),
     prepare: async (file, settings) => {
@@ -6254,6 +6341,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       const ext = file.name.split(".").pop().toLowerCase();
       const importOptions = {
         encoding: settings.encoding || "auto",
+        ...(XLIFF_DOCUMENT_TYPES.has(ext) ? { splitBilingualBlocks: settings.splitBilingualBlocks !== false } : {}),
         ...(settings.multilingualExcel ? { multilingualExcel: settings.multilingualExcel } : {}),
         ...(ext === "tmx" ? { importedTranslationStatus: settings.importedTranslationStatus || "draft" } : {})
       };
@@ -6261,7 +6349,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
         ext === "docx"
           ? await extractDocxSegments(file)
           : XLIFF_DOCUMENT_TYPES.has(ext)
-            ? await parseXliffFile(file, { encoding: settings.encoding })
+            ? await parseXliffFile(file, importOptions)
             : await parseLocalizationFile(file, {
                 ...importOptions,
                 sourceLang: editorSessionStore.getProject().sourceLang,
@@ -6385,6 +6473,34 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     "loopcat:statistics",
     () => void statisticsController.open().catch((error) => applicationSaveStatusController.set(error.message, "dirty"))
   );
+  installWorkspaceShell({
+    document,
+    window,
+    session: editorSessionStore,
+    store: applicationStore,
+    translate: uiLocalizationService.source,
+    show: (view) => (view === "project" ? projectHomeController.show() : applicationViewController.show(view)),
+    openCommands: () => paletteController.open(),
+    openStatistics: () => window.dispatchEvent(new window.CustomEvent("loopcat:statistics")),
+    resumeEditor: (previous) => {
+      const segments = editorSessionStore.getSegments();
+      const project = editorSessionStore.getProject();
+      if (!project || !segments.length) return;
+      let activeIndex = previous?.segmentId ? segments.findIndex((row) => row.id === previous.segmentId) : -1;
+      if (activeIndex < 0 && previous?.documentId)
+        activeIndex = segments.findIndex((row) => row.documentId === previous.documentId);
+      activeIndex = Math.max(0, activeIndex);
+      const segment = segments[activeIndex];
+      applicationNavigation.openEditor({
+        projectId: project.id,
+        documentId: previous && !previous.documentId ? "" : segment.documentId || "",
+        segmentId: segment.id,
+        activeIndex
+      });
+      applicationAggregatePresentationController.render();
+      void editorContextController.refresh();
+    }
+  });
   reliabilityControls.mount();
   window.addEventListener("loopcat:localechange", () => languageInputService.renderDatalists());
   window.addEventListener("loopcat-catalog-ready", () => {

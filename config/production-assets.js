@@ -7,6 +7,7 @@
     "index.html",
     "docs/beginner-guide/index.html",
     "docs/beginner-guide/ar.html",
+    "docs/beginner-guide/guide.css",
     "styles.css",
     "liquid-glass/styles.css",
     "src/ui/tokens.css",
@@ -14,6 +15,12 @@
     "src/ui/base.css",
     "src/ui/components.css",
     "src/ui/layouts.css",
+    "src/ui/exchange.css",
+    "src/ui/exchange-workflows.css",
+    "src/ui/exchange-catalog.css",
+    "src/ui/workspace-shell.css",
+    "src/ui/editor-workbench.css",
+    "src/ui/workspace-tools.css",
     "manifest.webmanifest",
     "service-worker.js",
     "config/production-assets.js",
@@ -39,7 +46,7 @@
   ]);
 
   return Object.freeze({
-    appVersion: "0.0.4-dev.20261115.1",
+    appVersion: "0.0.4-dev.20261122.1",
     contractVersion: 1,
     runtimeAssets,
     offlineAssets,

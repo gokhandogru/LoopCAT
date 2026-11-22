@@ -126,13 +126,13 @@ async function auditCurrentTheme(name) {
 async function waitForThemePaint(theme) {
   const expected =
     theme === "dark"
-      ? { textToken: "#e8edf2", canvasToken: "#111820", textColor: "rgb(232, 237, 242)" }
-      : { textToken: "#15322f", canvasToken: "#f6f7f6", textColor: "rgb(21, 50, 47)" };
+      ? { textToken: "#edf4eb", canvasToken: "#15211e", textColor: "rgb(237, 244, 235)" }
+      : { textToken: "#183932", canvasToken: "#f7f7f2", textColor: "rgb(24, 57, 50)" };
   await waitFor(
     `(() => {
       const rootStyle = getComputedStyle(document.documentElement);
       const visibleHeadings = Array.from(document.querySelectorAll(
-        ".brand h1, .projects-header h2, .resources-header h2, .project-home-header h2, .actionable-empty-state h3, .panel-title h2, .command-palette h2"
+        ".projects-header h2, .resources-header h2, .project-home-header h2, .actionable-empty-state h3, .panel-title h2, .command-palette h2"
       )).filter((element) => element.getClientRects().length > 0);
       return rootStyle.getPropertyValue("--color-text").trim().toLowerCase() === ${JSON.stringify(expected.textToken)} &&
         rootStyle.getPropertyValue("--color-canvas").trim().toLowerCase() === ${JSON.stringify(expected.canvasToken)} &&
@@ -386,14 +386,15 @@ app
       );
       await windowRef.webContents.executeJavaScript(
         `(() => {
-          const toggle = document.querySelector("#inspectorQualityPanel [data-panel-toggle]");
-          if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
-          document.querySelector("#runQaBtn").click();
           document.querySelector("#refreshQualityRiskBtn").click();
+          document.querySelector("#inspectorQualityPanel .quality-disclosure > summary").click();
         })()`,
         true
       );
-      await waitFor("document.querySelector('#qualitySummary .quality-summary-grid')", "expanded quality summary");
+      await waitFor(
+        "document.querySelector('#qaResults .qa-card') && document.querySelector('#qualitySummary .quality-summary-grid')",
+        "populated QA findings and risk summary"
+      );
       await audit("Quality Workbench populated");
       await windowRef.webContents.executeJavaScript(
         `(() => {

@@ -26,11 +26,11 @@ function createHarness(createReportDataService, overrides = {}) {
   const terms = [
     {
       id: "term-2",
-      sourceTerm: "Zulu",
-      targetTerm: "Z",
+      source: "Zulu",
+      target: "Z",
       termBaseName: "TB B",
       notes: "secret-token",
-      isForbidden: true
+      forbidden: true
     },
     { id: "term-1", sourceTerm: "Alpha", targetTerm: "A", termBaseName: "TB A", notes: "  note  " }
   ];

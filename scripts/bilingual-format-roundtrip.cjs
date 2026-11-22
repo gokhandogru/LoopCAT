@@ -71,6 +71,88 @@ app.whenReady().then(async () => {
         const output = xliff.buildTargetXliff(project, p.segments, p.structure);
         check(xliff.parseXliffText(output).segments[0].target === p.segments[0].target && xml(output).querySelector("target ph").getAttribute("dataRef") === "d", `XLIFF ${version} inline/reference round trip`);
       }
+      const literalDocument = (source, target, version = "2.0") => {
+        if (version === "1.2") return '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file original="sample"><body><trans-unit id="u"><source>' + source + '</source>' + (target === null ? "" : '<target state="signed-off">' + target + '</target>') + '</trans-unit></body></file></xliff>';
+        return '<?xml version="1.0"?>\r\n<xliff version="' + version + '" xmlns="urn:oasis:names:tc:xliff:document:' + (version === "2.2" ? "2.2" : "2.0") + '" xmlns:q="urn:synthetic" srcLang="en" trgLang="tr"><file id="f"><unit id="u"><segment id="s" state="final" subState="q:signed"><source>' + source + '</source>' + (target === null ? "" : '<target q:keep="yes">' + target + '</target>') + '</segment></unit></file></xliff>';
+      };
+      for (const version of ["1.2","2.0","2.1","2.2"]) {
+        const left = '&lt;h1&gt;Garden&lt;/h1&gt;\r\n\r\n&lt;p&gt;\r\n  Leaf &amp; stem.\r\n&lt;/p&gt;';
+        const right = '&lt;h1&gt;Bahçe&lt;/h1&gt;\r\n\r\n&lt;p&gt;\r\n  Yaprak &#38; sap.\r\n&lt;/p&gt;';
+        const input = literalDocument(left, right, version);
+        const parsed = xliff.parseXliffText(input);
+        check(parsed.segments.length === 5 && parsed.segments.map(s => s.structure.xliffPart.kind).join(",") === "text,blank,markup,text,markup" &&
+          parsed.segments[0].text === "<h1>Garden</h1>" && parsed.segments[1].text === "" && parsed.segments[3].text.startsWith("  ") &&
+          parsed.segments.every((s,i) => s.structure.xliffPart.index === i && s.structure.xliffPart.lineBreakAfter === (i < 4)),
+          "XLIFF " + version + " preserves physical rows, blank lines, markup and indent");
+        check(xliff.parseXliffText(input,"sample.xlf",{splitBilingualBlocks:false}).segments.length === 1 && xliff.buildTargetXliff(project,parsed.segments,parsed.structure) === input,
+          "XLIFF " + version + " native projection and byte-identical untouched export");
+        parsed.segments[3].target += " ✓";
+        check(xliff.buildTargetXliff(project,parsed.segments.slice().reverse(),parsed.structure) === input.replace("sap.","sap. ✓"),
+          "XLIFF " + version + " surgical edit preserves entity spelling, CRLF and authored state");
+        parsed.segments[0].target = "Başlık";
+        const reopened = xliff.parseXliffText(xliff.buildTargetXliff(project,parsed.segments,parsed.structure)).segments;
+        check(reopened[0].target === "<h1>Başlık</h1>" && reopened[3].target === parsed.segments[3].target && reopened[1].target === "", "XLIFF " + version + " pasted heading keeps its authored wrapper");
+      }
+      const cdataInput = literalDocument("<![CDATA[Plan\n\nTerm]]>", "<![CDATA[Plan\n\nTerim]]>");
+      const cdataRows = xliff.parseXliffText(cdataInput);
+      cdataRows.segments[2].target = "Zemin";
+      check(xliff.buildTargetXliff(project,cdataRows.segments,cdataRows.structure) === cdataInput.replace("Terim","Zemin"), "XLIFF edited CDATA remains CDATA");
+      cdataRows.segments[2].target = "A]]>B";
+      check(xliff.parseXliffText(xliff.buildTargetXliff(project,cdataRows.segments,cdataRows.structure)).segments[2].target === "A]]>B","XLIFF safely materializes literal CDATA terminator");
+      const missing = xliff.parseXliffText(literalDocument("&lt;p&gt;\nfirst\nsecond\n&lt;/p&gt;",null));
+      check(missing.segments.every(s=>!s.target) && !xml(xliff.buildTargetXliff(project,missing.segments,missing.structure)).querySelector("target"),"Untranslated XLIFF keeps missing target absent");
+      missing.segments[2].target = "ikinci";
+      const filled = xml(xliff.buildTargetXliff(project,missing.segments,missing.structure));
+      check(filled.querySelector("target").textContent === "<p>\n\nikinci\n</p>" && !filled.querySelector("target").firstElementChild,"Partial translation restores escaped HTML skeleton without copying untranslated prose");
+      const blockInput = literalDocument("&lt;p&gt;One&lt;/p&gt;&lt;p&gt;Two&lt;br/&gt;Three&lt;/p&gt;", "&lt;p&gt;Bir&lt;/p&gt;&lt;p&gt;İki&lt;br /&gt;Üç&lt;/p&gt;");
+      const block = xliff.parseXliffText(blockInput);
+      check(block.segments.map(s=>s.target).join("|") === "Bir|İki|Üç" && block.segments.every(s=>!s.structure.xliffPart.lineBreakAfter), "Aligned single-line HTML paragraphs and BRs preserve nonphysical boundaries");
+      block.segments[1].target = "İKİ";
+      check(xliff.buildTargetXliff(project,block.segments,block.structure) === blockInput.replace("İki","İKİ"), "HTML-only edit keeps target-native BR spelling");
+      const different = literalDocument("One\nTwo\nThree","Bir\nÜç");
+      check(xliff.parseXliffText(different).segments.length === 1, "Mismatched bilingual boundaries retained as one native unit");
+      const forbiddenSplit = literalDocument("One\n\nTwo","Bir\n\nİki").replace('<unit id="u">','<unit id="u" canResegment="no">');
+      const fixedUnit = xliff.parseXliffText(forbiddenSplit);
+      check(fixedUnit.segments.length === 1 && xliff.buildTargetXliff(project,fixedUnit.segments,fixedUnit.structure) === forbiddenSplit,"Inherited XLIFF canResegment=no preserves the native editing unit");
+      const unsupportedLayout = literalDocument("&lt;h1&gt;One&lt;/h1&gt;&lt;p&gt;Two&lt;/p&gt;","&lt;p&gt;Bir ve iki&lt;/p&gt;");
+      check(xliff.parseXliffText(unsupportedLayout).segments.length === 1,"Different target HTML block layout stays in its native unit");
+      const ambiguous = literalDocument("&lt;p&gt;One&lt;/p&gt;&lt;p&gt;Two&lt;/p&gt;","&lt;p&gt;Bir&lt;br&gt;İki&lt;/p&gt;");
+      check(xliff.parseXliffText(ambiguous).segments.length === 1,"Equal visible span counts do not align a paragraph with a different break hierarchy");
+      const conversionInput = literalDocument("&lt;h1&gt;Garden&lt;/h1&gt;\n\n&lt;p&gt;\nLeaf\n&lt;/p&gt;","&lt;h1&gt;Bahçe&lt;/h1&gt;\n\n&lt;p&gt;\nYaprak\n&lt;/p&gt;");
+      const convert = xliff.parseXliffText(conversionInput);
+      const editorRows = convert.segments.map((row,i)=>({...row, id:"row-"+i, source:row.text, documentId:"sample"}));
+      editorRows[3].target="Çiçek";
+      for (const build of [xliff.buildXliff, xliff.buildXliff22]) {
+        const content = build({...project,localizationStructures:{sample:convert.structure}},editorRows);
+        const reopened = xliff.parseXliffText(content).segments;
+        check(reopened.length === editorRows.length && reopened.every((row,i)=>row.text === editorRows[i].source && row.target === editorRows[i].target) &&
+          xml(content).querySelector("source").childElementCount === 0, "Generic XLIFF export preserves blank and markup-only rows and translated text as literal payload");
+      }
+      const mixed = literalDocument('One\n<ph id="c"/>\nTwo','Bir\n<ph id="c"/>\nİki');
+      const nativeCodes = xliff.parseXliffText(mixed);
+      check(nativeCodes.segments.length === 1 && xliff.buildTargetXliff(project,nativeCodes.segments,nativeCodes.structure) === mixed,"Native inline code identity takes precedence over literal hard lines");
+      const nested = segmented.replace('mid="1">First.','mid="1">First.\nSecond line').replace('mid="1">İlk.','mid="1">İlk.\nİkinci satır');
+      const nativeMarkers = xliff.parseXliffText(nested);
+      check(nativeMarkers.segments.length === 3 && nativeMarkers.segments[1].structure.segmentMid === "1" && nativeMarkers.segments[2].structure.segmentMid === "2","SDLXLIFF physical lines remain inside their original mid");
+      nativeMarkers.segments[1].target = "Yeni satır";
+      check(xliff.buildTargetXliff(project,nativeMarkers.segments,nativeMarkers.structure) === nested.replace("İkinci satır","Yeni satır"),"SDLXLIFF subrow edits preserve adjacent markers and the unit state");
+      const unaligned = segmented.replace(/<target>[\s\S]*?<\/target>/,'<target state="signed-off"><![CDATA[Birleştirilmiş çeviri.]]></target>');
+      const unalignedParsed = xliff.parseXliffText(unaligned);
+      check(unalignedParsed.segments.length === 1 && unalignedParsed.segments[0].text === "First. Second." &&
+        unalignedParsed.segments[0].target === "Birleştirilmiş çeviri." && xliff.buildTargetXliff(project,unalignedParsed.segments,unalignedParsed.structure) === unaligned,
+        "XLIFF 1.2 segmented source retains the complete unmarked target as one native row");
+      unalignedParsed.segments[0].target = "Birleştirilmiş metin.";
+      check(xliff.buildTargetXliff(project,unalignedParsed.segments,unalignedParsed.structure) === unaligned.replace("çeviri.","metin."),
+        "XLIFF 1.2 edit preserves unaligned source mids, CDATA, target attributes and untargeted XML bytes");
+      const orphan = segmented.replace(/<target>[\s\S]*?<\/target>/,'<target><mrk mtype="seg" mid="other">Bir</mrk> <mrk mtype="seg" mid="2">İki</mrk></target>');
+      const orphanParsed = xliff.parseXliffText(orphan);
+      check(orphanParsed.segments.length === 1 && orphanParsed.segments[0].target === "Bir İki" && xliff.buildTargetXliff(project,orphanParsed.segments,orphanParsed.structure) === orphan,
+        "XLIFF 1.2 unknown and partially overlapping target mids retain every translated word");
+      orphanParsed.segments[0].target = "Bir İkinci";
+      check(xliff.buildTargetXliff(project,orphanParsed.segments,orphanParsed.structure) === orphan.replace(">İki<",">İkinci<"),
+        "XLIFF 1.2 edits inside orphan marker text preserve its original mid and adjacent translation");
+      orphanParsed.segments[0].target = "Tamamı";
+      rejects(()=>xliff.buildTargetXliff(project,orphanParsed.segments,orphanParsed.structure),"Ambiguous edit across unrelated target mids refuses to assign or discard translated text");
       const generated = xliff.buildXliff22(project, [{ source: "Open <b>file</b><br/>", target: "<b>Dosyayı</b> aç<br/>", status: "confirmed" }]);
       check(xliff.parseXliffText(generated).segments.length === 1, "Generated XLIFF 2.2 reimport");
       rejects(() => xliff.parseXliffText("<xliff><file>"), "Malformed XLIFF rejected");

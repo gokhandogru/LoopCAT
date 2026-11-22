@@ -38,7 +38,10 @@ export function createMultilingualExcelImportDialog(options) {
       body.setAttribute("aria-labelledby", "multilingualExcelTitle");
       node("h2", body, t("Excel columns")).id = "multilingualExcelTitle";
       dialog.setAttribute("aria-labelledby", "multilingualExcelTitle");
-      node("p", body, file.name).className = "excel-file-name";
+      const filename = node("p", body, file.name);
+      filename.className = "excel-file-name";
+      filename.dir = "auto";
+      filename.setAttribute("data-i18n-skip", "");
       const help = node(
         "p",
         body,
@@ -68,6 +71,7 @@ export function createMultilingualExcelImportDialog(options) {
       target.maxLength = 3;
       target.autocomplete = "off";
       target.spellcheck = false;
+      target.dir = "ltr";
       target.setAttribute("list", "excelImportTargetColumns");
       target.setAttribute("aria-describedby", "excelImportTargetHelp");
       target.value = currentMapping?.targetColumn || "B";
@@ -138,6 +142,10 @@ export function createMultilingualExcelImportDialog(options) {
               : "";
         error.textContent = message;
         target.setAttribute("aria-invalid", message ? "true" : "false");
+        target.setAttribute(
+          "aria-describedby",
+          message ? "excelImportTargetHelp excelImportError" : "excelImportTargetHelp"
+        );
         apply.disabled = Boolean(message);
         return !message;
       }
@@ -156,8 +164,12 @@ export function createMultilingualExcelImportDialog(options) {
           const isHeader = header.checked && row.rowNumber === 1;
           if (isHeader) tr.className = "excel-preview-header";
           node("th", tr, String(row.rowNumber) + (isHeader ? ` · ${t("Header (skipped)")}` : "")).scope = "row";
-          node("td", tr, row.cells?.[source.value] || "");
+          const sourceCell = node("td", tr, row.cells?.[source.value] || "");
           const targetCell = node("td", tr, row.cells?.[targetLetter()] || "");
+          for (const text of [sourceCell, targetCell]) {
+            text.dir = "auto";
+            text.setAttribute("data-i18n-skip", "");
+          }
           if (!existing.checked && !isHeader) targetCell.className = "excel-preview-ignored";
         }
         validate();

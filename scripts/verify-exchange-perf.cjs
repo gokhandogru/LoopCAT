@@ -1,5 +1,5 @@
 /* Compare four configurations in a counterbalanced block on the same dataset.
-   Each dataset/block/condition has its own nonpersistent Chromium partition and editor. */
+   Each dataset/condition has private temporary disk-backed storage and a fresh editor per block. */
 const fs = require("node:fs"),
   fsp = require("node:fs/promises"),
   http = require("node:http"),
@@ -11,20 +11,40 @@ const smoke = process.argv.includes("--smoke") || inactiveProbe;
 const earlyFail = process.argv.includes("--early-fail");
 const largeFirst = process.argv.includes("--large-first");
 const smallOnly = process.argv.includes("--10k-only");
+const profiling = process.argv.includes("--profile");
+if (profiling && smoke) throw new Error("Choose either --profile or a smoke/probe mode.");
 if (!process.versions.electron) {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
+  const temporaryProfile = fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-exchange-perf-"));
+  env.LOOPCAT_EXCHANGE_BENCH_PROFILE = temporaryProfile;
   const cp = require("node:child_process").spawnSync(require("electron"), [__filename, ...process.argv.slice(2)], {
     env,
     cwd: root,
     stdio: "inherit",
-    windowsHide: true
+    windowsHide: true,
+    timeout:
+      Math.min(2 * 60 * 60 * 1000, Math.max(60_000, Number(env.LOOPCAT_EXCHANGE_BENCH_LIMIT_MS) || 60 * 60 * 1000)) +
+      120_000
   });
   if (cp.error) console.error(cp.error.message);
+  // Chromium must release its profile locks before Windows removes the private
+  // directory. Deleting it from Electron's process exit handler can stall exit.
+  if (
+    path.dirname(temporaryProfile) === path.resolve(os.tmpdir()) &&
+    path.basename(temporaryProfile).startsWith("loopcat-exchange-perf-")
+  ) {
+    try {
+      fs.rmSync(temporaryProfile, { recursive: true, force: true, maxRetries: 2 });
+    } catch (error) {
+      console.warn("Could not remove benchmark temporary profile:", temporaryProfile, error.message);
+    }
+  }
   process.exit(cp.status ?? 1);
 }
 const { app, BrowserWindow } = require("electron");
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-exchange-perf-"));
+const profile =
+  process.env.LOOPCAT_EXCHANGE_BENCH_PROFILE || fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-exchange-perf-"));
 app.setPath("userData", profile);
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("in-process-gpu");
@@ -34,23 +54,43 @@ app.on("window-all-closed", () => {});
 const out = path.join(
   root,
   "output",
-  smoke
-    ? inactiveProbe
-      ? "exchange-inactive-probe.json"
-      : "exchange-performance-smoke.json"
-    : smallOnly
-      ? "exchange-performance-mixed-10k.json"
-      : largeFirst
-        ? "exchange-performance-mixed-large-first.json"
-        : "exchange-performance.json"
+  profiling
+    ? "exchange-performance-profile.json"
+    : smoke
+      ? inactiveProbe
+        ? "exchange-inactive-probe.json"
+        : "exchange-performance-smoke.json"
+      : smallOnly
+        ? "exchange-performance-mixed-10k.json"
+        : largeFirst
+          ? "exchange-performance-mixed-large-first.json"
+          : "exchange-performance.json"
 );
-const cases = inactiveProbe ? ["empty", "inactive", "one"] : ["empty", "inactive", "one", "five"];
+const cases = profiling
+  ? ["empty"]
+  : inactiveProbe
+    ? ["empty", "inactive", "one"]
+    : ["empty", "inactive", "one", "five"];
 if (fs.existsSync(out)) {
   const prior = JSON.parse(fs.readFileSync(out, "utf8"));
   if (prior.date) {
     const stamp = new Date(prior.date).toISOString().replace(/[:.]/g, "-");
     const archived = out.replace(/\.json$/, "-" + stamp + ".json");
     if (!fs.existsSync(archived)) fs.copyFileSync(out, archived, fs.constants.COPYFILE_EXCL);
+    if (profiling) {
+      for (const size of [10000, 100000]) {
+        const cpu = out.replace(/\.json$/, `-${size}.cpuprofile`);
+        const saved = archived.replace(/\.json$/, `-${size}.cpuprofile`);
+        if (fs.existsSync(cpu) && !fs.existsSync(saved)) fs.copyFileSync(cpu, saved, fs.constants.COPYFILE_EXCL);
+      }
+    }
+    if (profiling) {
+      for (const size of [10000, 100000]) {
+        const cpu = out.replace(/\.json$/, `-${size}.cpuprofile`);
+        const saved = archived.replace(/\.json$/, `-${size}.cpuprofile`);
+        if (fs.existsSync(cpu) && !fs.existsSync(saved)) fs.copyFileSync(cpu, saved, fs.constants.COPYFILE_EXCL);
+      }
+    }
   }
 }
 const median = (values) => {
@@ -58,7 +98,7 @@ const median = (values) => {
   return a.length % 2 ? a[a.length >> 1] : (a[(a.length >> 1) - 1] + a[a.length >> 1]) / 2;
 };
 const report = {
-  mode: smoke ? "smoke" : "matched",
+  mode: profiling ? "profile-diagnostic" : smoke ? "smoke" : "matched",
   date: new Date().toISOString(),
   device: {
     os: process.platform,
@@ -73,6 +113,12 @@ const report = {
   blocks: [],
   comparisons: []
 };
+report.instrumentedCpuProfile = profiling;
+report.driverSha256 = require("node:crypto").createHash("sha256").update(fs.readFileSync(__filename)).digest("hex");
+report.fixtureSha256 = require("node:crypto")
+  .createHash("sha256")
+  .update(fs.readFileSync(path.join(root, "tests/reliability/exchange-performance-driver.js")))
+  .digest("hex");
 const wallBudget = Math.min(
   2 * 60 * 60 * 1000,
   Math.max(60_000, Number(process.env.LOOPCAT_EXCHANGE_BENCH_LIMIT_MS) || 60 * 60 * 1000)
@@ -178,7 +224,7 @@ async function main() {
   });
   for (const segments of smoke || smallOnly ? [10000] : largeFirst ? [100000, 10000] : [10000, 100000]) {
     const retainedSessions = new Set();
-    for (let pair = 0; pair < (smoke ? 1 : 5); pair++) {
+    for (let pair = 0; pair < (smoke || profiling ? 1 : 5); pair++) {
       const order = Array.from({ length: cases.length }, (_, i) => cases[(i + pair) % cases.length]);
       const rows = [];
       for (const mode of order) {
@@ -231,6 +277,11 @@ async function main() {
         win.webContents.setFrameRate(60);
         win.webContents.startPainting();
         await win.loadURL(`http://127.0.0.1:${server.address().port}/__bench.html`);
+        if (profiling) {
+          win.webContents.debugger.attach("1.3");
+          await win.webContents.debugger.sendCommand("Profiler.enable");
+          await win.webContents.debugger.sendCommand("Profiler.start");
+        }
         const config = {
           segments,
           order: [mode],
@@ -251,6 +302,11 @@ async function main() {
             );
           })
         ]).finally(() => clearTimeout(timer));
+        if (profiling) {
+          const { profile: cpuProfile } = await win.webContents.debugger.sendCommand("Profiler.stop");
+          fs.writeFileSync(out.replace(/\.json$/, `-${segments}.cpuprofile`), JSON.stringify(cpuProfile));
+          win.webContents.debugger.detach();
+        }
         for (const row of modeRows) {
           row.transport = { ...transport };
           if (row.active > 0 && !(row.exchangeDbOpens > 0))
@@ -313,12 +369,12 @@ async function main() {
     }
   }
   report.complete = true;
-  report.passed = report.comparisons.every((x) => x.passed);
+  report.passed = !profiling && report.comparisons.every((x) => x.passed);
   record();
   console.log(
-    `${smoke ? "Smoke observation (not certification)" : "Paired gate: " + (report.passed ? "PASS" : "FAIL")} — ${out}`
+    `${profiling ? "CPU profile diagnostic (not certification)" : smoke ? "Smoke observation (not certification)" : "Paired gate: " + (report.passed ? "PASS" : "FAIL")} — ${out}`
   );
-  if (!smoke && !report.passed)
+  if (!smoke && !profiling && !report.passed)
     throw Error("Exchange performance gate exceeded; see measured ratios and limits in report.");
 }
 app
@@ -338,11 +394,3 @@ function finish(code) {
   server?.close();
   app.exit(code);
 }
-// The sole recursive target is a process-created, validated private temporary profile.
-process.on("exit", () => {
-  if (
-    path.dirname(profile) === path.resolve(os.tmpdir()) &&
-    path.basename(profile).startsWith("loopcat-exchange-perf-")
-  )
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 2 });
-});

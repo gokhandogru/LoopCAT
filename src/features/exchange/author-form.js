@@ -5,7 +5,9 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
   const { exchangeAuthorSelection = [], ...pack } = structuredClone(initial);
   const maxRows = pack.kind === "qa" ? 100 : 500;
   if (pack.entries.length > maxRows) throw Error("This collection exceeds the no-code editor limit. Use the pack CLI.");
+  const details = el("section", null, "exchange-panel");
   const fields = el("div", null, "exchange-grid");
+  details.append(el("h4", "Pack details"), fields);
   const meta = {};
   for (const [key, label, value] of [
     ["id", "Pack ID", pack.id],
@@ -22,15 +24,29 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
     pack.kind === "terminology"
       ? field(fields, "Allow copying individual terms", pack.allowTermCopy === true, "checkbox")
       : null;
-  const entries = el("div"),
-    controls = el("div", null, "exchange-actions");
-  root.append(fields, entries, controls);
+  const workspace = el("section");
+  const entries = el("div", null, "exchange-author-entries");
+  const entryControls = el("div", null, "exchange-actions");
+  const controls = el("section", null, "exchange-panel");
+  const footer = el("div", null, "exchange-actions");
+  controls.append(el("h4", "Save and share"), footer);
+  workspace.append(el("h4", pack.kind === "qa" ? "QA rules" : "Terminology entries"), entryControls, entries);
+  root.append(details, workspace, controls);
   const rows = [];
+  const addEntry = action("Add entry", () => row().focus());
+  let nextRule = 1;
+  function ruleId() {
+    const used = new Set(rows.map((r) => r.values.id?.value));
+    while (used.has("rule-" + nextRule)) nextRule++;
+    return "rule-" + nextRule++;
+  }
   function row(item = {}, selected = true) {
     if (rows.length >= maxRows) throw Error("This collection exceeds the no-code editor limit. Use the pack CLI.");
     const group = el("fieldset"),
       include = field(group, "Include in shared pack", selected, "checkbox");
     group.prepend(el("legend", pack.kind === "qa" ? "QA rule" : "Terminology entry"));
+    const data = el("div", null, "exchange-grid");
+    group.append(data);
     const values = {};
     if (pack.kind === "terminology") {
       for (const [key, label] of [
@@ -40,42 +56,62 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
         ["domain", "Domain"],
         ["attribution", "Source attribution"]
       ])
-        values[key] = field(group, label, item[key] || "");
-      values.status = field(group, "Term status", item.status || "preferred", ["preferred", "admitted", "forbidden"]);
+        values[key] = field(data, label, item[key] || "");
+      values.status = field(data, "Term status", item.status || "preferred", ["preferred", "admitted", "forbidden"]);
     } else {
-      values.id = field(group, "Rule ID", item.id || "rule-" + (rows.length + 1));
-      values.op = field(group, "Rule type", item.op || "target-missing-if-source", [
+      values.id = field(data, "Rule ID", item.id || ruleId());
+      values.op = field(data, "Rule type", item.op || "target-missing-if-source", [
         "target-missing-if-source",
         "target-contains"
       ]);
-      values.source = field(group, "Source trigger", item.source || "");
-      values.targets = field(group, "Target forms (one per line)", (item.targets || []).join("\n"), "textarea");
-      values.message = field(group, "Explanation", item.message || "");
-      values.severity = field(group, "Severity", item.severity || "warning", ["warning"]);
+      values.source = field(data, "Source trigger", item.source || "");
+      const showTrigger = () => {
+        values.source.parentElement.hidden = values.op.value === "target-contains";
+      };
+      values.op.onchange = showTrigger;
+      showTrigger();
+      values.targets = field(data, "Target forms (one per line)", (item.targets || []).join("\n"), "textarea");
+      values.message = field(data, "Explanation", item.message || "", "textarea");
+      values.severity = field(data, "Severity", item.severity || "warning", ["warning"]);
       for (const outcome of ["fail", "pass"]) {
         const ex = item.examples?.find((e) => e.expect === outcome);
+        const example = el("section", null, "exchange-rule-example");
+        const pair = el("div", null, "exchange-grid");
+        example.append(el("h5", outcome === "fail" ? "Triggers the check" : "Passes the check"), pair);
+        group.append(example);
         values[outcome + "Source"] = field(
-          group,
+          pair,
           outcome === "fail" ? "Example that should flag: source" : "Counterexample that should pass: source",
           ex?.source || ""
         );
         values[outcome + "Target"] = field(
-          group,
+          pair,
           outcome === "fail" ? "Example that should flag: target" : "Counterexample that should pass: target",
           ex?.target || ""
         );
       }
     }
     entries.append(group);
-    const caseSensitive = field(group, "Case-sensitive matching", item.caseSensitive === true, "checkbox");
+    const rowActions = el("div", null, "exchange-actions");
+    group.append(rowActions);
+    const caseSensitive = field(rowActions, "Case-sensitive matching", item.caseSensitive === true, "checkbox");
     const firstFail = item.examples?.find((e) => e.expect === "fail"),
       firstPass = item.examples?.find((e) => e.expect === "pass");
-    rows.push({
+    const record = {
       include,
       values,
       caseSensitive,
       extraExamples: (item.examples || []).filter((e) => e !== firstFail && e !== firstPass)
-    });
+    };
+    rowActions.append(
+      action("Remove entry", () => {
+        rows.splice(rows.indexOf(record), 1);
+        group.remove();
+        addEntry.focus();
+      })
+    );
+    rows.push(record);
+    return values.sourceTerm || values.id;
   }
   function read(privateDraft = false) {
     const f = Object.fromEntries(Object.entries(meta).map(([k, v]) => [k, v.value.trim()]));
@@ -122,11 +158,11 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
     }
     return result;
   }
+  entryControls.append(addEntry);
   for (const [i, item] of pack.entries.entries()) row(item, exchangeAuthorSelection[i] !== false);
   if (!pack.entries.length) row();
-  controls.append(action("Add entry", () => row()));
   if (pack.kind === "terminology") {
-    const file = field(controls, "Import CSV or TSV", "", "file");
+    const file = field(entryControls, "Import CSV or TSV", "", "file");
     file.accept = ".csv,.tsv,.txt";
     file.onchange = async () => {
       try {
@@ -163,8 +199,9 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
       }
     };
   }
-  controls.append(
-    el("p", "Private drafts include excluded entries. Share an exported pack with translators."),
+  controls.append(el("p", "Private drafts include excluded entries. Share an exported pack with translators."));
+  footer.append(
+    action("Validate and preview", () => onPreview(read(), read(true)), "primary"),
     action("Export private author draft", () => {
       const draft = read(true);
       ctx.save("loopcat-private-author-draft.loopcat-draft.json", encodeAuthorDraft(draft));
@@ -173,7 +210,6 @@ export function createAuthorForm(ctx, root, initial, onPreview) {
       const draft = read(true);
       await repo.saveDraft(draft.id, draft);
       note("Draft saved on this device. Export a file for a separate copy.");
-    }),
-    action("Validate and preview", () => onPreview(read()))
+    })
   );
 }

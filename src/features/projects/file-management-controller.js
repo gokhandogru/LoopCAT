@@ -1,3 +1,5 @@
+import { isXliffFilename, xliffSegmentationSelect } from "../import-export/xliff-segmentation-options.js";
+
 /** Shared file actions; every closure captures the intended project and file. @param {any} options */
 export function createFileManagementController(options) {
   const { document: doc, session, service, translate: t } = options;
@@ -21,13 +23,29 @@ export function createFileManagementController(options) {
   title.id = "fileManagementTitle";
   dialog.setAttribute("aria-labelledby", title.id);
   const status = node("p", "", dialog);
+  status.className = "file-management-status";
   status.setAttribute("role", "status");
   const content = node("section", "", dialog),
     footer = node("footer", "", dialog);
+  content.className = "file-management-content";
   footer.className = "statistics-controls";
+  function literal(tag, value, parent) {
+    const element = doc.createElement(tag);
+    element.dir = "auto";
+    element.setAttribute("data-i18n-skip", "");
+    element.textContent = value;
+    parent.append(element);
+    return element;
+  }
+  function comparisonValue(list, label, text, lang = "") {
+    const group = node("div", "", list);
+    node("dt", label, group);
+    const value = literal("dd", text || "—", group);
+    if (lang) value.lang = lang;
+  }
   const fail = (error) => {
     if (!dialog.open) show("File action could not be completed");
-    status.textContent = error.message || String(error);
+    status.textContent = t(error.message || String(error));
   };
   const button = (label, parent, action) => {
     const b = node("button", label, parent);
@@ -53,7 +71,8 @@ export function createFileManagementController(options) {
     abort?.abort();
     service.cancel();
   });
-  function show(label) {
+  function show(label, layout = "form") {
+    dialog.dataset.layout = layout;
     title.textContent = t(label);
     content.replaceChildren();
     footer.replaceChildren();
@@ -96,19 +115,36 @@ export function createFileManagementController(options) {
     button("Save name", footer, async () => {
       await mutation(projectId, () => service.rename(projectId, file.id, input.value));
       dialog.close();
-    });
+    }).classList.add("primary");
   }
   function review(projectId, file, preview) {
-    show("Review source update");
-    node(
-      "p",
-      `${file.name} · ${preview.rows.length} segments · ${preview.rows.filter((r) => r.safeReuse).length} carried · ${preview.rows.filter((r) => r.disposition === "changed").length} changed · ${preview.rows.filter((r) => r.disposition === "added").length} added · ${preview.rows.filter((r) => r.disposition === "ambiguous").length} ambiguous · ${preview.removed.length} unmatched old segments`,
-      content
-    );
+    show("Review source update", "comparison");
+    literal("p", file.name, content).className = "file-context-name";
+    const counts = node("dl", "", content);
+    counts.className = "file-comparison-counts";
+    for (const [label, count] of [
+      ["Segments", preview.rows.length],
+      ["Carried over", preview.rows.filter((row) => row.safeReuse).length],
+      ["Changed", preview.rows.filter((row) => row.disposition === "changed").length],
+      ["Added", preview.rows.filter((row) => row.disposition === "added").length],
+      ["Ambiguous", preview.rows.filter((row) => row.disposition === "ambiguous").length],
+      ["Unmatched previous segments", preview.removed.length]
+    ]) {
+      const metric = node("div", "", counts);
+      node("dt", String(label), metric);
+      literal("dd", count.toLocaleString(doc.documentElement.lang || undefined), metric);
+    }
     node("p", "Changed source translations remain suggestions. Applying creates a recoverable new version.", content);
     const choices = {},
       area = node("div", "", content),
       nav = node("div", "", content);
+    const changeLabels = {
+      unchanged: "Unchanged",
+      protected: "Protected content changed",
+      ambiguous: "Ambiguous",
+      added: "Added",
+      changed: "Changed"
+    };
     let page = 0;
     const draw = () => {
       area.replaceChildren();
@@ -116,12 +152,20 @@ export function createFileManagementController(options) {
       for (const row of preview.rows.slice(page * 50, page * 50 + 50)) {
         const item = node("article", "", area);
         item.className = "file-update-row";
-        node("h3", `${row.index + 1} · ${row.disposition}`, item);
-        if (row.previousSource) node("p", `${t("Previous source")}: ${row.previousSource}`, item);
-        node("p", `${t("New source")}: ${row.source}`, item);
-        if (row.previousTarget) node("p", `${t("Previous translation")}: ${row.previousTarget}`, item);
+        const rowTitle = node("h3", "", item);
+        rowTitle.textContent = `${t("Segment")} ${(row.index + 1).toLocaleString(doc.documentElement.lang || undefined)}`;
+        const badge = node("span", changeLabels[row.disposition] || row.disposition, rowTitle);
+        badge.className = "file-comparison-state";
+        badge.dataset.state = row.disposition;
+        const values = node("dl", "", item);
+        values.className = "file-comparison-values";
+        const project = session.getProject();
+        if (row.previousSource) comparisonValue(values, "Previous source", row.previousSource, project?.sourceLang);
+        comparisonValue(values, "New source", row.source, project?.sourceLang);
+        if (row.previousTarget)
+          comparisonValue(values, "Previous translation", row.previousTarget, project?.targetLang);
         if (row.conflict) {
-          node("p", `${t("Incoming translation")}: ${row.incomingTarget}`, item);
+          comparisonValue(values, "Incoming translation", row.incomingTarget, project?.targetLang);
           const label = node("label", "Translation choice", item),
             select = node("select", "", label);
           for (const [value, text] of [
@@ -165,7 +209,7 @@ export function createFileManagementController(options) {
     if (preview.removed.length) {
       const removed = node("details", "", content);
       node("summary", "Previous segments not safely carried", removed);
-      for (const row of preview.removed.slice(0, 50)) node("p", row.source, removed);
+      for (const row of preview.removed.slice(0, 50)) literal("p", row.source, removed);
       node("p", "All prior segments remain available in Version history.", removed);
     }
     const requestId = crypto.randomUUID();
@@ -181,8 +225,51 @@ export function createFileManagementController(options) {
       }
     });
     apply.disabled = preview.noChanges && !preview.restoredFromVersionId;
+    apply.classList.add("primary");
     if (apply.disabled)
       status.textContent = t("No update needed: source, extraction settings and translations are unchanged.");
+  }
+  async function resegment(projectId, file) {
+    show("Split XLIFF lines");
+    const subject = literal("p", file.name, content);
+    subject.className = "file-context-name";
+    status.textContent = t("Checking segment boundaries…");
+    abort = new AbortController();
+    let preview;
+    try {
+      preview = await service.previewResegmentation(projectId, file.id, abort.signal);
+    } catch (error) {
+      if (error.name === "AbortError" || !dialog.open || !content.contains(subject)) return;
+      throw error;
+    }
+    if (!dialog.open || !content.contains(subject)) return;
+    assertProject(projectId);
+    if (!preview) {
+      status.textContent = t("This file already uses the available segment boundaries.");
+      return;
+    }
+    status.textContent = "";
+    const counts = node("dl", "", content);
+    counts.className = "file-comparison-counts";
+    comparisonValue(counts, "Current segments", String(preview.before.segments.length));
+    comparisonValue(counts, "After splitting", String(preview.incoming.length));
+    node(
+      "p",
+      "Current translations are carried over. The previous rows and their history are saved in Version history.",
+      content
+    );
+    const requestId = crypto.randomUUID();
+    const apply = button("Apply segmentation", footer, async () => {
+      apply.disabled = true;
+      try {
+        await mutation(projectId, () => service.commit(preview.id, {}, requestId));
+        dialog.close();
+        await options.openDocument(file.id);
+      } finally {
+        apply.disabled = false;
+      }
+    });
+    apply.classList.add("primary");
   }
   function update(projectId, file) {
     show("Update source file");
@@ -198,6 +285,14 @@ export function createFileManagementController(options) {
       option.value = value;
     }
     encoding.value = file.importOptions?.encoding || "auto";
+    const segmentation = isXliffFilename(file.name)
+      ? xliffSegmentationSelect(
+          node,
+          node("label", "XLIFF segmentation", content),
+          t,
+          file.importOptions?.splitBilingualBlocks === true
+        )
+      : null;
     const label = node("label", "Replacement file", content),
       input = node("input", "", label);
     input.type = "file";
@@ -216,6 +311,7 @@ export function createFileManagementController(options) {
             status.textContent = t("Parsing and comparing source…");
             const preview = await service.preview(projectId, file.id, input.files[0], {
               encoding: encoding.value,
+              ...(segmentation ? { splitBilingualBlocks: segmentation.value === "split" } : {}),
               signal: abort.signal
             });
             assertProject(projectId);
@@ -232,7 +328,7 @@ export function createFileManagementController(options) {
     button("Cancel comparison", footer, () => abort?.abort());
   }
   async function history(projectId, file) {
-    show("Version history");
+    show("Version history", "history");
     node("p", `${file.name} · ${t("Current version")}: ${file.sourceRevision || 1}`, content);
     const versions = await service.versions(projectId, file.id);
     if (!versions.length) node("p", "No previous source versions yet.", content);
@@ -247,7 +343,10 @@ export function createFileManagementController(options) {
       node("p", `${version.createdAt} · ${version.segmentCount} segments`, item);
       button("Inspect version", item, async () => {
         const rows = await service.versionSegments(version.id);
-        show("Historical source version");
+        show("Historical source version", "comparison");
+        literal("p", version.documentInfo.originalFilename || version.documentInfo.name, content).className =
+          "file-context-name";
+        node("p", `${t("Version")} ${version.version}`, content);
         let page = 0;
         const area = node("div", "", content),
           nav = node("div", "", content);
@@ -257,10 +356,13 @@ export function createFileManagementController(options) {
           for (const row of rows.slice(page * 50, page * 50 + 50)) {
             const entry = node("article", "", area);
             entry.className = "file-update-row";
-            node("p", row.source, entry);
-            node("p", row.target || "", entry);
-            node("p", row.status || "", entry);
-            for (const comment of row.comments || []) node("p", comment.text || comment, entry);
+            const values = node("dl", "", entry);
+            values.className = "file-comparison-values";
+            const project = session.getProject();
+            comparisonValue(values, "Source", row.source, project?.sourceLang);
+            comparisonValue(values, "Target", row.target, project?.targetLang);
+            if (row.status) comparisonValue(values, "Status", t(row.status));
+            for (const comment of row.comments || []) comparisonValue(values, "Comments", comment.text || comment);
           }
           if (page)
             button("Previous", nav, () => {
@@ -290,7 +392,7 @@ export function createFileManagementController(options) {
       `${files.length} ${t("files selected. Their translations and previous versions can be restored from Project Trash.")}`,
       content
     );
-    for (const file of files) node("p", file.name, content);
+    for (const file of files) literal("p", file.name, content);
     button("Move to Trash", footer, async () => {
       await mutation(projectId, () =>
         options.moveTrash(
@@ -300,7 +402,7 @@ export function createFileManagementController(options) {
       );
       selection.clear();
       dialog.close();
-    });
+    }).classList.add("danger-small");
   }
   async function projectTrash() {
     const projectId = session.getProject()?.id;
@@ -336,7 +438,8 @@ export function createFileManagementController(options) {
     assertProject(projectId);
     file = session.getProject().documents.find((document) => document.id === file.id);
     if (!file) throw Error(t("This file is no longer in the project."));
-    if (["rename", "update", "trash"].includes(action)) globalThis.window?.CatHan?.ownership?.assertWritable(projectId);
+    if (["rename", "update", "resegment", "trash"].includes(action))
+      globalThis.window?.CatHan?.ownership?.assertWritable(projectId);
     await options.flush();
     switch (action) {
       case "open":
@@ -349,6 +452,8 @@ export function createFileManagementController(options) {
         return rename(projectId, file);
       case "update":
         return update(projectId, file);
+      case "resegment":
+        return resegment(projectId, file);
       case "history":
         return history(projectId, file);
       case "trash":
@@ -389,6 +494,9 @@ export function createFileManagementController(options) {
       ["export", "Export translation…"],
       ["rename", "Rename…"],
       ["update", "Update source file…"],
+      ...(isXliffFilename(file.name) && file.importOptions?.splitBilingualBlocks !== true
+        ? [["resegment", "Split XLIFF lines…"]]
+        : []),
       ["history", "Version history…"],
       ["trash", "Move to Trash…"]
     ]) {
@@ -400,7 +508,7 @@ export function createFileManagementController(options) {
       b.dataset.fileAction = action;
       if (action === "trash") b.classList.add("menu-danger");
       if (
-        ["rename", "update", "trash"].includes(action) &&
+        ["rename", "update", "resegment", "trash"].includes(action) &&
         globalThis.window?.CatHan?.ownership?.isReadOnly(projectId)
       ) {
         b.disabled = true;
@@ -482,5 +590,12 @@ export function createFileManagementController(options) {
     node("p", row.status || "", content);
     node("p", "This segment belongs to a previous source version and is read-only.", content);
   }
-  return { mountMenu, dispatch, projectTrash, refresh, inspectHistoricalSegment };
+  return {
+    mountMenu,
+    dispatch,
+    projectTrash,
+    refresh,
+    inspectHistoricalSegment,
+    selectedFileIds: () => [...selection]
+  };
 }

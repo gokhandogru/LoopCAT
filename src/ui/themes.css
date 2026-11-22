@@ -3,27 +3,31 @@
   color-scheme: light;
 }
 
-:root[data-theme="dark"] {
+/* The help guides load this sheet only when the system requests dark mode. */
+:root[data-theme="dark"],
+:root.system-theme {
   color-scheme: dark;
-  --color-canvas: #111820;
-  --color-surface: #18222d;
-  --color-surface-subtle: #202d39;
-  --color-surface-raised: #253442;
-  --color-input: #121c26;
-  --color-hover: #2b3c4b;
-  --color-text: #e8edf2;
-  --color-text-muted: #acbac7;
-  --color-line: #3a4b5c;
-  --color-line-strong: #8293a3;
-  --color-control-line: #718596;
-  --color-accent: #5cd3bf;
-  --color-accent-hover: #91ebdb;
-  --color-accent-soft: #193e39;
+  --color-canvas: #15211e;
+  --color-surface: #1c2c27;
+  --color-surface-subtle: #23362f;
+  --color-surface-raised: #293c34;
+  --color-rail: #0b221e;
+  --color-selected-surface: #253d34;
+  --color-input: #182620;
+  --color-hover: #2d4036;
+  --color-text: #edf4eb;
+  --color-text-muted: #b5c6bb;
+  --color-line: #3c5046;
+  --color-line-strong: #83998a;
+  --color-control-line: #879c8d;
+  --color-accent: #94e5c9;
+  --color-accent-hover: #b0f0d8;
+  --color-accent-soft: #29483c;
   --color-success: #a0e2ba;
   --color-success-soft: #15392c;
-  --color-warning: #ffd28a;
-  --color-warning-soft: #49351a;
-  --color-danger: #ffabb3;
+  --color-warning: #f6c674;
+  --color-warning-soft: #46391f;
+  --color-danger: #ffadb2;
   --color-diff-removed: #ffb8b8;
   --color-diff-removed-bg: #4a252d;
   --color-diff-added: #a0e2ba;
@@ -38,24 +42,29 @@
   --color-violet-soft: #322749;
   --color-highlight: #eec96d;
   --color-on-highlight: #211908;
-  --color-focus: #91f4df;
-  --color-on-accent: #0b2925;
-  --color-disabled: #98a7b5;
-  --color-overlay: rgba(3, 8, 14, 0.72);
+  --color-focus: #9ff2d4;
+  --color-on-accent: #10392d;
+  --color-disabled: #a4b2aa;
+  --color-overlay: rgba(5, 16, 12, 0.72);
   --elevation-transient: 0 16px 40px rgba(0, 0, 0, 0.42);
   --focus-ring: 0 0 0 1px var(--color-canvas);
 }
 
 @media (prefers-contrast: more) {
-  :root[data-theme="dark"] {
-    --color-text-muted: #d2dce5;
-    --color-line: #8293a3;
-    --color-control-line: #acbac7;
+  :root:not([data-theme="dark"], .system-theme) {
+    --color-text-muted: #364c40;
+    --color-line: #71877a;
+    --color-control-line: #476353;
+  }
+  :root[data-theme="dark"],
+  :root.system-theme {
+    --color-text-muted: #d4e1d8;
+    --color-line: #879b8e;
+    --color-control-line: #b3c5b9;
   }
 }
 
-/* The legacy editor and glass skin contain fixed light surfaces. Keep their
-   light appearance intact while giving every dark surface a matching foreground. */
+/* Pair surfaces with their foregrounds, including nested editor controls. */
 :root[data-theme="dark"] .liquid-glass-edition * {
   scrollbar-color: var(--color-line-strong) var(--color-canvas);
 }

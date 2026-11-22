@@ -99,3 +99,47 @@ export function createQualityPresentationService(options) {
 
   return Object.freeze({ aiReviewRisk, category, decisionSeverity, profile, riskLevel });
 }
+// Only interpret labels emitted by the scoring engine. Older or custom evidence stays verbatim.
+export function qualityReasonText(reason, source, locale) {
+  const text = reason?.label || "";
+  if (/^qa-(empty|tag|copy|number|punctuation|forbidden-term|term)$/.test(reason?.type)) {
+    return source(text, reason.messageValues || {});
+  }
+  if (!reason?.type || /^en(?:-|$)/i.test(locale)) return text;
+  const aliases = {
+    untranslated: ["Target is still empty.", "Target is empty."],
+    unconfirmed: ["Target is not confirmed.", "Draft"],
+    "needs-review": ["Marked needs review.", "Needs review"],
+    blocked: ["Marked blocked.", "Blocked"]
+  };
+  if (Object.hasOwn(aliases, reason.type) && aliases[reason.type][0] === text) return source(aliases[reason.type][1]);
+  const counts = {
+    comments: [/^(\d+) review notes?\.$/, "Review notes"],
+    "ai-suggestions": [/^(\d+) unapplied AI suggestions?\.$/, "AI suggestions"],
+    "revision-density": [/^(\d+) target revisions\.$/, "Target revisions"],
+    "low-tm-leverage": [/^Best TM match is (\d+%)\.$/, "Best TM match"]
+  };
+  if (Object.hasOwn(counts, reason.type)) {
+    const [pattern, caption] = counts[reason.type];
+    const match = text.match(pattern);
+    if (match) return `${source(caption)}: ${match[1]}`;
+  }
+  if (reason.type === "ai-risk") {
+    const match = /^(Low|Medium|High|Critical) AI review risk\.$/.exec(text);
+    if (match) return `${source("AI review risk")}: ${source(match[1])}`;
+  }
+  if (reason.type === "quality-decision") {
+    const match =
+      /^(Accuracy|Terminology|Fluency|Style|Locale|Formatting|Compliance|Review) (?:(Low|Medium|High|Critical) )?decision recorded\.$/.exec(
+        text
+      );
+    if (match)
+      return [source("Quality decision saved"), source(match[1]), match[2] && source(match[2])]
+        .filter(Boolean)
+        .join(" · ");
+  }
+  if (["ai-draft", "full-review", "lqa-review", "regulated-profile", "strict-profile"].includes(reason.type)) {
+    return source(text);
+  }
+  return text;
+}

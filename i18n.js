@@ -47,8 +47,11 @@
   const nodeSources = new WeakMap();
   const attrSources = new WeakMap();
   let currentLocale = DEFAULT_LOCALE;
+  let catalogGeneration = 0;
   let observer = null;
   let observerQueued = false;
+  const pendingRoots = new Set();
+  const pendingAttributes = new Set();
 
   function storage() {
     try {
@@ -106,6 +109,7 @@
   }
 
   function registerSource(catalog = {}) {
+    catalogGeneration++;
     templateCache.clear();
     orderedTemplates = null;
     const messages = catalog.messages || catalog;
@@ -118,6 +122,7 @@
   }
 
   function registerLocale(catalog = {}) {
+    catalogGeneration++;
     const locale = normalizeLocale(catalog.locale || catalog.lang || catalog.id);
     const messages = normalizeLocaleMessages(catalog.messages || {});
     const meta = {
@@ -313,20 +318,26 @@
   function localizeTextNode(node) {
     if (!node?.nodeValue || shouldSkipNode(node)) return;
     const previous = nodeSources.get(node);
+    if (
+      previous?.locale === currentLocale &&
+      previous.generation === catalogGeneration &&
+      node.nodeValue === previous.translated
+    )
+      return;
     const original = previous && node.nodeValue === previous.translated ? previous.source : node.nodeValue;
     const trimmed = original.replace(/\s+/g, " ").trim();
     if (!trimmed || (!sourceTextKeys.has(trimmed) && !sourceTemplateMatch(trimmed))) return;
     const leading = original.match(/^\s*/)?.[0] || "";
     const trailing = original.match(/\s*$/)?.[0] || "";
     const next = `${leading}${source(trimmed)}${trailing}`;
-    nodeSources.set(node, { source: original, translated: next });
+    nodeSources.set(node, { source: original, translated: next, locale: currentLocale, generation: catalogGeneration });
     if (node.nodeValue !== next) node.nodeValue = next;
   }
 
-  function localizeAttributes(root) {
+  function localizeAttributes(root, descendants = true) {
     const elements =
       root.nodeType === Node.ELEMENT_NODE
-        ? [root, ...root.querySelectorAll("*")]
+        ? [root, ...(descendants ? root.querySelectorAll("*") : [])]
         : Array.from(root.querySelectorAll?.("*") || []);
     elements.forEach((element) => {
       const editableUiElement = ["INPUT", "TEXTAREA", "SELECT", "OPTION"].includes(element.tagName);
@@ -340,17 +351,27 @@
         }
         const current = element.getAttribute(attr) || "";
         const previous = sources[attr];
+        if (
+          previous?.locale === currentLocale &&
+          previous.generation === catalogGeneration &&
+          current === previous.translated
+        )
+          return;
         const original = previous && current === previous.translated ? previous.source : current;
         if (!sourceTextKeys.has(original) && !sourceTemplateMatch(original)) return;
         const next = source(original);
-        sources[attr] = { source: original, translated: next };
+        sources[attr] = { source: original, translated: next, locale: currentLocale, generation: catalogGeneration };
         if (element.getAttribute(attr) !== next) element.setAttribute(attr, next);
       });
     });
   }
 
-  function localizeManualKeys(root = document) {
-    root.querySelectorAll?.("[data-i18n]").forEach((element) => {
+  function localizeManualKeys(root = document, descendants = true) {
+    const includingRoot = (selector) => [
+      ...(root.matches?.(selector) ? [root] : []),
+      ...(descendants ? root.querySelectorAll?.(selector) || [] : [])
+    ];
+    includingRoot("[data-i18n]").forEach((element) => {
       if (shouldSkipNode(element)) return;
       const next = t(element.dataset.i18n);
       if (element.textContent !== next) element.textContent = next;
@@ -360,19 +381,21 @@
         .split("-")
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join("")}`;
-      root
-        .querySelectorAll?.(`[data-${dataAttr.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}]`)
-        .forEach((element) => {
-          const key = element.dataset[dataAttr];
-          if (key) {
-            const next = t(key);
-            if (element.getAttribute(attr) !== next) element.setAttribute(attr, next);
-          }
-        });
+      includingRoot(`[data-${dataAttr.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}]`).forEach((element) => {
+        const key = element.dataset[dataAttr];
+        if (key) {
+          const next = t(key);
+          if (element.getAttribute(attr) !== next) element.setAttribute(attr, next);
+        }
+      });
     });
   }
 
   function localizeStaticDom(root = document.body || document) {
+    if (root.nodeType === Node.TEXT_NODE) {
+      localizeTextNode(root);
+      return;
+    }
     localizeManualKeys(root);
     localizeAttributes(root);
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -386,26 +409,53 @@
     nodes.forEach(localizeTextNode);
   }
 
-  function queueLocalize(root = document.body) {
+  function queueLocalize() {
     if (observerQueued) return;
     observerQueued = true;
     requestAnimationFrame(() => {
       observerQueued = false;
-      localizeStaticDom(root);
+      const roots = new Set(pendingRoots);
+      const attributes = Array.from(pendingAttributes);
+      pendingRoots.clear();
+      pendingAttributes.clear();
+      const coveredByRoot = (node, includeSelf = false) => {
+        for (let parent = includeSelf ? node : node.parentNode; parent; parent = parent.parentNode) {
+          if (roots.has(parent)) return true;
+        }
+        return false;
+      };
+      for (const node of roots) {
+        if (node.isConnected !== false && !coveredByRoot(node)) localizeStaticDom(node);
+      }
+      for (const node of attributes) {
+        if (node.isConnected !== false && !coveredByRoot(node, true)) {
+          localizeManualKeys(node, false);
+          localizeAttributes(node, false);
+        }
+      }
     });
   }
 
   function observe(root = document.body) {
     if (!root || observer || typeof MutationObserver === "undefined") return;
     observer = new MutationObserver((mutations) => {
-      if (
-        mutations.some(
-          (mutation) =>
-            mutation.type === "childList" || mutation.type === "characterData" || mutation.type === "attributes"
-        )
-      ) {
-        queueLocalize(root);
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes") {
+          pendingAttributes.add(mutation.target);
+        } else if (!shouldSkipNode(mutation.target)) {
+          const element =
+            mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
+          const keyed = element?.closest?.("[data-i18n]");
+          if (keyed) pendingRoots.add(keyed);
+          else if (mutation.type === "characterData") pendingRoots.add(mutation.target);
+          else if (mutation.type === "childList") {
+            // Revisit only inserted content. Deletions cannot introduce UI text;
+            // typing in a protected editing surface never scans the app shell.
+            for (const node of mutation.addedNodes) pendingRoots.add(node);
+          }
+        }
       }
+      if (pendingRoots.size || pendingAttributes.size) queueLocalize();
     });
     observer.observe(root, {
       childList: true,

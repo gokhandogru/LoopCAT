@@ -50,8 +50,9 @@ function defaultQualityProfile(profile = {}) {
   };
 }
 
-function wordCount(text) {
-  return String(text || "").trim().split(/\s+/).filter(Boolean).length;
+function wordCount(segment, locale) {
+  return globalThis.LoopCATLinguistics?.metricsForSegment(segment, locale || "en").words ??
+    String(segment.source || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
 function countBy(items, keyFn) {
@@ -151,14 +152,15 @@ function topCategoryForReasons(reasons = []) {
   return entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
 }
 
-function addReason(reasons, score, type, label, detail = "", category = "review") {
+function addReason(reasons, score, type, label, detail = "", category = "review", messageValues) {
   if (!score) return 0;
   reasons.push({
     type,
     score,
     category: qualityCategory(category),
     label,
-    detail
+    detail,
+    ...(messageValues && Object.keys(messageValues).length ? { messageValues } : {})
   });
   return score;
 }
@@ -176,14 +178,16 @@ function scoreSegment(segment = {}, index = 0, context = {}) {
       `qa-${check.type || "issue"}`,
       check.message || `QA ${check.type || "issue"}`,
       check.fixHint || "",
-      qaCategory(check)
+      qaCategory(check),
+      check.messageValues
     );
   });
 
-  if (!String(segment.target || "").trim()) {
+  const preservedLayout = globalThis.LoopCATLinguistics?.isPreservedXliffLayout?.(segment);
+  if (!preservedLayout && !String(segment.target || "").trim()) {
     score += addReason(reasons, 32, "untranslated", "Target is still empty.", "", "accuracy");
   }
-  if (segment.status !== "confirmed" && String(segment.target || "").trim()) {
+  if (!preservedLayout && segment.status !== "confirmed" && String(segment.target || "").trim()) {
     score += addReason(reasons, profile.riskTolerance === "balanced" ? 6 : 12, "unconfirmed", "Target is not confirmed.", "", "review");
   }
   if (segment.reviewState === "needs-review") {
@@ -260,7 +264,7 @@ function scoreSegment(segment = {}, index = 0, context = {}) {
     label: String(index + 1),
     status: segment.status || "",
     reviewState: segment.reviewState || "",
-    sourceWords: wordCount(segment.source),
+    sourceWords: wordCount(segment, context.sourceLang),
     score: finalScore,
     level: riskLevelForScore(finalScore),
     category: topCategoryForReasons(sortedReasons),
@@ -274,7 +278,7 @@ function buildRiskQueue({ project = null, segments = [], qaChecks = [], tmEntrie
   const activeProfile = defaultQualityProfile(profile || project?.qualityProfile);
   const qaBySegment = qaChecksBySegment(qaChecks);
   const items = (Array.isArray(segments) ? segments : [])
-    .map((segment, index) => scoreSegment(segment, index, { profile: activeProfile, qaBySegment, tmEntries }))
+    .map((segment, index) => scoreSegment(segment, index, { profile: activeProfile, qaBySegment, tmEntries, sourceLang: project?.sourceLang }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index);
   const byLevel = { critical: 0, high: 0, medium: 0, low: 0, clear: 0 };
@@ -360,9 +364,9 @@ function buildQualityPassportData({
   const riskQueue = buildRiskQueue({ project, segments, qaChecks, tmEntries, profile: activeProfile });
   const totals = analysis?.totals || {
     segments: segments.length,
-    words: segments.reduce((sum, segment) => sum + wordCount(segment.source), 0),
+    words: segments.reduce((sum, segment) => sum + wordCount(segment, project?.sourceLang), 0),
     confirmed: segments.filter((segment) => segment.status === "confirmed").length,
-    untranslated: segments.filter((segment) => !String(segment.target || "").trim()).length,
+    untranslated: segments.filter((segment) => !String(segment.target || "").trim() && !globalThis.LoopCATLinguistics?.isPreservedXliffLayout?.(segment)).length,
     comments: segments.reduce((sum, segment) => sum + (segment.comments?.length || 0) + (segment.reviewNote ? 1 : 0), 0),
     aiDrafts: segments.filter(segmentHasAiDraft).length
   };

@@ -79,15 +79,19 @@ function analyzeProject(project, segments = [], tmEntries = [], tmScores = null)
   };
 
   segments.forEach((segment, segmentIndex) => {
-    const words = globalThis.LoopCATLinguistics.metricsForSegment(segment, project?.sourceLang || "en").words;
+    const {words, countingComplete} = globalThis.LoopCATLinguistics.metricsForSegment(segment, project?.sourceLang || "en");
+    if (!countingComplete) totals.countingComplete = false;
     const key = normalize(segment.source);
     const sourceCount = bySource.get(key) || 0;
-    bySource.set(key, sourceCount + 1);
-    if (sourceCount > 0) totals.repetitions += 1;
+    if (words) {
+      bySource.set(key, sourceCount + 1);
+      if (sourceCount > 0) totals.repetitions += 1;
+    }
 
     totals.words += words;
     if (segment.status === "confirmed") totals.confirmed += 1;
-    if (!String(segment.target || "").trim()) totals.untranslated += 1;
+    const untranslated = !String(segment.target || "").trim() && !globalThis.LoopCATLinguistics.isPreservedXliffLayout(segment);
+    if (untranslated) totals.untranslated += 1;
     if (segment.reviewState === "needs-review") totals.needsReview += 1;
     if (segment.reviewState === "reviewed") totals.reviewed += 1;
     if (segment.reviewState === "blocked") totals.blocked += 1;
@@ -134,8 +138,9 @@ function analyzeProject(project, segments = [], tmEntries = [], tmScores = null)
     const file = files.get(documentId);
     file.segments += 1;
     file.words += words;
+    if (!countingComplete) file.countingComplete = false;
     if (segment.status === "confirmed") file.confirmed += 1;
-    if (!String(segment.target || "").trim()) file.untranslated += 1;
+    if (untranslated) file.untranslated += 1;
     if (segment.reviewState || segment.reviewNote || (segment.comments || []).length) file.reviewItems += 1;
     if (segmentHasAiDraft(segment)) file.aiDrafts += 1;
     file.aiSuggestions += aiSuggestionCount;

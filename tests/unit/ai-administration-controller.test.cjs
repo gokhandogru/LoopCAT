@@ -455,3 +455,18 @@ test("AiAdministrationController renders busy status, progress, availability, an
   controller.unmount();
   assert.equal(disconnected, true);
 });
+
+test("AI output follows the interface language only for application messages", async () => {
+  const { createAiAdministrationController } = await moduleAt("src/features/ai/ai-administration-controller.js");
+  const els = elements(fakeDocument());
+  let locale = "en";
+  const controller = createAiAdministrationController({ elements: els, source: (text) => locale + ":" + text });
+  controller.renderOutput("Fixed message", { uiMessage: true });
+  assert.equal(els.promptOutput.textContent, "en:Fixed message");
+  locale = "ar";
+  controller.render();
+  assert.equal(els.promptOutput.textContent, "ar:Fixed message");
+  controller.renderOutput("Fixed message");
+  controller.render();
+  assert.equal(els.promptOutput.textContent, "Fixed message");
+});

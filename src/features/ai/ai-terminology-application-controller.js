@@ -164,7 +164,7 @@ export function createAiTerminologyApplicationController(options) {
     if (!glossaryTerms.length) {
       status.set("No matching project terminology found for the active segment.", "saved");
       presentation.renderOutput("No matching project terminology found for the active segment.", {
-        muted: false
+        uiMessage: true
       });
       return true;
     }
@@ -191,7 +191,7 @@ export function createAiTerminologyApplicationController(options) {
       );
       if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
         presentation.renderOutput("AI did not propose a different terminology revision.", {
-          muted: false
+          uiMessage: true
         });
         status.set("AI did not propose a different terminology revision.", "saved");
         return true;

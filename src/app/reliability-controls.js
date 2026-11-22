@@ -5,6 +5,8 @@ export function createReliabilityControls({
   session,
   autosave,
   status,
+  translate = (message, values = {}) => message.replace(/\{(\w+)\}/g, (token, key) => values[key] ?? token),
+  locale = () => undefined,
   saveState,
   render,
   reopen,
@@ -50,8 +52,20 @@ export function createReliabilityControls({
     const button = document.getElementById("requestEditingBtn");
     if (button) button.hidden = !readOnly.has(projectId);
     const label = document.getElementById("protectionStatus");
-    if (label)
-      label.textContent = `${readOnly.has(projectId) ? "Read-only · " : ""}${storageError || (autosave.size() ? "Local save pending" : "Local save up to date")} · ${backupError || (workspace.connected() ? (lastVerifiedBackup ? `External backup verified ${new Date(lastVerifiedBackup.createdAt).toLocaleTimeString()}` : "External backup pending") : "External backup not configured")}`;
+    if (label) {
+      const local = storageError || translate(autosave.size() ? "Local save pending" : "Local save up to date");
+      let backup = backupError;
+      if (!backup && workspace.connected() && lastVerifiedBackup) {
+        backup = translate("External backup verified {value1}", {
+          value1: new Date(lastVerifiedBackup.createdAt).toLocaleTimeString(locale())
+        });
+      }
+      if (!backup)
+        backup = translate(workspace.connected() ? "External backup pending" : "External backup not configured");
+      const prefix = readOnly.has(projectId) ? translate("Read-only ·") + " " : "";
+      const protection = `${prefix}${local} · ${backup}`;
+      if (label.textContent !== protection) label.textContent = protection;
+    }
     if (workspace.connected() && !wasConnected) {
       dirtySinceCheckpoint = true;
       scheduleCheckpoint();
@@ -125,16 +139,7 @@ export function createReliabilityControls({
       const checkpoint = await storage.createCheckpoint();
       const project = session.getProject();
       if (project && !isReadOnly(project.id)) {
-        const migrated = await storage.migrateCheckpointAssets(checkpoint.id, project.id);
-        if (
-          migrated &&
-          session.getProject()?.id === migrated.id &&
-          session.getProject().storageVersion === project.storageVersion
-        )
-          session.replaceProject({
-            ...migrated,
-            docxStructure: migrated.docxStructures[migrated.legacyDocxDocumentId]
-          });
+        await storage.migrateCheckpointAssets(checkpoint.id, project.id);
       }
       if (committedGeneration <= checkpoint.generation) dirtySinceCheckpoint = false;
       if (workspace.connected()) {

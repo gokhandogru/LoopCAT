@@ -71,7 +71,7 @@ export function createProjectHomePresentationController(options) {
     const documentRecords = documents.list();
     const documentStatsById = statistics.byDocument(documentRecords);
     const total = statistics.aggregate(documentStatsById);
-    const sourceWords = total.words;
+    const sourceWords = total.countingComplete === false ? "≥ " + total.words : total.words;
     const resourceSummary = resources.summary();
     elements.title.textContent = text.displaySafeText(session.getProject().name);
     elements.meta.textContent = `${language.display()} - ${text.displaySafeText(session.getProject().domain || localization.label("noDomain"))} - ${localization.label("mainTm")}: ${text.displaySafeText(resourceSummary.mainTm, localization.label("none"))} - ${text.displaySafeText(localization.source(resourceSummary.tmLabel))} - ${text.displaySafeText(localization.source(resourceSummary.tbLabel))}`;
@@ -109,7 +109,7 @@ export function createProjectHomePresentationController(options) {
         </div>
       </header>
       <div class="project-stats">
-        <div><strong>${stats.words}</strong><span>${localization.labelHtml("words")}</span></div>
+        <div><strong>${stats.countingComplete === false ? "≥ " : ""}${stats.words}</strong><span>${localization.labelHtml("words")}</span></div>
         <div><strong>${stats.segments}</strong><span>${localization.labelHtml("segments")}</span></div>
       </div>
       <div class="file-progress"><span>${stats.percent}% ${localization.labelHtml("confirmed")}</span><div class="progress-bar"><div style="width:${stats.percent}%"></div></div><small>${localization.labelHtml("emptyDraftCount", { empty: stats.empty, draft: stats.draft })}</small></div>

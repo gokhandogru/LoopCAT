@@ -31,3 +31,13 @@ test("palette groups recent commands first without changing command availability
   );
   assert.equal(groups[0].commands[1].enabled, false);
 });
+
+test("the first visible command group contains the best search result", async () => {
+  const { groupCommandResults, searchCommands } = await moduleAt("src/features/palette/command-search.js");
+  const entries = [
+    { id: "confirm-file", label: "Confirm export", group: "Translation" },
+    { id: "export", label: "Export", group: "Export" }
+  ];
+  const results = searchCommands(entries, "export");
+  assert.equal(groupCommandResults(results, [], true)[0].commands[0].id, "export");
+});
