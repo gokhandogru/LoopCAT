@@ -909,7 +909,7 @@ html[dir="rtl"] :is(code, kbd, input[type="url"], input[type="password"]) {
   flex: 1;
 }
 .liquid-glass-edition .coordinated-editor #segmentStatusFilter {
-  flex: 0 0 150px;
+  flex: 0 0 160px;
   min-width: 110px;
   max-width: 160px;
 }
