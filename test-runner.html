@@ -126,7 +126,9 @@
       function runTest(test) {
         return new Promise((resolve) => {
           const frame = document.createElement("iframe");
-          if (test.name === "Performance") frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0";
+          if (["Performance", "App workflow"].includes(test.name)) {
+            frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0";
+          }
           frame.title = `${test.name} test`;
           const startedAt = Date.now();
           let timer = null;

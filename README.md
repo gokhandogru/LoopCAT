@@ -31,7 +31,14 @@ LoopCAT implements the core offline CAT workflow, recovery model, editor, revers
 
 The detailed distinction between shipped behavior, release blockers, near-term priorities, and ongoing guardrails is maintained in [ROADMAP.md](ROADMAP.md).
 
-## New in the November 15 preview
+## New in the November 22 preview
+
+- **Consistent workspace:** refreshed teal navigation, all five inspector tabs, Resources, Exchange, Statistics and dialogs, with light, dark, responsive and Arabic layouts.
+- **XLIFF segmentation:** aligned hard lines can become separate editor rows while preserving bilingual structure. Existing imports offer a preview and version-history backup before splitting. Native boundaries remain available and are retained when alignment is uncertain or resegmentation is prohibited.
+- **Statistics:** editor and report word counts agree, including markup-only rows. Analyze the current file, checked files or the whole project; recalculate existing results or retry an incomplete analysis. Stale quotes are invalidated when project content or translation memories change.
+- **Verification:** 1,760 unit tests and 63 bilingual interchange checks passed locally, alongside packaged Windows/web workflows and an existing-file upgrade preserving an edited target. See the [release verification](downloads/verification.md) for platform build and download checks.
+
+### Included from the November 15 preview
 
 - **Formatting preservation:** Word, Excel and PowerPoint retain native formatting runs, hyperlinks and document structure through import/export. Native Office checks passed for copy-source and translated fixtures; unchanged files are byte-identical and their rendered pages have zero changed pixels. IDML/ICML preserve style runs and nested structures in 20 structural checks; native InDesign rendering remains unverified.
 - **Localization formats:** expanded regression coverage across 55 supported extensions, including XLIFF/SDLXLIFF, TMX/TBX, gettext, Qt, software resources and subtitles. See the [file-format review](docs/file-format-review-2026-11-15.md) and [Office/DTP evidence](docs/office-dtp-formatting-2026-11-15.md).
