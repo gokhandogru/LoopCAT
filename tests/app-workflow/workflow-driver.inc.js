@@ -856,7 +856,11 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
       opener.click();
       await waitForMenuPanel(menu);
       control.focus();
-      assert(menu.open && document.activeElement === control, `${menuId} exposes its controls to keyboard focus`);
+      assert(
+        menu.open && document.activeElement === control,
+        `${menuId} exposes its controls to keyboard focus` +
+          (document.activeElement === control ? "" : ` (open=${menu.open}; visible=${control.checkVisibility()}; active=${document.activeElement?.id || document.activeElement?.tagName}; viewport=${innerWidth}x${innerHeight}; modal=${document.querySelector("dialog:modal")?.id || "none"})`)
+      );
       control.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
       assert(!menu.open && document.activeElement === opener, `${menuId} closes with Escape and restores focus`);
       ancestors.forEach((ancestor) => { ancestor.open = false; });

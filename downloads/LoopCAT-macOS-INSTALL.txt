@@ -1,5 +1,5 @@
 LoopCAT for macOS - installation and first launch
-Updated: 15 November 2026
+Updated: 22 November 2026
 
 READ BEFORE OPENING
 LoopCAT development previews are not signed with an Apple Developer ID and are
@@ -12,7 +12,7 @@ Full guide: https://github.com/gokhandogru/LoopCAT/blob/main/docs/macos-installa
 
 1. CHOOSE THE RIGHT MAC DOWNLOAD
 Open Apple menu > About This Mac.
-- The 0.0.4-dev.20261115.1 release offers universal packages for both Apple
+- The 0.0.4-dev.20261122.1 release offers universal packages for both Apple
   Silicon and Intel. Choose a file labelled universal.
 - For older releases, Apple Silicon can also use a file labelled arm64.
 - If it shows an Intel processor, choose an explicitly labelled x64/x86_64
