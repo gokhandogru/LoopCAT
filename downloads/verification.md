@@ -1,3 +1,42 @@
+# LoopCAT 0.0.4-dev.20261122.1 release verification
+
+Verified and published on 22 November 2026.
+
+- [GitHub prerelease](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261122.1)
+- [Public downloads website](https://loopcat-downloads.gokhan-dogru.chatgpt.site/)
+- [Release manifest: files, byte sizes, SHA-256 hashes and URLs](latest-release.json)
+- [Successful all-platform workflow](https://github.com/gokhandogru/LoopCAT/actions/runs/44999817698)
+
+## Source and downloads
+
+All nine application packages were built from commit `c192ec11510f4cef161e21e70f027cd61d2cce84`. The release tag points to that revision. Later download-documentation commits do not change the packaged application code.
+
+Available packages: Windows installer EXE/ZIP and portable EXE/ZIP; universal macOS DMG/ZIP for Apple Silicon and Intel; Linux x64 AppImage/DEB; and web ZIP. The release also includes the current Mac installation guide and `SHA256SUMS.txt`.
+
+The combined CI bundle passed its artifact and checksum checks. All 11 public assets matched GitHub's stored digests and byte sizes, and each asset was downloaded in full and independently hashed. The combined published checksum list covers all nine application packages and the installation guide. The web build receipt matches the tagged source revision.
+
+## Platform verification
+
+All seven jobs passed: Windows, macOS, Linux, static web, Apple Silicon launch, Intel Mac launch, and the combined release bundle. Native checks include 1,760 unit tests, static quality gates, all nine browser suites, Exchange and file-format workflows, automated accessibility, Resources workflows and native window lifecycle, packaged launch, artifact integrity, Electron fuses and checksums. Firefox and WebKit Resources checks passed in the web job. Universal Mac signatures and both architectures were verified.
+
+The release checks exposed and corrected two issues: the browser runner now tests the workspace at a full desktop viewport and waits for nested menu panels before checking keyboard focus; the status filter now has enough space for Catalan labels in the macOS system font. All 60 native Mac locale/font/viewport/theme combinations passed after the width correction.
+
+XLIFF and Statistics verification includes 63 bilingual interchange checks, XLIFF schema validation, native/split word-count agreement for individual files, selected files and project scope, and upgrading an existing import while preserving an edited translation and its archived version. See the [release notes](../docs/releases/0.0.4-dev.20261122.1.md).
+
+## Download website
+
+Sites version 7 was published from source commit `830cabb5b2566f9670d44ae013af334187a4ce66`, preserving the public audience and download counter. The page now describes the modern workspace, XLIFF and Statistics improvements, shows the updated editor, and serves matching English and Arabic online manuals.
+
+Chrome checks at desktop and 390-pixel mobile widths verified all nine package choices against this release. Both Mac package formats and Apple Silicon/Intel choices resolved correctly through the guide-before-download dialog. The bundled release snapshot worked with the GitHub feed unavailable. Local assets, checksum links, installation guide and manual navigation were checked. No JavaScript page errors, serious/critical automated accessibility violations or mobile horizontal overflow were found. Desktop and mobile screenshots were inspected.
+
+## Qualification limits
+
+This remains a development preview. Windows is unsigned; macOS is ad-hoc signed, without Developer ID signing or notarization. Native InDesign rendering remains unverified. Automated checks do not establish that every workflow is bug-free or replace the remaining production qualification checks.
+
+---
+
+## Historical November 15 verification
+
 # LoopCAT 0.0.4-dev.20261115.1 release verification
 
 Verified and published on 15 November 2026.
