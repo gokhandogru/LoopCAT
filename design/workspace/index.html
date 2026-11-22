@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>LoopCAT · Workspace design preview</title>
+    <link rel="icon" href="../../icons/loopcat-icon.svg" />
+    <link rel="stylesheet" href="studio.css" />
+    <link rel="stylesheet" href="views.css" />
+    <script defer src="icons.js"></script>
+    <script defer src="views.js"></script>
+    <script defer src="studio.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to workspace</a>
+    <div class="shell">
+      <nav class="rail" id="rail" aria-label="Workspace navigation"></nav>
+      <div class="workspace">
+        <header class="mast">
+          <button
+            class="square mobile-nav"
+            id="nav-toggle"
+            aria-controls="rail"
+            aria-expanded="false"
+            aria-label="Open navigation"
+          ></button>
+          <div id="crumbs" class="crumbs" aria-label="Current location"></div>
+          <div class="mast-actions">
+            <button class="command-trigger" data-action="commands" aria-label="Find a command"></button>
+            <button class="square" id="theme" data-action="theme"></button>
+          </div>
+        </header>
+        <main id="content" tabindex="-1"></main>
+        <footer class="foot">
+          <span
+            ><i class="session-dot"></i>Design preview <span class="foot-note">· Sample data, session only</span></span
+          ><span id="foot-context"></span>
+        </footer>
+      </div>
+    </div>
+    <dialog id="overlay" aria-labelledby="dialog-title"></dialog>
+    <div id="notice" role="status" aria-live="polite"></div>
+  </body>
+</html>

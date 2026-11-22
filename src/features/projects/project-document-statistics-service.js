@@ -5,7 +5,8 @@
  * @param {{
  *   getDocuments: () => any[],
  *   getSegments: () => any[],
- *   sourceWordCount: (segment: any) => number
+ *   sourceWordCount: (segment: any) => number,
+ *   sourceWordMetrics?: (segment: any) => {words: number, countingComplete: boolean}
  * }} options
  */
 export function createProjectDocumentStatisticsService(options) {
@@ -31,7 +32,9 @@ export function createProjectDocumentStatisticsService(options) {
     if (segment.status === "confirmed") stats.confirmed += 1;
     if (segment.status === "draft") stats.draft += 1;
     if (segment.status === "empty") stats.empty += 1;
-    stats.words += sourceWordCount(segment);
+    const metrics = options.sourceWordMetrics?.(segment);
+    stats.words += metrics?.words ?? sourceWordCount(segment);
+    if (metrics?.countingComplete === false) stats.countingComplete = false;
     return stats;
   }
 
@@ -59,6 +62,7 @@ export function createProjectDocumentStatisticsService(options) {
       total.draft += stats.draft;
       total.empty += stats.empty;
       total.words += stats.words;
+      if (stats.countingComplete === false) total.countingComplete = false;
     });
     return finalize(total);
   }

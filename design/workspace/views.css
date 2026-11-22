@@ -1,0 +1,448 @@
+.sv-page {
+  display: grid;
+  align-content: start;
+  gap: 1.25rem;
+  min-inline-size: 0;
+}
+.sv-page .page-head,
+.sv-page .panel-head,
+.sv-toolbar,
+.sv-actions,
+.sv-list-row,
+.sv-pack-top,
+.sv-pack-end,
+.sv-dialog > header,
+.sv-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+}
+.sv-page .page-head h1,
+.sv-page .page-head p,
+.sv-page .panel-head h2,
+.sv-page .sv-pack h2,
+.sv-dialog > header h2 {
+  margin: 0;
+}
+.sv-page .page-head p {
+  margin-block-start: 0.4rem;
+  color: var(--muted);
+}
+.sv-page .page-head {
+  padding-block-end: 0;
+}
+.sv-page .panel {
+  min-inline-size: 0;
+  overflow: hidden;
+}
+.sv-page .panel-head {
+  padding: 0.95rem 1.15rem;
+  border-block-end: 1px solid var(--line);
+}
+.sv-page .panel-head h2,
+.sv-pack h2,
+.sv-dialog h2 {
+  font-size: 1.04rem;
+}
+.sv-page .btn {
+  white-space: normal;
+}
+.sv-actions {
+  justify-content: flex-start;
+}
+.sv-toolbar {
+  justify-content: space-between;
+}
+.sv-modes {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--canvas);
+}
+.sv-modes .btn {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.43rem;
+  box-shadow: none;
+}
+.sv-modes .btn[aria-pressed="true"] {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.sv-name,
+.sv-line {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  min-inline-size: 0;
+}
+.sv-name strong,
+.sv-name small {
+  display: block;
+}
+.sv-name small,
+.sv-line p,
+.sv-pack small,
+.sv-pack p,
+.sv-state,
+.sv-progress > span,
+.sv-blank p {
+  color: var(--muted);
+}
+.sv-name small {
+  margin-block-start: 0.2rem;
+  font-size: 0.78rem;
+}
+.sv-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  background: var(--tint);
+  color: var(--teal);
+  border-radius: 0.65rem;
+}
+.sv-line {
+  padding: 1rem 1.15rem;
+  align-items: flex-start;
+}
+.sv-line strong,
+.sv-name strong {
+  font-size: 0.92rem;
+}
+.sv-line p,
+.sv-blank p {
+  margin: 0.25rem 0 0;
+  font-size: 0.87rem;
+  line-height: 1.55;
+}
+.sv-line + .sv-line,
+.sv-list-row + .sv-list-row,
+.sv-panel-foot {
+  border-block-start: 1px solid var(--line);
+}
+.sv-list-row,
+.sv-panel-foot,
+.sv-blank {
+  padding: 0.95rem 1.15rem;
+}
+.sv-panel-foot {
+  justify-content: flex-start;
+}
+.sv-progress {
+  display: grid;
+  gap: 0.38rem;
+  min-inline-size: 6.5rem;
+  max-inline-size: 11rem;
+}
+.sv-progress > span {
+  font-size: 0.79rem;
+}
+.sv-page progress {
+  display: block;
+  inline-size: 100%;
+  block-size: 0.36rem;
+  margin: 0;
+  border: none;
+  border-radius: 1rem;
+  overflow: hidden;
+  appearance: none;
+  background: var(--line);
+  color: var(--teal);
+  accent-color: var(--teal);
+}
+.sv-page progress::-webkit-progress-bar {
+  background: var(--line);
+  border-radius: 1rem;
+}
+.sv-page progress::-webkit-progress-value {
+  background: var(--teal);
+  border-radius: 1rem;
+}
+.sv-page progress::-moz-progress-bar {
+  background: var(--teal);
+  border-radius: 1rem;
+}
+.sv-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+.sv-pack {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.sv-pack-top,
+.sv-pack-end {
+  align-self: stretch;
+}
+.sv-pack-top {
+  margin-block-end: 1.2rem;
+}
+.sv-pack small {
+  margin-block-start: 0.3rem;
+}
+.sv-pack p {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin-block: 0.8rem 1.25rem;
+}
+.sv-pack-end {
+  margin-block-start: auto;
+  border-block-start: 1px solid var(--line);
+  padding-block-start: 1rem;
+}
+.sv-state {
+  font-size: 0.78rem;
+}
+.sv-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.sv-metrics > div {
+  padding: 1.15rem;
+  display: grid;
+  gap: 0.45rem;
+}
+.sv-metrics > div + div {
+  border-inline-start: 1px solid var(--line);
+}
+.sv-metrics strong {
+  font-size: 1.85rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em;
+}
+.sv-metrics small,
+.sv-select {
+  color: var(--muted);
+}
+.sv-select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+}
+.sv-select select,
+.sv-dialog select,
+.sv-dialog input:not([type="radio"]),
+.sv-dialog textarea {
+  font: inherit;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0.6rem 0.65rem;
+  border-radius: 0.45rem;
+}
+.sv-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-inline-size: 18rem;
+}
+.sv-bar progress {
+  flex: 1;
+  min-inline-size: 3rem;
+}
+.sv-bar span {
+  inline-size: 3rem;
+  font-variant-numeric: tabular-nums;
+}
+.sv-page table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+.sv-page .table-wrap {
+  overflow-x: auto;
+}
+.sv-page :is(td, th) {
+  padding: 0.85rem 1.15rem;
+  border-block-end: 1px solid var(--line);
+  text-align: start;
+  font-variant-numeric: tabular-nums;
+}
+.sv-page th {
+  white-space: nowrap;
+  color: var(--muted);
+  font-weight: 600;
+}
+.sv-page td {
+  font-size: 0.88rem;
+}
+.sv-page tr:last-child td {
+  border-block-end: none;
+}
+.sv-notice:not([hidden]) {
+  border-inline-start: 3px solid var(--teal);
+  background: var(--tint);
+  padding: 0.7rem 1rem;
+  margin: 0;
+}
+.sv-dialog {
+  box-sizing: border-box;
+  inline-size: min(30rem, calc(100vw - 2rem));
+  max-block-size: calc(100dvh - 3rem);
+  margin: auto;
+  padding: 1.35rem;
+  position: fixed;
+  inset: 0;
+  height: fit-content;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  box-shadow: 0 0.7rem 3rem #06282533;
+  overflow: auto;
+}
+.sv-dialog:not([open]) {
+  display: none;
+}
+.sv-dialog::backdrop {
+  background: #08292766;
+}
+.sv-dialog > header {
+  padding-block-end: 1rem;
+}
+.sv-dialog p,
+.sv-dialog dd,
+.sv-dialog blockquote {
+  line-height: 1.5;
+}
+.sv-dialog .sv-line {
+  padding-inline: 0;
+}
+.sv-dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.75rem 1.2rem;
+  padding-block: 1rem;
+  border-block: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+.sv-dl dt {
+  color: var(--muted);
+}
+.sv-dl dd {
+  margin: 0;
+}
+.sv-dialog form,
+.sv-dialog form label:not(.sv-radio) {
+  display: grid;
+  gap: 0.4rem;
+}
+.sv-dialog form {
+  gap: 1rem;
+}
+.sv-dialog form label {
+  font-size: 0.87rem;
+}
+.sv-static {
+  display: block;
+  padding-block: 0.45rem;
+  font-weight: 600;
+}
+.sv-dialog fieldset {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.65rem 1rem;
+}
+.sv-radio {
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  padding-block: 0.45rem;
+}
+.sv-radio input {
+  accent-color: var(--teal);
+}
+.sv-dialog textarea {
+  resize: vertical;
+}
+.sv-dialog blockquote {
+  margin: 0.65rem 0;
+  border-inline-start: 2px solid var(--teal);
+  padding-inline-start: 0.8rem;
+}
+.sv-page :focus-visible {
+  outline: 3px solid var(--focus, var(--teal));
+  outline-offset: 2px;
+}
+@media (max-width: 780px) {
+  .sv-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sv-metrics > div:nth-child(3) {
+    border-inline-start: none;
+  }
+  .sv-metrics > div:nth-child(n + 3) {
+    border-block-start: 1px solid var(--line);
+  }
+  .sv-page {
+    gap: 0.9rem;
+  }
+  .sv-page :is(td, th) {
+    padding: 0.65rem 0.7rem;
+  }
+}
+@media (max-width: 530px) {
+  .sv-page table,
+  .sv-page tbody {
+    display: block;
+  }
+  .sv-page thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .sv-page tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 0.6rem 1rem;
+    padding: 0.85rem;
+  }
+  .sv-page tbody tr + tr {
+    border-block-start: 1px solid var(--line);
+  }
+  .sv-page td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+  .sv-page td:first-child {
+    grid-column: 1 / -1;
+  }
+  .sv-page td[data-label]:not(:first-child)::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.72rem;
+    margin-block-end: 0.2rem;
+  }
+  .sv-progress {
+    min-inline-size: 0;
+  }
+  .sv-dialog {
+    max-block-size: calc(100dvh - 1rem);
+  }
+}
+@media (forced-colors: active) {
+  .sv-modes .btn[aria-pressed="true"] {
+    border: 2px solid Highlight;
+  }
+  .sv-page progress {
+    appearance: auto;
+  }
+}

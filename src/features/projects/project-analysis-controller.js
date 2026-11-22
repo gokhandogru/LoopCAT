@@ -119,7 +119,7 @@ export function createProjectAnalysisController(options) {
     <div><strong>${result.leverage.fuzzy95 + result.leverage.fuzzy85}</strong><span>${localization.labelHtml("strongFuzzy")}</span></div>
     <div><strong>${result.totals.segments - result.totals.confirmed}</strong><span>${localization.labelHtml("openSegments")}</span></div>
     <div><strong>${result.totals.files}</strong><span>${localization.labelHtml("files")}</span></div>
-    <div><strong>${result.totals.words}</strong><span>${localization.labelHtml("sourceWords")}</span></div>
+    <div><strong>${result.totals.words}</strong><span>${result.totals.countingComplete === false ? localization.sourceHtml("Known source words") : localization.labelHtml("sourceWords")}</span></div>
     <div><strong>${ai.drafts || 0}</strong><span>${localization.sourceHtml("AI initiated")}</span></div>
     <div><strong>${ai.suggestionSegments || 0}</strong><span>${localization.labelHtml("aiSuggestionRows")}</span></div>
     <div><strong>${ai.highRisk || 0}</strong><span>${localization.labelHtml("highAiRisk")}</span></div>

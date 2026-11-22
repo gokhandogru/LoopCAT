@@ -21,7 +21,7 @@ function storage() {
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../../storage.js"), "utf8"), context);
   return context.window.CatHan.storage;
 }
-async function setup() {
+async function setup(overrides = {}) {
   const api = storage();
   const module = await import("../../src/features/projects/file-lifecycle-service.js");
   await api.put("projects", {
@@ -70,7 +70,8 @@ async function setup() {
       segments: file.sources.map((source) => ({ source, target: "" })),
       importOptions: { encoding: "auto" }
     }),
-    validate: async () => {}
+    validate: async () => {},
+    ...overrides
   });
   return { api, service, module };
 }
@@ -101,6 +102,53 @@ test("reviewed update archives complete old rows, retains logical identity and r
   assert.equal(restored.versionSegments.length, 2);
   (await api.openDatabase()).close();
 });
+test("resegmenting a stored bilingual file versions live edits, comments and review state atomically", async () => {
+  const { api, service } = await setup({
+    resegment: ({ segments }) => ({
+      prepared: {
+        fileName: "sample.xlf",
+        documentType: "xlf",
+        structure: { format: "xliff" },
+        importOptions: { splitBilingualBlocks: true },
+        segments: [
+          { text: "Hello", target: "Merhaba", structure: { xliffPart: { index: 0, count: 2 } } },
+          { text: "world", target: "dünya", structure: { xliffPart: { index: 1, count: 2 } } },
+          { text: segments[1].source, target: segments[1].target, structure: {} }
+        ]
+      },
+      parentRows: [segments[0], segments[0], segments[1]]
+    })
+  });
+  let preview = await service.previewResegmentation("p", "d");
+  const old = await api.get("segments", "b");
+  await api.put("segments", { ...old, target: "Edited after import", targetHistory: [{ target: old.target }] });
+  await assert.rejects(service.commit(preview.id), /changed after review/);
+  assert.equal((await api.getAll("documentVersions")).length, 0);
+  preview = await service.previewResegmentation("p", "d");
+  await service.commit(preview.id, {}, "split-request");
+  await service.commit(preview.id, {}, "split-request");
+  const live = (await api.getAll("segments")).sort((a, b) => a.index - b.index);
+  assert.deepEqual(
+    live.map((s) => s.target),
+    ["Merhaba", "dünya", "Edited after import"]
+  );
+  assert.deepEqual(
+    live.map((s) => s.documentIndex),
+    [0, 1, 2]
+  );
+  assert.deepEqual(
+    live.map((s) => s.status),
+    ["confirmed", "confirmed", "draft"]
+  );
+  assert.equal(live[0].comments[0].text, "Saved note");
+  assert.equal(live[1].comments.length, 0);
+  assert.equal(live[2].targetHistory[0].target, old.target);
+  assert.equal((await api.get("versionSegments", "b")).target, "Edited after import");
+  assert.equal((await api.getAll("documentVersions")).length, 1);
+  assert.equal((await api.get("projects", "p")).documents[0].importOptions.splitBilingualBlocks, true);
+  (await api.openDatabase()).close();
+});
+
 test("an edit made after preview prevents source replacement and retains the edit", async () => {
   const { api, service } = await setup();
   const p = await service.preview("p", "d", { sources: ["New source"] });

@@ -161,18 +161,25 @@
   // Analysis has its own disposable worker: exhaustive project scoring must
   // never queue in front of the active segment's TM lookup or QA request.
   function analyzeTm({ sources, entries, signal, options, segments, request, onProgress, sourceUpdate }) {
+    const foreground = () => globalThis.LoopCATStatistics.analyze(request, onProgress, signal);
+    const requiresWorker = !request || !globalThis.LoopCATStatistics?.analyze;
     return new Promise((resolve, reject) => {
       if (signal?.aborted) {
         reject(new DOMException("Analysis canceled", "AbortError"));
         return;
       }
       if (!canUseWorker()) {
-        reject(new Error("Background analysis is unavailable."));
+        if (requiresWorker) reject(new Error("Background analysis is unavailable."));
+        else resolve(foreground());
         return;
       }
       let analysisWorker;
       let timer;
+      let started = false,
+        settled = false;
       const finish = (error, result) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         signal?.removeEventListener("abort", abort);
         analysisWorker?.terminate();
@@ -182,11 +189,17 @@
       function abort() {
         finish(new DOMException("Analysis canceled", "AbortError"));
       }
+      function startupFailure(error) {
+        if (settled) return;
+        if (requiresWorker || started || signal?.aborted) finish(error);
+        else finish(null, foreground());
+      }
       try {
         const url = window.CatHan?.appRuntime?.safeHtml?.trustedScriptUrl?.(WORKER_URL) || WORKER_URL;
         analysisWorker = window.CatHan?.createFileWorker?.(WORKER_URL) || new Worker(url);
         signal?.addEventListener("abort", abort, { once: true });
         analysisWorker.addEventListener("message", ({ data }) => {
+          started = true;
           if (data.progress) {
             clearTimeout(timer);
             timer = setTimeout(() => finish(new Error("Analysis stopped responding. Retry the calculation.")), 60000);
@@ -195,7 +208,9 @@
           }
           finish(data.ok ? null : new Error(data.error), data.result);
         });
-        analysisWorker.addEventListener("error", (error) => finish(new Error(error.message || "Analysis failed.")));
+        analysisWorker.addEventListener("error", (error) =>
+          startupFailure(new Error(error.message || "Analysis failed."))
+        );
         timer = setTimeout(
           () => finish(new Error("Project analysis timed out. Reopen the file view to retry.")),
           60000
@@ -206,7 +221,7 @@
           payload: sourceUpdate || request || { sources, entries, options, segments }
         });
       } catch (error) {
-        finish(error);
+        startupFailure(error);
       }
     });
   }

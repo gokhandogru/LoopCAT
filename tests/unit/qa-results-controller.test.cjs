@@ -186,6 +186,8 @@ test("QaResultsController preserves localized message and optional fix-hint valu
 test("QaResultsController preserves the localized muted no-issues state and clear return", async () => {
   const { createQaResultsController } = await loadFactory();
   const harness = createHarness(createQaResultsController);
+  harness.controller.render();
+  assert.equal(harness.root.textContent, "L:Run QA to check this file.");
   assert.equal(harness.controller.clear(), undefined);
   assert.equal(harness.controller.render(), undefined);
   assert.equal(harness.root.textContent, "L:No QA issues found.");
@@ -228,22 +230,21 @@ test("QaResultsController preserves exact safe cards, summary controls, and filt
     [
       ["button", "active", 'L:All {value1}:{"value1":2}'],
       ["button", "", "L:accuracy 1"],
-      ["button", "", "L:terminology 1"],
-      ["button", "", "L:undefined 1"]
+      ["button", "", "L:terminology 1"]
     ]
   );
   assert.equal(harness.cards().length, 2);
   assert.equal(
     harness.cards()[0].safeHtml,
-    '<header><strong>E[L:accuracy]</strong><span class="severity-pill E[error]">E[L:error]</span><span>#E[1<2]</span></header><p>E[L:Wrong {value1}:{"value1":"term"}]</p><p class="muted">E[L:Use {value1}:{"value1":"right"}]</p>'
+    '<header><strong>E[L:Wrong {value1}:{"value1":"term"}]</strong><span class="severity-pill E[error]">E[L:error]</span></header><p class="muted">E[L:Use {value1}:{"value1":"right"}]</p>'
   );
   assert.equal(
     harness.cards()[1].safeHtml,
-    '<header><strong>E[L:terminology]</strong><span class="severity-pill E[info]">E[L:info]</span><span>#E[2]</span></header><p>E[L:Term:{}]</p>'
+    '<header><strong>E[L:Term:{}]</strong><span class="severity-pill E[info]">E[L:info]</span></header>'
   );
   assert.deepEqual(
     harness.cards().map((card) => card.children[0].textContent),
-    ["LABEL:go", "LABEL:go"]
+    ['L:Go to segment {value1}:{"value1":"1<2"}', 'L:Go to segment {value1}:{"value1":"2"}']
   );
 
   const accuracyButton = harness.summaryWrap().children[1];

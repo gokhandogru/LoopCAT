@@ -525,6 +525,23 @@ const appEntryJs = readText("app.js");
 const applicationCompositionJs = readText("src/app/application-composition.js");
 const applicationCompositionUnitTests = readText("tests/unit/application-composition.test.cjs");
 const appJs = `${appEntryJs}\n${applicationCompositionJs}`;
+// Composition bindings are top-level statements inside installApplicationComposition.
+// Check each owner as well as the total, so a duplicate cannot hide a missing binding.
+const compositionStatements = applicationCompositionJs.split(/\r?\n(?=  \S)/);
+function assertCompositionReferences(member, owners) {
+  const reference = new RegExp(`\\b${regexEscape(member)}\\b`, "g");
+  for (const owner of owners) {
+    const matches = compositionStatements.filter((statement) => statement.startsWith(`  ${owner}`));
+    assert(
+      matches.length === 1 && (matches[0].match(reference) || []).length === 1,
+      `Application composition must reference ${member} exactly once in ${owner}.`
+    );
+  }
+  assert(
+    (appJs.match(reference) || []).length === owners.length,
+    `Every application use of ${member} must have a checked owner.`
+  );
+}
 const appWorkflowDriverJs = readText("tests/app-workflow/workflow-driver.inc.js");
 const appBootstrapJs = readText("src/app/bootstrap.js");
 const appStoreJs = readText("src/app/app-store.js");
@@ -2706,10 +2723,13 @@ assertIncludes(
   "date.format(project.updatedAt)",
   "ProjectsViewPresentationController must use the injected shared application date policy."
 );
-assert(
-  (appJs.match(/\bapplicationDateTimeService\.dateTime\b/g) || []).length === 4,
-  "all four application date-time consumers must call ApplicationDateTimeService directly."
-);
+assertCompositionReferences("applicationDateTimeService.dateTime", [
+  "const reportDocumentCompositionService =",
+  "const revisionHistoryPresentationService =",
+  "const renderSegmentInfo =",
+  "const aiSuggestionListController =",
+  "const recoveryWorkspaceController ="
+]);
 assert(
   (appJs.match(/\bapplicationDateTimeService\.date\b/g) || []).length === 5,
   "all five application date-only consumers must call ApplicationDateTimeService directly."
@@ -4129,8 +4149,9 @@ for (const boundary of [
   'editorFilterStore.update({ query: "", status: "all", reviewState: "", aiState: "" })',
   "qa: { run: (...args) => projectQaController.run(...args) }",
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
-  "renderWorkbench: (viewModel) => qualityReviewController?.renderQuality?.(viewModel)",
-  "focus: { target: () => targetEditController.focusActive() }",
+  "qualityReviewController?.renderQuality?.(viewModel);",
+  "renderSegmentInfo(viewModel);",
+  "focus: { target: focusQualityFinding }",
   "status: { set: applicationSaveStatusController.set }"
 ]) {
   assertIncludes(appJs, boundary, `quality-workbench composition must inject the checked ${boundary} boundary.`);
@@ -4220,17 +4241,19 @@ for (const snippet of [
   'check?.fixHint ? localization.source(check.fixHint, check.fixHintValues || {}) : ""',
   "const qaChecks = session.getQaChecks();",
   "const checks = filter ? qaChecks.filter((check) => check.type === filter) : qaChecks;",
-  'qaIsIncomplete(qaChecks) ? "Required Exchange checks: Not evaluated." : "No QA issues found."',
+  'if (qaIsIncomplete(qaChecks)) status = "Required Exchange checks: Not evaluated.";',
+  'else if (qaChecks === completedChecks) status = "No QA issues found.";',
   'root.classList.add("muted");',
   'summaryWrap.className = "qa-summary";',
   'allButton.className = filter ? "" : "active";',
   'localization.source("All {value1}", { value1: qaChecks.length })',
-  '!["error", "warning", "info"].includes(type)',
+  "if (type) typeCounts.set(type, (typeCounts.get(type) || 0) + 1);",
+  "button.ariaPressed = String(filter === type);",
   'filter = filter === type ? "" : type;',
   "checks.slice(0, 100).forEach((check) => {",
   'card.className = "qa-card";',
   'check.severity || "info"',
-  'button.textContent = localization.label("go");',
+  'button.textContent = localization.source("Go to segment {value1}", { value1: check.label });',
   "const index = session.getSegments().findIndex((segment) => segment.id === check.segmentId);",
   "await navigation.select(index);",
   "presentation.renderSegments();",
@@ -4256,7 +4279,8 @@ for (const boundary of [
   "replaceSafeHtml: (...args) => appRuntime.safeHtml.replace(...args)",
   "navigation: { select: (index) => segmentNavigationController.select(index) }",
   "presentation: { renderSegments: (...args) => segmentGridPresentationController.render(...args) }",
-  "focus: { target: () => targetEditController.focusActive() }"
+  "focus: { target: focusQualityFinding }",
+  "verticalFeatureState?.inspector?.closeForNavigation();"
 ]) {
   assertIncludes(appJs, boundary, `QA-results composition must inject the checked ${boundary} boundary.`);
 }
@@ -4270,11 +4294,22 @@ for (const consumer of [
   const source = consumer === "qaResultsController.render();" ? `${appJs}\n${appWorkflowDriverJs}` : appJs;
   assertIncludes(source, consumer, `QA-results consumers must call the checked controller directly: ${consumer}.`);
 }
+const qaRunOwners = ["projectQaController =", "const reportExportController =", "const deliveryExportController ="];
+assertCompositionReferences("qaResultsController.clear", qaRunOwners);
+assertCompositionReferences("qaResultsController.render", [
+  ...qaRunOwners,
+  "applicationStore.subscribe((next, previous)",
+  "const exchange =",
+  "const uiLocaleOrchestrationController =",
+  "async function refreshSharedResources("
+]);
 assert(
-  (appJs.match(/\bqaResultsController\.clear\b/g) || []).length === 3 &&
-    (appJs.match(/\bqaResultsController\.render\b/g) || []).length === 6 &&
-    (appWorkflowDriverJs.match(/\bqaResultsController\.render\b/g) || []).length === 1,
-  "all report, delivery, ProjectQaController, locale-refresh, external resource-change, and workflow consumers must call QaResultsController directly."
+  /next\.navigation\.projectId !== previous\.navigation\.projectId\s*\|\|\s*next\.navigation\.documentId !== previous\.navigation\.documentId\s*\)\s*\{\s*editorSessionStore\.replaceQaChecks\(\[\]\);\s*editorSessionStore\.replaceQualityRiskQueue\(null\);\s*qaResultsController\.render\(\);/.test(appJs),
+  "switching project or document scope must discard stale findings and risks before rendering QA."
+);
+assert(
+  (appWorkflowDriverJs.match(/\bqaResultsController\.render\b/g) || []).length === 1,
+  "the QA workflow must still render the checked QA results controller directly."
 );
 for (const removedHelper of ["qaSummary", "qaCheckMessage", "qaCheckFixHint", "renderQaResults"]) {
   const directHelper = new RegExp(`function\\s+${removedHelper}\\b`);
@@ -4349,8 +4384,10 @@ for (const snippet of [
   'statusLabel(entry.toStatus || "empty")',
   '${localization.labelHtml("before")}',
   '${localization.labelHtml("after")}',
-  'escapeHtml(entry.fromTarget || "") || "&nbsp;"',
-  'escapeHtml(entry.toTarget || "") || "&nbsp;"',
+  "target(entry.fromTarget)",
+  "target(entry.toTarget)",
+  'escapeHtml(localization.source("Empty target"))',
+  "value ? escapeHtml(value)",
   "return Object.freeze({ reasonLabel, render });"
 ]) {
   assertIncludes(
@@ -4706,9 +4743,9 @@ for (const testName of [
   );
 }
 for (const hash of [
-  "04164535fea017832eb2222404e2b70f10480cf08a7d1f980d568a13cf6c46a9",
-  "806010870e1b58cd1cefcafbde420922b3a283f8ccc5ddfbf3dc23ac3dc79c26",
-  "422503b2c6bb051f4f2dc0bdac16159abd638f18ec49b044c95d809f9f18ee37"
+  "9dedaf051736cad4979f569f3102077ec3478a64f1ce85aa93988ae679ab4163",
+  "fb22adf8c600572c31dbeaafbce8cbf44f8aaa71bd60297d8991dbf70376013f",
+  "2b4f349534637c4f862b842ab22abcddc5f6dd1e3d995726cda50be8de3955f7"
 ]) {
   assertIncludes(
     reportDocumentCompositionServiceUnitTests,
@@ -6113,7 +6150,10 @@ for (const snippet of [
   'if (segment.status === "confirmed") stats.confirmed += 1',
   'if (segment.status === "draft") stats.draft += 1',
   'if (segment.status === "empty") stats.empty += 1',
-  "stats.words += sourceWordCount(segment)",
+  "const metrics = options.sourceWordMetrics?.(segment)",
+  "stats.words += metrics?.words ?? sourceWordCount(segment)",
+  "if (metrics?.countingComplete === false) stats.countingComplete = false",
+  "if (stats.countingComplete === false) total.countingComplete = false",
   "Math.round((stats.confirmed / stats.segments) * 100)",
   "new Map(documents.map((documentInfo) => [documentInfo.id, empty()]))",
   'const id = segment.documentId || "default-document"',
@@ -8138,7 +8178,7 @@ assertIncludes(
 );
 assertIncludes(
   appJs,
-  "dialog lifecycle controller restores the Trash opener after cancel and close",
+  "dialog lifecycle controller restores the visible Workspace trigger after closing Trash",
   "the app workflow must characterize native cancel/close focus restoration for migrated dialogs."
 );
 assertIncludes(
@@ -10086,9 +10126,13 @@ assert(
     !appWorkflowDriverJs.includes('projectHomeDeleteBtn.addEventListener("click"'),
   "project-home navigation facade and listener ownership must not return to app.js or the workflow driver."
 );
+assertCompositionReferences("projectHomeController.show", [
+  "const projectDeletionController =",
+  "const refreshFileLifecycle =",
+  "installWorkspaceShell({"
+]);
 assert(
   (applicationEventWiringControllerJs.match(/\blifecycles\.projectHome\.mount\b/g) || []).length === 1 &&
-    (appJs.match(/\bprojectHomeController\.show\b/g) || []).length === 2 &&
     (appWorkflowDriverJs.match(/\bprojectHomeController\.show\b/g) || []).length === 1,
   "ApplicationEventWiringController and direct application/workflow consumers must retain checked project-home controller calls."
 );
@@ -10534,11 +10578,21 @@ assert(
     !appWorkflowDriverJs.includes('projectsViewBtn.addEventListener("click"'),
   "application view orchestration and primary navigation listeners must not return to app.js or the workflow driver."
 );
+assertCompositionReferences("applicationViewController.show", [
+  "const applicationCommandHistoryController =",
+  "const resourcesController =",
+  "installWorkspaceShell({",
+  "async function openResourceLibrary("
+]);
+assertIncludes(
+  appJs,
+  'show: (view) => (view === "project" ? projectHomeController.show() : applicationViewController.show(view))',
+  "the workspace shell must refresh project files through ProjectHomeController and route its remaining views through ApplicationViewController."
+);
 assert(
-  (appJs.match(/\bapplicationViewController\.show\b/g) || []).length === 3 &&
-    (applicationEventWiringControllerJs.match(/\blifecycles\.applicationView\.mount\b/g) || []).length === 1 &&
+  (applicationEventWiringControllerJs.match(/\blifecycles\.applicationView\.mount\b/g) || []).length === 1 &&
     (appWorkflowDriverJs.match(/\bapplicationViewController\.show\b/g) || []).length === 1,
-  "all three application and one workflow view consumers, including return-to-library routing, must call ApplicationViewController directly with one lifecycle mount."
+  "ApplicationViewController must have one lifecycle mount and one direct workflow consumer."
 );
 for (const forbiddenOwner of [
   "applicationNavigation",
@@ -12165,17 +12219,23 @@ assertIncludes(
 );
 for (const snippet of [
   "const sourceWordCounts = new WeakMap()",
-  "linguistics.metricsForSegment(segment, language).words",
-  'if (!segment || typeof segment !== "object") return 0',
-  "cached.language === language && cached.descriptor === descriptor",
-  "sourceWordCounts.set(segment, { source, count, language, descriptor })",
+  "const metrics = linguistics.metricsForSegment(segment, language)",
+  'if (!segment || typeof segment !== "object") return { words: 0, countingComplete: false }',
+  "cached?.source === source && cached.language === language && cached.descriptor === descriptor",
+  "return cached.metrics",
+  "sourceWordCounts.set(segment, { source, metrics, language, descriptor })",
+  "const sourceWordCount = (segment) => sourceWordMetrics(segment).words",
   "for (const segment of segments)",
   'if (segment.status === "confirmed") confirmed += 1',
   'if (segment.status === "draft") draft += 1',
   "Math.round((confirmed / total) * 100)",
-  "return { total, confirmed, draft, words, percent }",
-  "for (const segment of getSegments())",
-  'return { projectId: getProjectId() || "", total, confirmed, words }',
+  "const metrics = sourceWordMetrics(segment)",
+  "words += metrics.words",
+  "countingComplete &&= metrics.countingComplete",
+  "return { total, confirmed, draft, words, percent, ...(countingComplete ? {} : { countingComplete: false }) }",
+  "const { total, confirmed, words, countingComplete } = projectProgress(getSegments())",
+  'projectId: getProjectId() || ""',
+  "...(countingComplete === false ? { countingComplete } : {})",
   'cached.projectId === (getProjectId() || "")',
   "cached.total === getSegments().length",
   "previousStatus !== undefined",
@@ -12183,7 +12243,7 @@ for (const snippet of [
   'if (previousStatus !== "confirmed" && nextStatus === "confirmed") confirmed += 1',
   "Math.max(0, Math.min(cached.total, confirmed))",
   "replaceCachedSummary(summary)",
-  "return Object.freeze({ wordCount, sourceWordCount, projectProgress, activeSummary, refresh })"
+  "return Object.freeze({ wordCount, sourceWordCount, sourceWordMetrics, projectProgress, activeSummary, refresh })"
 ]) {
   assertIncludes(
     segmentProgressServiceJs,
@@ -12256,13 +12316,29 @@ for (const snippet of [
   "const open = total - confirmed",
   'localization.label("progressSummary", { confirmed, open, total })',
   'localization.label("sourceWordCount", { count: words })',
-  'total ? `${Math.round((confirmed / total) * 100)}%` : "0"',
+  "const percent = total ? Math.round((confirmed / total) * 100) : 0;",
+  'elements.progressFill.style.width = total ? `${percent}%` : "0";',
+  'elements.progressFill.parentElement?.setAttribute("aria-valuenow", String(percent));',
   "return Object.freeze({ render })"
 ]) {
   assertIncludes(
     segmentProgressPresentationServiceJs,
     snippet,
     `SegmentProgressPresentationService must retain characterized progress DOM policy: ${snippet}`
+  );
+}
+const progressMeterMarkup =
+  indexHtml.match(/<div\b[^>]*\brole="progressbar"[^>]*>\s*<div\s+id="progressFill"\s*>/u)?.[0] || "";
+for (const attribute of [
+  'aria-labelledby="progressScope progressText"',
+  'aria-valuemin="0"',
+  'aria-valuemax="100"',
+  'aria-valuenow="0"'
+]) {
+  assertIncludes(
+    progressMeterMarkup,
+    attribute,
+    `the labeled progress meter owning progressFill must declare ${attribute}.`
   );
 }
 assertIncludes(
@@ -12653,7 +12729,6 @@ for (const snippet of [
   'throw new TypeError("SegmentTmSaveController requires translation-memory boundaries.")',
   "const beforeSave =",
   "async function save(segment, project = session.getProject())",
-  "if (!segment || !project || !segment.source.trim() || !segment.target.trim()) return null",
   "beforeSave(segment)",
   "const entry = await tm.saveEntry({",
   "source: segment.source",
@@ -12665,7 +12740,6 @@ for (const snippet of [
   "workspace.markDirty(project.id)",
   "const { reportStatus = true } = saveOptions || {}",
   "const segment = selection.getActiveSegment()",
-  "if (!segment || !session.getProject() || !segment.source.trim() || !segment.target.trim()) return null",
   "const entry = await save(segment, session.getProject())",
   "await tm.refreshMatches()",
   'if (reportStatus) status.set("Segment saved to TM", "saved")',
@@ -12677,6 +12751,17 @@ for (const snippet of [
     segmentTmSaveControllerJs,
     snippet,
     `SegmentTmSaveController must retain characterized direct-save orchestration: ${snippet}`
+  );
+}
+for (const [start, end, project, firstEffect] of [
+  ["async function save(segment,", "async function saveActive(", "!project", "beforeSave(segment)"],
+  ["async function saveActive(", "return Object.freeze({ save, saveActive })", "!session.getProject()", "const entry = await save("]
+]) {
+  const body = functionBody(segmentTmSaveControllerJs, start, end).replace(/\s+/g, " ");
+  const guarded = "if ( !segment || " + project + " || !segment.source.trim() || !segment.target.trim() || linguistics.isPreservedXliffLayout(segment) ) return null";
+  assert(
+    body.includes(guarded) && body.indexOf(guarded) < body.indexOf(firstEffect),
+    "Direct and active TM saves must reject missing data, blank text, and preserved structural XLIFF rows before any save effects."
   );
 }
 assert(
@@ -12757,11 +12842,12 @@ for (const snippet of [
   'text.escapeHtml(match.tmName || match.resourceName || "")',
   'card.addEventListener("dblclick", insert)',
   'card.addEventListener("keydown", (event) => {',
-  "target.insert(translatedTarget, {",
+  "if (match.safeToApply === false || !getResults().includes(match)) return",
+  "target.insert(match.adaptedTarget || match.target, {",
   'channel: "match"',
   'resourceId: match.id || ""',
   "root.replaceChildren(fragment)",
-  "return Object.freeze({ getResults, refresh })"
+  "return Object.freeze({ getResults, refresh, insertMatch })"
 ]) {
   assertIncludes(
     tmMatchesControllerJs,
@@ -13186,7 +13272,8 @@ for (const snippet of [
   ".map((project) => (project.id === session.getProject().id ? session.getProject() : project))",
   "await presentation.refreshSummaries()",
   "presentation.renderAll()",
-  'elements.form.classList.toggle("hidden", Boolean((session.getProject().domain || "").trim()))',
+  'elements.form.classList.toggle("clean", true)',
+  "if (elements.error) elements.error.hidden = false;",
   "workspace.markDirty()",
   'status.set("Project domain saved", "saved")',
   "session.replaceProject(previousProject)",
@@ -14876,7 +14963,9 @@ for (const snippet of [
   'card.className = "concordance-card"',
   "highlight(entry.source, keyword)",
   "highlight(entry.target, keyword)",
-  'text.escapeHtml(entry.projectName || entry.tmName || "")',
+  'new Set([entry.tmName, entry.projectName].filter(Boolean))',
+  "text.escapeHtml(provenance)",
+  "version !== searchVersion || session.getProject()?.id !== project.id",
   'insertButton.textContent = localization.source("Insert target")',
   "target.insert(entry.target, {",
   'channel: "concordance"',
@@ -20208,8 +20297,8 @@ assertIncludes(
 );
 assertIncludes(
   readText("styles.css"),
-  "#e7f2ff",
-  "styles.css must render confirmed AI-initiated segment badges with a light-blue background."
+  ".ai-segment-badge.ai-initiated {\n  background: var(--color-info-soft);",
+  "AI-initiated segment badges must use the theme's informational background."
 );
 assertIncludes(
   appJs,
@@ -20555,16 +20644,16 @@ assertIncludes(
 assertIncludes(indexHtml, "qualityForm", "index.html must expose Quality Workbench controls.");
 assertIncludes(indexHtml, "qualityActiveEvidence", "index.html must expose active segment quality evidence.");
 assertIncludes(indexHtml, "<h2>Comments</h2>", "index.html must label the review panel as Comments.");
-assertIncludes(indexHtml, "<h2>QA Checks</h2>", "index.html must title-case the QA panel.");
+assertIncludes(indexHtml, "<h2>QA findings</h2>", "index.html must identify the QA findings section.");
 assertIncludes(
   readText("styles.css"),
   ".ai-panel {\n  order: 3;",
   "styles.css must place AI Command Centre directly after termbases."
 );
 assertIncludes(
-  readText("styles.css"),
-  ".qa-panel {\n  order: 4;",
-  "styles.css must place QA Checks after AI Command Centre."
+  indexHtml,
+  'aria-controls="inspectorQualityPanel"',
+  "the Quality tab must control a single panel offering QA findings and review tools."
 );
 assertIncludes(
   readText("styles.css"),
@@ -21072,15 +21161,18 @@ assertIncludes(
   "const sourceWordCounts = new WeakMap",
   "SegmentProgressService must cache per-segment source word counts outside persisted project data."
 );
-assertIncludes(
-  segmentProgressServiceJs,
-  "function sourceWordCount",
-  "SegmentProgressService must reuse cached source word counts during progress calculation."
+const projectProgressBody = functionBody(segmentProgressServiceJs, "function projectProgress(segments)", "function activeSummary()");
+const activeSummaryBody = functionBody(segmentProgressServiceJs, "function activeSummary()", "function refresh(");
+assert(
+  (projectProgressBody.match(/for\s*\(const segment of segments\)/g) || []).length === 1 &&
+    (projectProgressBody.match(/sourceWordMetrics\(segment\)/g) || []).length === 1 &&
+    !/segments\.(?:forEach|filter|map|reduce)\(/.test(projectProgressBody),
+  "Project progress must accumulate statuses and cached count metrics together in one segment pass."
 );
-assertIncludes(
-  segmentProgressServiceJs,
-  "for (const segment of getSegments())",
-  "SegmentProgressService must calculate active project progress with one segment pass."
+assert(
+  (activeSummaryBody.match(/projectProgress\(getSegments\(\)\)/g) || []).length === 1 &&
+    !/\bfor\s*\(|\.(?:forEach|filter|map|reduce)\(/.test(activeSummaryBody),
+  "The active summary must reuse one project-progress result without rescanning segments."
 );
 assertIncludes(
   projectDocumentStatisticsServiceJs,
@@ -21683,10 +21775,24 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `editor-shell composition must retain the checked ${boundary} boundary.`);
 }
-assert(
-  (appJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 11,
-  "all eleven application editor-shell consumers must call EditorShellPresentationController.render directly."
-);
+assertCompositionReferences("editorShellPresentationController.render", [
+  "const applicationAggregatePresentationController =",
+  "const projectCollectionLoadController =",
+  "const aiOpenAiSuggestionController =",
+  "const aiSettingsPersistenceController =",
+  "function openInspectorTab(",
+  "const applicationViewController =",
+  "const uiLocaleOrchestrationController =",
+  "const workspaceLayoutController =",
+  "const inspectorToggleController =",
+  "projectExportController ="
+]);
+assertCompositionReferences("openInspectorTab", [
+  "function openInspectorTab(",
+  "const filterPresetController =",
+  "const openReviewComment ="
+]);
+assertIncludes(appJs, 'openInspectorTab("review");', "the review-comment action must open the Review tab.");
 assert(
   (appWorkflowDriverJs.match(/\beditorShellPresentationController\.render\b/g) || []).length === 3,
   "all three workflow editor-shell consumers must call EditorShellPresentationController.render directly."
@@ -22080,10 +22186,28 @@ for (const boundary of [
 ]) {
   assertIncludes(appJs, boundary, `aggregate-presentation composition must retain the checked ${boundary} boundary.`);
 }
-assert(
-  (appJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 19,
-  "all characterized application aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
-);
+assertCompositionReferences("applicationAggregatePresentationController.render", [
+  "const projectOpenController =",
+  "const projectDocumentOpenController =",
+  "const applicationCommandHistoryController =",
+  "const projectDomainController =",
+  "const segmentCommandRestorationController =",
+  "const aiPretranslationController =",
+  "const aiReviewController =",
+  "const aiTagRepairController =",
+  "const aiAlternativesController =",
+  "const aiTerminologyApplicationController =",
+  "const aiDraftEditingController =",
+  "const aiSuggestionApplicationController =",
+  "const structuralSegmentController =",
+  "const projectHomeController =",
+  "const projectDocumentImportController =",
+  "const projectDialogSaveController =",
+  "const reliabilityControls =",
+  "const refreshFileLifecycle =",
+  "const fileManagementController =",
+  "installWorkspaceShell({"
+]);
 assert(
   (appWorkflowDriverJs.match(/\bapplicationAggregatePresentationController\.render\b/g) || []).length === 5,
   "all five workflow aggregate-presentation consumers must call ApplicationAggregatePresentationController.render directly."
@@ -22165,8 +22289,9 @@ for (const boundary of [
   assertIncludes(appJs, boundary, `application active-segment composition and consumers must retain ${boundary}.`);
 }
 assert(
-  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 35,
-  "all 35 application active-segment consumers must call ApplicationActiveSegmentService directly."
+  (appJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 36 &&
+    /refreshInfo:\s*\(\)\s*=>\s*renderSegmentInfo\(\{\s*project:\s*editorSessionStore\.getProject\(\),\s*segment:\s*applicationActiveSegmentService\.get\(\),\s*evidence:\s*qualityWorkbenchController\.evidence\(\)/.test(appJs),
+  "the original 35 active-segment consumers and the Info tab refresh must read the current segment directly."
 );
 assert(
   (appWorkflowDriverJs.match(/\bapplicationActiveSegmentService\.get\b/g) || []).length === 9,
@@ -27109,7 +27234,7 @@ assertIncludes(
 );
 assertIncludes(
   desktopMain,
-  'fetchAppShellAsset("./src/ui/tokens.css", "--color-accent: #087b71")',
+  'fetchAppShellAsset("./src/ui/tokens.css", "--color-accent: #086959")',
   "desktop/main.cjs desktop smoke must verify the semantic design token source is packaged."
 );
 assertIncludes(

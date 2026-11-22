@@ -1,6 +1,6 @@
 # LoopCAT Exchange
 
-Exchange is a local pack library available from the top bar. The English–Turkish terminology and QA examples and the frozen translation lesson work without an account, a model download, or an API key. This is a development feature in the checkout; the November 6 download mirrors predate it.
+Open **Exchange** in the navigation rail. In a narrow window, choose **Open navigation** first. **Examples** has English–Turkish terminology and QA packs and a frozen translation lesson. All three work without an account, a model download or an API key. **Installed** lists the packs on this device. Search by name, publisher or pack ID, or filter by pack type. The project panel and **Active in this project** label show which packs the current job uses.
 
 ## Try a two-translator exchange
 
@@ -10,6 +10,8 @@ Exchange is a local pack library available from the top bar. The English–Turki
 4. Read-only terms appear in **Matches**. Enter inserts an allowed target; open the context menu to copy a permitted term through normal term capture. QA pack findings appear when you run QA. The editor keeps native checks, document reconstruction guards, and the translator's authority over targets.
 5. **Disable for this project** removes a pack from that project’s active tools. **Uninstall from this device** removes the installed artifact. Neither erases accepted targets, independently copied terms, TM contributions, or student submissions. Drafts and learner responses have their own delete controls.
 6. Project handoffs record pack requirements. On a new device, a recipient can continue editing without those packs. A missing required check is **Not evaluated** in the Passport. Ordinary target exports ask before continuing if a required Exchange check could not run. Acknowledging that warning never overrides native format or reconstruction failures.
+
+When reviewing an update, choose **Compare update** in the new pack’s preview. Use the editor selection to compare both versions on your own segments, or leave the selection empty to compare on the pack examples. The comparison leaves the project’s current version pinned. Activate the new version when you are ready to switch.
 
 ## Teaching, teams, and AI
 
@@ -27,7 +29,9 @@ See [the pack format](exchange-pack-format-v1.md) for schemas and limits and [ca
 
 ## Verification and release decision
 
-- `pnpm verify:exchange`: isolated Electron production-renderer checks for pack authoring, sharing, installation, editor use, handoff, removal, direct-file use, and the no-account Lab.
+See the [20 November preview verification](exchange-verification-20261120.md) for current development evidence and the [fresh paired measurements](exchange-performance-evidence-2026-11-20.md) for the typing and save checks.
+
+- `pnpm verify:exchange`: production renderer checks for pack authoring, sharing, installation, editor use, handoff, removal, direct-file use, and the no-account Lab. It also captures screenshots and checks the library, update comparison, authoring, focus and accessibility in light and dark themes and at 200% zoom in Arabic.
 - `pnpm verify:exchange-perf`: paired 10k/100k editor and storage workloads, including inactive packs and mixed active packs. A smoke is diagnostic, not a substitute for the full gate on a quiet reference device.
 - `pnpm verify:quality`, `verify:renderer`, `verify:a11y`, `verify:arabic`, `verify:matches`, web and packaged desktop smoke checks remain applicable. Use clean profiles for platform testing.
 - Before calling the Exchange ready for public release, record an independent translator's author/share/remove test, an instructor's adaptation of the lesson, reference-device performance results, and verification against newly built platform artifacts. Use the [independent pilot exercises](exchange-pilot.md) to distinguish real reuse from an implementer's demonstration. The compute prototype stays outside the production renderer.

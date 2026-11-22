@@ -40,7 +40,7 @@ export function createMatchContextMenu({ document, window, onError = () => {} })
       if (!button.disabled) buttons.push(button);
     }
     if (!buttons.length) return;
-    document.body.append(menu);
+    (anchor.closest?.("dialog[open]") || document.body).append(menu);
     const bounds = anchor.getBoundingClientRect();
     const pointer = event.type === "contextmenu" && (event.clientX || event.clientY);
     const x = pointer ? event.clientX : bounds.left;

@@ -1,0 +1,299 @@
+/* Global navigation keeps the bilingual grid and its inspector in the same workspace. */
+body.liquid-glass-edition {
+  --shell-rail-width: 5.5rem;
+}
+.liquid-glass-edition .app-shell {
+  padding-inline-start: var(--shell-rail-width);
+}
+.liquid-glass-edition #shellRailSlot {
+  position: fixed;
+  z-index: 9;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--shell-rail-width);
+}
+.liquid-glass-edition .shell-navigation {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  padding: 0.65rem 0.4rem;
+  background: var(--color-rail);
+  color: var(--color-rail-text);
+}
+.liquid-glass-edition .shell-brand {
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  padding: 0.2rem 0 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+.liquid-glass-edition .shell-brand img {
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
+  filter: brightness(0) invert(1);
+}
+.liquid-glass-edition .shell-brand h1 {
+  margin: 0;
+  font-size: 0.87rem;
+  color: inherit;
+  line-height: 1.25;
+}
+.shell-nav-group {
+  display: grid;
+  gap: 0.2rem;
+  padding-block: 0.65rem;
+  border-block-start: 1px solid var(--color-rail-active);
+}
+.liquid-glass-edition .shell-navigation button {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.22rem;
+  min-height: 3.6rem;
+  width: 100%;
+  padding: 0.35rem 0.15rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: 560 0.78rem/1.25 var(--font-sans);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  transform: none;
+}
+.shell-navigation svg,
+.shell-masthead svg {
+  inline-size: 1.22rem;
+  block-size: 1.22rem;
+  flex: none;
+}
+.liquid-glass-edition .shell-navigation button:is(:hover, [aria-current="page"]) {
+  background: var(--color-rail-active);
+  color: var(--color-rail-text);
+}
+.shell-navigation [aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 28%;
+  border-inline-start: 3px solid var(--color-rail-focus);
+  border-radius: 3px;
+}
+.liquid-glass-edition .shell-navigation :focus-visible {
+  outline-color: var(--color-rail-focus) !important;
+  outline-offset: -3px;
+  box-shadow: none;
+}
+.liquid-glass-edition .shell-navigation button:disabled {
+  opacity: 0.62;
+  background: transparent;
+}
+.liquid-glass-edition :is(#shellNavToggle, #shellNavClose) {
+  display: none;
+}
+.liquid-glass-edition .topbar.shell-masthead {
+  position: relative;
+  z-index: 7;
+  flex: 0 0 auto;
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-height: 3.05rem;
+  padding: 0.35rem clamp(0.6rem, 1.5vw, 1.65rem);
+}
+.shell-context,
+#shellBreadcrumbs,
+.shell-masthead .topbar-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.4rem;
+}
+.shell-context {
+  flex: 1 1 auto;
+}
+.liquid-glass-edition .shell-masthead .topbar-actions {
+  flex: none;
+  width: auto;
+  flex-wrap: nowrap;
+}
+#shellBreadcrumbs {
+  overflow: hidden;
+  font-size: 0.84rem;
+  color: var(--color-text-muted);
+}
+#shellBreadcrumbs > :is(button, strong) {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#shellBreadcrumbs strong {
+  color: var(--color-text);
+  font-weight: 620;
+}
+.liquid-glass-edition #shellBreadcrumbs > button {
+  background: transparent;
+  padding: 3px;
+  min-height: 1.85rem;
+  color: var(--color-text-muted);
+  font: inherit;
+  border: none;
+  box-shadow: none;
+}
+#shellBreadcrumbs > button:hover {
+  text-decoration: underline;
+}
+.liquid-glass-edition .shell-masthead :is(#shellCommandsBtn, #workspaceMenuSummary, #shellNavToggle) {
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.1rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 550 0.85rem/1.3 var(--font-sans);
+  box-shadow: none;
+}
+.liquid-glass-edition #shellCommandsBtn {
+  display: inline-flex;
+}
+#shellCommandsBtn kbd {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+}
+.liquid-glass-edition .workspace.projects-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+.liquid-glass-edition :is(.projects-view, .project-home-view) {
+  padding: clamp(1rem, 2vw, 2rem);
+  background: var(--color-canvas);
+}
+.liquid-glass-edition :is(.projects-header, .project-home-header) {
+  align-items: center;
+  gap: 1rem;
+  min-height: 0;
+  padding-block: 0.25rem 1.2rem;
+  border-block-end: 1px solid var(--color-line);
+}
+.liquid-glass-edition :is(.projects-header, .project-home-header) h2 {
+  color: var(--color-text);
+  font-size: clamp(1.6rem, 2.6vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.liquid-glass-edition :is(.project-tile, .file-card, .analysis-panel, .actionable-empty-state, .empty-file-state) {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+.liquid-glass-edition .project-filters {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.liquid-glass-edition #projectHomeStats > div {
+  background: var(--color-surface);
+  border-color: var(--color-line);
+}
+.liquid-glass-edition :is(.project-home-stats, .project-stats, .file-progress) {
+  font-variant-numeric: tabular-nums;
+}
+.liquid-glass-edition .file-list-header {
+  margin-block-start: 1.3rem;
+}
+.liquid-glass-edition #projectHomeView .analysis-panel {
+  margin-block-start: 1.4rem;
+}
+.liquid-glass-edition #shellNavigationDialog {
+  padding: 0;
+  border: 0;
+}
+.liquid-glass-edition #shellNavigationDialog:not([open]) {
+  display: none;
+}
+.liquid-glass-edition #shellNavigationDialog::backdrop {
+  background: var(--color-overlay);
+}
+body.liquid-glass-edition.focus-mode .app-shell {
+  padding-inline-start: 0;
+}
+body.liquid-glass-edition.focus-mode :is(#shellRailSlot, .shell-masthead) {
+  display: none;
+}
+@media (max-width: 799px) {
+  .liquid-glass-edition .app-shell {
+    padding-inline-start: 0;
+  }
+  .liquid-glass-edition #shellRailSlot {
+    display: none;
+  }
+  .liquid-glass-edition #shellNavigationDialog[open] {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    margin-inline-end: auto;
+    display: block;
+    inline-size: min(16rem, 85vw);
+    max-inline-size: none;
+    max-block-size: none;
+    block-size: 100dvh;
+    border-radius: 0;
+    background: var(--color-rail);
+    overflow: auto;
+  }
+  .liquid-glass-edition #shellNavToggle {
+    display: inline-flex;
+  }
+  .liquid-glass-edition .shell-navigation #shellNavClose {
+    display: inline-grid;
+    justify-self: end;
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inset-inline-end: 0.5rem;
+    width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  .liquid-glass-edition .shell-brand {
+    justify-content: start;
+    padding-inline: 0.65rem;
+  }
+  .liquid-glass-edition .shell-nav-group button {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    padding-inline: 1rem;
+    gap: 0.8rem;
+    min-height: 2.9rem;
+    font-size: 0.95rem;
+  }
+  .liquid-glass-edition :is(.projects-header, .project-home-header) {
+    align-items: flex-start;
+  }
+}
+@media (max-width: 600px) {
+  #shellCommandsBtn :is(span, kbd) {
+    display: none;
+  }
+  #shellBreadcrumbs > :not(:last-child) {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .shell-navigation [aria-current="page"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

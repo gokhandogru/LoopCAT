@@ -42,10 +42,10 @@ export function createReportPresentationService(options) {
       : `<p class="muted">${localization.sourceHtml(emptyText)}</p>`;
   }
 
-  function countTableHtml(counts, emptyText = "None") {
+  function countTableHtml(counts, emptyText = "None", labelFor = localization.source) {
     const entries = Object.entries(counts || {}).sort(([a], [b]) => a.localeCompare(b));
     if (!entries.length) return `<p class="muted">${localization.sourceHtml(emptyText)}</p>`;
-    return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(localization.source(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
+    return `<table><tbody>${entries.map(([label, count]) => `<tr><th>${escapeHtml(labelFor(label))}</th><td>${count}</td></tr>`).join("")}</tbody></table>`;
   }
 
   function qualityCategoryCountTableHtml(counts, emptyText = "None") {

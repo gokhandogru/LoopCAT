@@ -52,6 +52,7 @@ export function createAiAdministrationController(options) {
   const listeners = [];
   let outputObserver = null;
   let mounted = false;
+  let outputMessage = "";
   let scopeMode = "selected";
   let scopeProjectId = null;
   let availability = {};
@@ -216,9 +217,10 @@ export function createAiAdministrationController(options) {
     promptPreview.value = String(value || "");
   }
 
-  function renderOutput(value, { muted = !value } = {}) {
+  function renderOutput(value, { muted = !value, uiMessage = false } = {}) {
     if (!elements.promptOutput) return;
-    elements.promptOutput.textContent = String(value || "");
+    outputMessage = uiMessage ? String(value || "") : "";
+    elements.promptOutput.textContent = outputMessage ? source(outputMessage) : String(value || "");
     elements.promptOutput.classList.toggle("muted", Boolean(muted));
     revealOutputWhenUseful();
   }
@@ -385,6 +387,10 @@ export function createAiAdministrationController(options) {
   }
 
   function render(view = {}) {
+    if (outputMessage && elements.promptOutput) {
+      const translated = source(outputMessage);
+      if (elements.promptOutput.textContent !== translated) elements.promptOutput.textContent = translated;
+    }
     if (scopeProjectId !== view.projectId) {
       scopeProjectId = view.projectId;
       scopeMode = "selected";

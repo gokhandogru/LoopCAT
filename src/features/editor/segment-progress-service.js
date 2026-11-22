@@ -33,42 +33,47 @@ export function createSegmentProgressService(options) {
     return linguistics.sourceMetrics(typeof text === "string" ? text : text?.trim?.() || "").words;
   }
 
-  function sourceWordCount(segment) {
-    if (!segment || typeof segment !== "object") return 0;
-    const source = segment.source || "";
+  function sourceWordMetrics(segment) {
+    if (!segment || typeof segment !== "object") return { words: 0, countingComplete: false };
+    const source = segment.source;
     const cached = sourceWordCounts.get(segment);
     const language = options.getSourceLanguage?.() || segment.sourceLang || "en";
     const descriptor = JSON.stringify(linguistics.descriptorFor(segment));
     if (cached?.source === source && cached.language === language && cached.descriptor === descriptor)
-      return cached.count;
-    const count = linguistics.metricsForSegment(segment, language).words;
-    sourceWordCounts.set(segment, { source, count, language, descriptor });
-    return count;
+      return cached.metrics;
+    const metrics = linguistics.metricsForSegment(segment, language);
+    sourceWordCounts.set(segment, { source, metrics, language, descriptor });
+    return metrics;
   }
+
+  const sourceWordCount = (segment) => sourceWordMetrics(segment).words;
 
   function projectProgress(segments) {
     const total = segments.length;
     let confirmed = 0;
     let draft = 0;
     let words = 0;
+    let countingComplete = true;
     for (const segment of segments) {
       if (segment.status === "confirmed") confirmed += 1;
       if (segment.status === "draft") draft += 1;
-      words += sourceWordCount(segment);
+      const metrics = sourceWordMetrics(segment);
+      words += metrics.words;
+      countingComplete &&= metrics.countingComplete;
     }
     const percent = total ? Math.round((confirmed / total) * 100) : 0;
-    return { total, confirmed, draft, words, percent };
+    return { total, confirmed, draft, words, percent, ...(countingComplete ? {} : { countingComplete: false }) };
   }
 
   function activeSummary() {
-    const total = getSegments().length;
-    let confirmed = 0;
-    let words = 0;
-    for (const segment of getSegments()) {
-      if (segment.status === "confirmed") confirmed += 1;
-      words += sourceWordCount(segment);
-    }
-    return { projectId: getProjectId() || "", total, confirmed, words };
+    const { total, confirmed, words, countingComplete } = projectProgress(getSegments());
+    return {
+      projectId: getProjectId() || "",
+      total,
+      confirmed,
+      words,
+      ...(countingComplete === false ? { countingComplete } : {})
+    };
   }
 
   function refresh(options = {}) {
@@ -94,5 +99,5 @@ export function createSegmentProgressService(options) {
     return summary;
   }
 
-  return Object.freeze({ wordCount, sourceWordCount, projectProgress, activeSummary, refresh });
+  return Object.freeze({ wordCount, sourceWordCount, sourceWordMetrics, projectProgress, activeSummary, refresh });
 }

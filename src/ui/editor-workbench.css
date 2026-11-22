@@ -1,0 +1,970 @@
+/* Shared reading surfaces for the live grid, inspector and its narrow dialog. */
+#editorView {
+  background: var(--color-canvas);
+}
+
+#editorView .project-toolbar,
+#editorView .segment-controls,
+#editorView .progress-wrap {
+  min-inline-size: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--color-surface);
+}
+
+#editorView .project-toolbar {
+  padding: 5px 12px 3px;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--color-canvas);
+}
+
+#editorView .editor-identity {
+  flex: 2 1 220px;
+}
+
+#editorView .editor-heading {
+  flex: 1 1 auto;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1px 7px;
+}
+
+#editorView .editor-document-picker {
+  grid-column: 1 / -1;
+  min-inline-size: 0;
+}
+
+#editorFileTitle {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#editorView #editorProjectDetails {
+  justify-self: start;
+}
+
+@media (min-width: 1000px) {
+  .app-shell:has(#shellFilesBtn:not([hidden]):enabled, #shellBreadcrumbs > button[data-view="project"])
+    #projectFilesBtn {
+    display: none;
+  }
+}
+
+#editorView #documentFilter {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 30px;
+  block-size: 32px;
+  padding: 0 4px;
+  padding-inline-end: 25px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  font-weight: 650;
+}
+
+#editorView #documentFilter:hover {
+  border-color: var(--color-control-line, var(--color-line-strong));
+}
+
+#editorView .editor-file-context {
+  flex: 0 1 auto;
+}
+
+#editorView .editor-language-pair {
+  padding-inline-start: 5px;
+  font-size: var(--font-size-xs);
+}
+
+#editorView #editorProjectDetails #projectTitle {
+  white-space: normal;
+  margin: 0 0 4px;
+}
+
+#editorView .segment-controls {
+  padding: 3px 12px;
+  border-block-start: 1px solid var(--color-line);
+}
+
+html[lang^="es"] #editorView #segmentStatusFilter {
+  flex: 0 0 200px;
+  max-width: 200px;
+}
+
+#editorView .progress-wrap {
+  min-block-size: 0;
+  padding: 3px 12px 6px;
+}
+
+#editorView .progress-label {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#editorView .progress-bar {
+  height: 3px;
+  background: var(--color-line);
+}
+
+#editorView #progressFill {
+  background: var(--color-accent);
+}
+
+#editorView #confirmBtn {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+#editorView #inspectorToggleBtn[aria-expanded="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+}
+
+#editorView .segment-grid-wrap {
+  background: var(--color-surface);
+  border: 0;
+  border-block-start: 1px solid var(--color-line);
+  border-radius: 0;
+}
+
+.editor-select-label {
+  display: none;
+}
+
+#editorView .segment-grid {
+  width: 100%;
+  min-width: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+#editorView .segment-grid th {
+  height: 34px;
+  padding: 6px 12px;
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  border-color: var(--color-line);
+  font-size: var(--font-size-xs);
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: start;
+}
+
+#editorView .segment-grid td {
+  padding: 8px 12px;
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+#editorView .segment-grid .num-col {
+  width: 54px;
+  padding-inline: 5px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+#editorView .segment-grid .status-col {
+  width: 105px;
+  padding-inline: 6px;
+  overflow-wrap: anywhere;
+}
+
+#editorView .segment-grid tr:hover td {
+  background: var(--color-surface-subtle);
+}
+
+#editorView .segment-grid tr.active td {
+  background: var(--color-selected-surface, var(--color-accent-soft));
+  box-shadow: none;
+}
+
+#editorView .segment-grid tr.active > .num-col {
+  border-inline-start: 3px solid var(--color-accent);
+  color: var(--color-accent-hover);
+}
+
+#editorView .source-cell,
+#editorView .target-cell :is(.target-editor, textarea) {
+  font-size: 0.97rem;
+  line-height: 1.55;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+#editorView .target-cell :is(.target-editor, textarea) {
+  min-height: 45px;
+  padding: 5px 8px;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+#editorView .active .target-cell :is(.target-editor, textarea) {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+#editorView .target-cell :is(.target-editor, textarea):focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+#editorView .tag-chip,
+#editorView .target-protected-tag {
+  color: var(--color-tag-text);
+  border-color: var(--color-tag-border);
+  background: var(--color-tag-background);
+  font-family: var(--font-mono);
+  unicode-bidi: isolate;
+}
+
+#editorView .status-pill {
+  padding: 3px 6px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-line-strong);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: normal;
+  text-align: start;
+}
+
+#editorView .status-pill.confirmed {
+  color: var(--color-success);
+  border-color: currentColor;
+}
+
+#editorView .status-pill.draft {
+  color: var(--color-warning);
+  border-color: currentColor;
+}
+
+#editorInspector {
+  padding: 8px;
+  gap: 6px;
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+#editorInspector .editor-inspector-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 1px 2px;
+}
+
+#editorInspectorTitle {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+#editorInspector .inspector-segment-context {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+#editorInspector #inspectorCloseBtn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1.2rem;
+}
+
+#editorInspector .inspector-tabs {
+  gap: 1px;
+  padding: 2px;
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-md);
+}
+
+#editorInspector .inspector-tabs button[aria-selected="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  background: var(--color-surface);
+  font-weight: 650;
+}
+
+#editorInspector .side-panel {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  background: var(--color-surface);
+}
+
+#editorInspector .match-target {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+html[data-density="compact"] #editorView .segment-grid td {
+  padding-block: 4px;
+}
+
+html[data-density="compact"] #editorView .target-cell :is(.target-editor, textarea) {
+  min-height: 34px;
+  padding-block: 3px;
+}
+
+body.focus-mode #workspace:not(.projects-mode),
+body.focus-mode #editorView {
+  padding: 0;
+}
+
+body.focus-mode #workspace:not(.projects-mode) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1000px) and (max-width: 1099px) {
+  #workspace:not(.projects-mode, .inspector-closed, .focus-mode) {
+    grid-template-columns: minmax(0, 1fr) var(--inspector-width, 320px);
+  }
+
+  #workspace:not(.projects-mode) #editorInspector {
+    position: relative;
+    inset: auto;
+    width: auto;
+    box-shadow: none;
+  }
+}
+
+#inspectorSheet:not([open]) {
+  display: none;
+}
+
+#inspectorSheet[open] {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: auto 0;
+  width: min(420px, 100%);
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-inline-start: 1px solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+#inspectorSheet::backdrop {
+  background: var(--color-overlay);
+}
+
+#inspectorSheet[open] #editorInspector {
+  position: relative;
+  inset: auto;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Keep status, provenance and QA evidence with their target. These four native
+   table cells use three visual tracks, leaving the reading pair more width. */
+@container editor (min-width: 621px) {
+  #editorView .segment-grid-wrap {
+    margin: 3px 8px 8px;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
+  }
+
+  #editorView .segment-grid,
+  #editorView .segment-grid :is(thead, tbody, .segment-spacer-row, .segment-spacer-row > td) {
+    display: block;
+  }
+
+  #editorView .segment-grid thead {
+    position: sticky;
+    z-index: 1;
+    inset-block-start: 0;
+  }
+
+  #editorView .segment-grid thead tr,
+  #editorView .segment-grid tr[data-index] {
+    display: grid;
+    grid-template-columns: 48px repeat(2, minmax(0, 1fr));
+  }
+
+  #editorView .segment-grid #editorStatusColumn {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  #editorView .segment-grid .num-col {
+    width: auto;
+  }
+
+  #editorView .segment-grid tr[data-index] > :is(.num-col, .source-cell) {
+    grid-row: 1 / span 2;
+  }
+
+  #editorView .segment-grid tr[data-index] > .target-cell {
+    grid-column: 3;
+    grid-row: 1;
+    padding-block-end: 1px;
+    border-block-end: 0;
+  }
+
+  #editorView .segment-grid tr[data-index] > .status-col {
+    display: flex;
+    grid-column: 3;
+    grid-row: 2;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 5px;
+    width: auto;
+    min-width: 0;
+    padding: 1px 12px 6px;
+    border-block-start: 0;
+  }
+
+  #editorView .segment-grid .status-col > * {
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  #editorView .status-pill {
+    padding: 1px 5px;
+  }
+
+  html[data-density="compact"] #editorView .segment-grid tr[data-index] > .status-col {
+    padding-block-end: 3px;
+  }
+}
+
+@container editor (max-width: 760px) {
+  #editorView .editor-context-actions,
+  #editorView .editor-file-context {
+    flex: 0 1 auto;
+  }
+
+  #editorView .editor-identity {
+    flex: 2 1 190px;
+  }
+
+  #editorView .editor-search {
+    flex: 2 1 150px;
+  }
+
+  #editorView .segment-grid .num-col {
+    width: 42px;
+  }
+
+  #editorView .segment-grid .status-col {
+    width: 86px;
+  }
+}
+
+@container editor (max-width: 620px) {
+  #editorView .project-toolbar,
+  #editorView .segment-controls {
+    gap: 4px;
+    padding-inline: 6px;
+  }
+
+  #editorView .segment-grid thead th:not(.num-col) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  #editorView .segment-grid thead,
+  #editorView .segment-grid thead tr {
+    display: block;
+  }
+
+  #editorView .segment-grid thead .num-col {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding-inline: 8px;
+  }
+
+  #editorView .editor-select-label {
+    display: inline;
+    cursor: pointer;
+  }
+
+  #editorView .segment-grid tbody,
+  #editorView .segment-grid {
+    display: block;
+  }
+
+  #editorView .segment-grid tr[data-index] {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    border-block-end: 1px solid var(--color-line);
+  }
+
+  #editorView .segment-grid tr[data-index] > td {
+    display: block;
+    border-block: 0;
+    padding-block: 4px;
+  }
+
+  #editorView .segment-grid tr[data-index] > .num-col {
+    grid-row: 1 / span 3;
+    width: auto;
+  }
+
+  #editorView .segment-grid tr[data-index] > :is(.source-cell, .target-cell, .status-col) {
+    grid-column: 2;
+    width: auto;
+  }
+
+  #editorView .source-cell::before,
+  #editorView .target-cell::before {
+    display: block;
+    color: var(--color-text-muted);
+    font: 600 var(--font-size-xs) var(--font-sans);
+  }
+
+  #editorView .source-cell::before {
+    content: var(--editor-source-label);
+  }
+
+  #editorView .target-cell::before {
+    content: var(--editor-target-label);
+  }
+}
+
+@media (forced-colors: active) {
+  #editorView .segment-grid tr.active > .num-col,
+  #editorInspector .inspector-tabs button[aria-selected="true"] {
+    border-color: Highlight;
+  }
+}
+
+/* AI inspector: connection, scoped commands and inspectable local results. */
+#inspectorAiPanel {
+  container: ai-inspector / inline-size;
+}
+
+#inspectorAiPanel > .panel-header {
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+#openProjectAiSettingsBtn {
+  margin-inline-start: auto;
+  min-height: 28px;
+  padding: 3px 7px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+}
+
+#openProjectAiSettingsBtn:hover {
+  background: var(--color-accent-soft);
+}
+
+#inspectorAiPanel .ai-contextual-workflow {
+  min-inline-size: 0;
+  gap: var(--space-2);
+}
+
+#inspectorAiPanel :is(.ai-connection, .ai-contextual-scope) {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 2fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+#inspectorAiPanel .ai-field-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+#contextualAiStatus {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+#contextualAiStatus::before {
+  content: "";
+  flex: 0 0 7px;
+  height: 7px;
+  border: 1px solid var(--color-control-line);
+  border-radius: 50%;
+}
+
+#contextualAiStatus[data-connection="connected"]::before {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+#contextualAiStatus:is([data-connection="checking"], [data-connection="error"])::before {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+#inspectorAiPanel :is(#localAiModeSelect, .ai-contextual-actions button) {
+  height: auto;
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font-size: var(--font-size-sm);
+  line-height: 1.25;
+}
+
+#inspectorAiPanel .ai-contextual-actions {
+  gap: 5px;
+}
+
+#inspectorAiPanel .ai-contextual-actions button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+#inspectorAiPanel .ai-contextual-safeguard {
+  line-height: var(--line-height-body);
+}
+
+#contextualAiSuggestionMount,
+#contextualAiOutputMount {
+  min-inline-size: 0;
+  border-block-start: 1px solid var(--color-line);
+  padding-block-start: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+#contextualAiSuggestionMount {
+  gap: var(--space-1);
+}
+
+#contextualAiSuggestionMount h3 {
+  margin: 0;
+  font: 650 var(--font-size-sm)/1.4 var(--font-sans);
+  color: var(--color-text);
+}
+
+#inspectorAiPanel :is(#aiSuggestionList, #localAiPromptOutput) {
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#inspectorAiPanel :is(#aiSuggestionList, #localAiPromptOutput).muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+#inspectorAiPanel .ai-suggestion-card {
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-inline-start: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-selected-surface);
+}
+
+#inspectorAiPanel .ai-suggestion-card header {
+  flex-wrap: wrap;
+  color: var(--color-text-muted);
+}
+
+#inspectorAiPanel .ai-suggestion-card header strong {
+  color: var(--color-accent);
+}
+
+#inspectorAiPanel .ai-suggestion-preview {
+  margin: var(--space-2) 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+#inspectorAiPanel .ai-suggestion-preview:empty,
+#inspectorAiPanel .ai-suggestion-card ul:empty,
+#inspectorAiPanel .ai-suggestion-card:has(.ai-suggestion-inspection[open]) .ai-suggestion-preview {
+  display: none;
+}
+
+#inspectorAiPanel .ai-suggestion-inspection {
+  border: 0;
+  background: transparent;
+}
+
+#inspectorAiPanel .ai-suggestion-inspection > summary {
+  padding: 5px 0;
+  color: var(--color-accent);
+}
+
+#inspectorAiPanel .ai-suggestion-diff {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#localAiOutputDrawer {
+  display: block;
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#editorInspector .local-ai-output-drawer > summary {
+  padding-inline: 0;
+}
+
+#localAiOutputDrawer[open] #localAiPromptOutput {
+  margin-block-start: var(--space-1);
+  white-space: pre-wrap;
+}
+
+html[data-density="compact"] #inspectorAiPanel .ai-contextual-workflow {
+  gap: 5px;
+}
+
+@container ai-inspector (max-width: 240px) {
+  #inspectorAiPanel :is(.ai-connection, .ai-contextual-scope),
+  #inspectorAiPanel .ai-contextual-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+#editorInspector :is(#inspectorReviewPanel, #inspectorInfoPanel) {
+  min-inline-size: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
+:is(#inspectorReviewPanel, #inspectorInfoPanel) > .panel-content {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+:is(#inspectorReviewPanel, #inspectorInfoPanel) h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-tight);
+}
+
+:is(#inspectorReviewPanel, #inspectorInfoPanel) > .inspector-disclosure {
+  border-block-start: 1px solid var(--color-line);
+}
+
+#inspectorReviewPanel :is(.review-form, .comment-list, .revision-history-list),
+#inspectorInfoPanel .domain-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+}
+
+#inspectorReviewPanel .review-form {
+  border-block-start: 1px solid var(--color-line);
+  padding-block-start: var(--space-3);
+}
+
+#inspectorReviewPanel label,
+#inspectorInfoPanel .domain-form label {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+#inspectorReviewPanel :is(select, textarea),
+#inspectorInfoPanel .domain-form input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  margin: 0;
+  background: var(--color-input);
+  color: var(--color-text);
+}
+
+#inspectorReviewPanel textarea {
+  min-block-size: 3.5rem;
+  resize: vertical;
+}
+
+#inspectorReviewPanel #reviewNoteDetails > summary {
+  padding-inline: 0;
+}
+
+#inspectorReviewPanel .comment-list:not(.muted) {
+  max-block-size: clamp(8rem, 28dvh, 18rem);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+#inspectorReviewPanel .comment-card {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-inline-start: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  white-space: pre-wrap;
+}
+
+#inspectorReviewPanel :is(.comment-card, .revision-card) header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-text-muted);
+}
+
+#inspectorReviewPanel :is(.comment-card, .revision-card) header strong {
+  color: var(--color-text);
+}
+
+#inspectorReviewPanel .revision-history-list,
+#inspectorInfoPanel :is(#projectInfo, .domain-form) {
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+
+#inspectorReviewPanel .revision-card {
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+#inspectorReviewPanel .revision-pair > div {
+  padding: var(--space-2);
+  border: 0;
+  border-inline-start: 2px solid var(--color-line-strong);
+  border-radius: 0;
+  background: var(--color-surface-subtle);
+}
+
+#inspectorReviewPanel .revision-pair > div:last-child {
+  border-inline-start-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+#inspectorReviewPanel .revision-pair span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+#inspectorInfoPanel dl {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr);
+  align-items: baseline;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-body);
+}
+
+#inspectorInfoPanel :is(dt, dd) {
+  min-inline-size: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+#inspectorInfoPanel dt {
+  color: var(--color-text-muted);
+}
+
+#inspectorInfoPanel dd {
+  color: var(--color-text);
+}
+
+#inspectorInfoPanel #segmentInfoEmpty,
+#inspectorReviewPanel .revision-history-list > p {
+  margin: 0;
+}
+
+#inspectorInfoPanel [data-segment-info="status"] {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-subtle);
+}
+
+#inspectorInfoPanel [data-state="confirmed"] {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+#inspectorInfoPanel [data-state="draft"] {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+#inspectorInfoPanel [data-state="high"],
+#inspectorInfoPanel [data-state="critical"] {
+  color: var(--color-danger);
+  font-weight: 650;
+}
+
+:is(#inspectorReviewPanel, #inspectorInfoPanel) .inspector-save-failure {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+#inspectorReviewPanel .empty-review,
+:is(#inspectorReviewPanel, #inspectorInfoPanel) [hidden] {
+  display: none;
+}
+.xliff-line-break {
+  display: inline-block;
+  margin-inline-start: 0.3em;
+  color: var(--color-text-muted);
+  font-size: 0.85em;
+  user-select: none;
+}

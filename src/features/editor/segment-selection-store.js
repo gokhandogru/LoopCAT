@@ -1,4 +1,25 @@
 /** Selection is independent of the active editing cell and DOM virtualization. */
+export function bindSegmentSelectionToSession(
+  session,
+  selection,
+  { getVisibleIndexes = () => null, onVisibleChange = () => {} } = {}
+) {
+  let visible = getVisibleIndexes();
+  return session.subscribe?.((next, previous) => {
+    const nextVisible = getVisibleIndexes();
+    // Draft progress and save status do not change segment membership. Avoid
+    // rebuilding a whole-project ID set and selection toolbar for each key.
+    if (next.segments !== previous.segments || next.project?.id !== previous.project?.id) {
+      selection.sync(next.project?.id || "", next.segments);
+    } else if (nextVisible !== visible) {
+      // Editing may remove a row from a target/status filter without replacing
+      // the segment array. Recompute the select-all indicator for that view.
+      onVisibleChange();
+    }
+    visible = nextVisible;
+  });
+}
+
 export function createSegmentSelectionStore() {
   let projectId = "";
   let anchor = "";

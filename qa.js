@@ -122,6 +122,7 @@ function runQaChecks(segments, terms = [], tagHelpers = {}) {
   const checks = [];
   const concepts = termConceptGroups(terms);
   segments.forEach((segment, index) => {
+    if (globalThis.LoopCATLinguistics?.isPreservedXliffLayout?.(segment)) return;
     const target = segment.target || "";
     if (!target.trim()) {
       checks.push(issue({

@@ -198,8 +198,8 @@ test("ReportDocumentCompositionService preserves complete normal and anonymized 
   const normal = service.projectReportHtml(data);
   const anonymized = service.projectReportHtml(data, { anonymized: true });
 
-  assert.equal(hash(normal), "04164535fea017832eb2222404e2b70f10480cf08a7d1f980d568a13cf6c46a9");
-  assert.equal(hash(anonymized), "806010870e1b58cd1cefcafbde420922b3a283f8ccc5ddfbf3dc23ac3dc79c26");
+  assert.equal(hash(normal), "9dedaf051736cad4979f569f3102077ec3478a64f1ce85aa93988ae679ab4163");
+  assert.equal(hash(anonymized), "fb22adf8c600572c31dbeaafbce8cbf44f8aaa71bd60297d8991dbf70376013f");
   assert.match(normal, /^<!doctype html>\n<html lang="ca-ES" dir="rtl">/);
   assert.match(normal, /Content-Security-Policy/);
   assert.doesNotMatch(normal, /secret-[\w-]+/);
@@ -214,7 +214,7 @@ test("ReportDocumentCompositionService preserves the complete Quality Passport a
   const { service } = await createHarness();
   const output = service.qualityPassportHtml(fixtureData());
 
-  assert.equal(hash(output), "422503b2c6bb051f4f2dc0bdac16159abd638f18ec49b044c95d809f9f18ee37");
+  assert.equal(hash(output), "2b4f349534637c4f862b842ab22abcddc5f6dd1e3d995726cda50be8de3955f7");
   assert.match(output, /^<!doctype html>\n<html lang="ca-ES" dir="rtl">/);
   assert.match(output, /L:LoopCAT Quality Passport/);
   assert.match(output, /<td>#20<\/td>/);
@@ -222,6 +222,58 @@ test("ReportDocumentCompositionService preserves the complete Quality Passport a
   assert.match(output, /three-20/);
   assert.doesNotMatch(output, /four-20/);
   assert.doesNotMatch(output, /secret-[\w-]+/);
+});
+
+test("Generated status, count, and QA evidence are localized while report text and custom signals are preserved", async () => {
+  const { service } = await createHarness();
+  const data = fixtureData();
+  const passport = data.qualityPassport;
+  passport.riskQueue.byLevel.clear = 3;
+  passport.riskQueue.items[0].reasons = [
+    { type: "qa-tag", label: "Missing protected placeholder {value1}.", messageValues: { value1: "<client-tag>" } },
+    { type: "low-tm-leverage", label: "Best TM match is 40%." },
+    { type: "client-rule", label: "Marked needs review." }
+  ];
+  passport.postEditingEffort.drivers = ["1 untranslated segment.", "Custom driver text"];
+  data.validation.warnings = ["2 empty target segments will be reported as untranslated.", "Custom warning text"];
+  const output = service.qualityPassportHtml(data);
+  assert.match(output, /L:No risk/);
+  assert.match(output, /L:Needs review/);
+  assert.match(output, /L:Missing protected placeholder &lt;client-tag&gt;\./);
+  assert.match(output, /L:Best TM match: 40%/);
+  assert.match(output, /L:Untranslated: 1/);
+  assert.match(output, /L:2 empty target segment\(s\) will be reported as untranslated\./);
+  assert.match(output, /@media print \{ :root \{ --canvas: white;/);
+  assert.match(output, /Marked needs review\./);
+  assert.match(output, /<li>Custom warning text<\/li>/);
+  assert.match(output, /<li>Custom driver text<\/li>/);
+  assert.match(output, /<td>Warm<\/td>/);
+});
+
+test("Generated status, count, and QA evidence are localized while report text and custom signals are preserved", async () => {
+  const { service } = await createHarness();
+  const data = fixtureData();
+  const passport = data.qualityPassport;
+  passport.riskQueue.byLevel.clear = 3;
+  passport.riskQueue.items[0].reasons = [
+    { type: "qa-tag", label: "Missing protected placeholder {value1}.", messageValues: { value1: "<client-tag>" } },
+    { type: "low-tm-leverage", label: "Best TM match is 40%." },
+    { type: "client-rule", label: "Marked needs review." }
+  ];
+  passport.postEditingEffort.drivers = ["1 untranslated segment.", "Custom driver text"];
+  data.validation.warnings = ["2 empty target segments will be reported as untranslated.", "Custom warning text"];
+  const output = service.qualityPassportHtml(data);
+  assert.match(output, /L:No risk/);
+  assert.match(output, /L:Needs review/);
+  assert.match(output, /L:Missing protected placeholder &lt;client-tag&gt;\./);
+  assert.match(output, /L:Best TM match: 40%/);
+  assert.match(output, /L:Untranslated: 1/);
+  assert.match(output, /L:2 empty target segment\(s\) will be reported as untranslated\./);
+  assert.match(output, /@media print \{ :root \{ --canvas: white;/);
+  assert.match(output, /Marked needs review\./);
+  assert.match(output, /<li>Custom warning text<\/li>/);
+  assert.match(output, /<li>Custom driver text<\/li>/);
+  assert.match(output, /<td>Warm<\/td>/);
 });
 
 test("ReportDocumentCompositionService is immutable, validates every boundary, and propagates delegate failures", async () => {

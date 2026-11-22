@@ -1,37 +1,43 @@
 import { openTrial, listResponses, forgetResponse, responseEvidence } from "./lab-session.js";
 import { BLIND_LAB_SAMPLE, validateWorkflowEntries } from "./workflow-packs.js";
 
-function el(root, tag, text = "") {
+function el(root, tag, text = "", className = "") {
   const e = root.ownerDocument.createElement(tag);
   if (text) e.textContent = text;
+  if (className) e.className = className;
   root.append(e);
   return e;
 }
-function action(root, label, onClick) {
+function action(root, label, onClick, disabled = () => false) {
   const b = el(root, "button", label);
   b.type = "button";
+  let error;
   b.addEventListener("click", async () => {
     b.disabled = true;
+    error?.remove();
+    error = null;
     try {
       await onClick();
     } catch (e) {
-      const msg = el(root, "p", e?.message || "Action failed.");
-      msg.setAttribute("role", "alert");
+      if (root.isConnected) {
+        error = el(root, "p", e?.message || "Action failed.", "exchange-workflow-error");
+        error.setAttribute("role", "alert");
+      }
     } finally {
-      b.disabled = false;
+      b.disabled = Boolean(disabled());
     }
   });
   return b;
 }
 function field(root, title, value = "", multiline = false) {
-  const label = el(root, "label", title + " ");
+  const label = el(root, "label", title + " ", "exchange-workflow-field");
   const input = el(label, multiline ? "textarea" : "input");
   input.dir = "auto";
   input.value = value;
   return input;
 }
 function select(root, title, values) {
-  const label = el(root, "label", title + " "),
+  const label = el(root, "label", title + " ", "exchange-workflow-field"),
     node = el(label, "select");
   for (const v of values) {
     const opt = el(node, "option", v);
@@ -53,22 +59,32 @@ function plainDownload(root, name, value) {
   }
 }
 
-export function renderResponseArchive({ root, storage = root.ownerDocument.defaultView.localStorage }) {
+export function renderResponseArchive({
+  root,
+  storage = root.ownerDocument.defaultView.localStorage,
+  afterDeletion = false
+}) {
   root.replaceChildren();
-  el(root, "h3", "Saved learner responses");
+  const heading = el(root, "h3", "Saved learner responses");
+  if (afterDeletion) {
+    heading.tabIndex = -1;
+    heading.focus?.();
+  }
   el(root, "p", "These personal records stay on this device after a lesson is removed. Exporting is optional.");
   const records = listResponses(storage);
   if (!records.length) el(root, "p", "No saved responses.");
   for (const { key, value } of records) {
-    const section = el(root, "section");
-    el(section, "h4", value ? `${value.packId} · ${value.exerciseId}` : "Unreadable local response");
+    const section = el(root, "section", "", "exchange-workflow exchange-response-card");
+    const title = el(section, "h4", value ? `${value.packId} · ${value.exerciseId}` : "Unreadable local response");
+    title.dir = "auto";
     if (value?.choice != null) {
       const reason = field(section, "Include my written justification (it could identify me)");
       reason.type = "checkbox";
       const consent = field(section, "I agree to export these fields for research or teaching");
       consent.type = "checkbox";
-      const preview = el(section, "pre");
+      const preview = el(section, "pre", "", "exchange-response-preview");
       preview.dir = "auto";
+      preview.tabIndex = 0;
       function update() {
         preview.textContent = JSON.stringify(responseEvidence(value, reason.checked), null, 2);
         consent.checked = false;
@@ -80,18 +96,20 @@ export function renderResponseArchive({ root, storage = root.ownerDocument.defau
         plainDownload(section, "loopcat-study-response.json", responseEvidence(value, reason.checked));
       });
     } else el(section, "p", "No submitted decision.");
-    const del = field(section, "Confirm deletion of this local response");
+    const removal = el(section, "div", "", "exchange-response-delete");
+    const del = field(removal, "Confirm deletion of this local response");
     del.type = "checkbox";
-    action(section, "Delete response", () => {
+    action(removal, "Delete response", () => {
       if (!del.checked) throw new Error("Confirm which record to delete.");
       forgetResponse(storage, key);
-      renderResponseArchive({ root, storage });
+      renderResponseArchive({ root, storage, afterDeletion: true });
     });
   }
 }
 
 function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active) {
-  const control = el(root, "div");
+  root.className += " exchange-lab";
+  const control = el(root, "div", "", "exchange-lab-controls");
   const selected = select(
     control,
     "Exercise",
@@ -103,29 +121,50 @@ function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active)
     "p",
     "Compare the four frozen examples. You can reopen a saved response; its order and group are preserved."
   );
-  const panel = el(root, "div");
+  const panel = el(root, "div", "", "exchange-lab-trial");
+  let exerciseJob;
+  function clearExercise() {
+    exerciseJob?.abort();
+    panel.replaceChildren();
+  }
+  signal.addEventListener("abort", clearExercise, { once: true });
   function start() {
     if (!active()) throw new Error("This pack is unavailable or withdrawn.");
+    clearExercise();
+    exerciseJob = new AbortController();
+    const exerciseSignal = exerciseJob.signal;
     const n = selected.selectedIndex,
       exercise = pack.entries[n];
     const trial = openTrial({ storage, pack, pin, exercise, exerciseIndex: n, group: group.selectedIndex });
     function show() {
       const state = trial.snapshot();
       panel.replaceChildren();
-      const source = el(panel, "p", exercise.source);
+      el(panel, "h4", "Source text");
+      const source = el(panel, "p", exercise.source, "exchange-lab-source");
       source.dir = "auto";
       if (pack.languages?.source) source.lang = pack.languages.source;
       el(panel, "p", translate("Group {group}", { group: "ABCD"[state.group] }));
+      const candidates = el(panel, "div", "", "exchange-lab-candidates");
+      let firstCandidate;
       for (let i = 0; i < 4; i++) {
         const c = exercise.candidates[state.order[i]];
-        const heading = el(panel, "h4", translate("Candidate {candidate}", { candidate: "ABCD"[i] }));
+        const chosen = state.choice === i;
+        const card = el(
+          candidates,
+          "article",
+          "",
+          chosen ? "exchange-lab-candidate is-chosen" : "exchange-lab-candidate"
+        );
+        if (chosen) card.setAttribute("aria-current", "true");
+        const heading = el(card, "h4", translate("Candidate {candidate}", { candidate: "ABCD"[i] }));
+        firstCandidate ||= heading;
         if (state.revealed) el(heading, "bdi", " · " + c.label).setAttribute("data-i18n-skip", "");
-        const t = el(panel, "p", c.text);
+        const t = el(card, "p", c.text);
         t.dir = "auto";
         if (pack.languages?.target) t.lang = pack.languages.target;
       }
       if (state.revealed && loadAiHost && pack.languages?.source && pack.languages?.target) {
-        const live = el(panel, "section");
+        const live = el(panel, "section", "", "exchange-workflow exchange-lab-live");
         action(live, "Compare with live engines", async () => {
           live.replaceChildren();
           el(live, "h4", "Separate live comparison");
@@ -135,20 +174,29 @@ function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active)
             "Only the lesson source and its languages are sent. These new outputs do not alter your frozen exercise or recorded judgement."
           );
           const host = await loadAiHost();
-          if (!live.isConnected || signal.aborted) return;
+          if (!live.isConnected || exerciseSignal.aborted) return;
           const ids = host.providerIds(),
             left = select(live, "First provider", ids),
             right = select(live, "Second provider", ids);
           right.selectedIndex = Math.min(1, ids.length - 1);
-          const detail = el(live, "div");
-          let running;
-          signal.addEventListener("abort", () => running?.abort(), { once: true });
+          const detail = el(live, "div", "", "exchange-workflow-disclosure");
+          const status = el(live, "p");
+          status.setAttribute("role", "status");
+          const outputs = el(live, "div", "", "exchange-workflow-outputs");
+          let running, cancel;
+          let blocked = false,
+            comparisonButton;
+          exerciseSignal.addEventListener("abort", () => running?.abort(), { once: true });
           const recipe = () => ({ operation: "compare", providerIds: [left.value, right.value], maxRequests: 2 });
           function preview() {
             running?.abort();
             detail.replaceChildren();
+            outputs.replaceChildren();
+            status.textContent = "";
             try {
               const plan = host.describe(recipe());
+              blocked = Boolean(plan.blocked);
+              if (plan.blocked) el(detail, "p", plan.blocked);
               el(detail, "p", "Two translation requests · cost unknown. Charges may apply.");
               for (const d of plan.destinations)
                 el(
@@ -163,39 +211,67 @@ function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active)
                     (d.external ? "External processing" : "Local runtime")
                 );
             } catch (e) {
+              blocked = true;
               el(detail, "p", e.message);
             }
+            if (comparisonButton) comparisonButton.disabled = blocked;
           }
           preview();
           left.onchange = right.onchange = preview;
-          action(live, "Run separate comparison", async () => {
-            if (running) return;
-            const job = new AbortController();
-            running = job;
-            try {
-              const results = await host.runLessonComparison(
-                recipe(),
-                {
-                  source: exercise.source,
-                  sourceLang: pack.languages.source,
-                  targetLang: pack.languages.target,
-                  exerciseId: exercise.id
-                },
-                {
-                  signal: job.signal,
-                  active: () => live.isConnected && active()
+          comparisonButton = action(
+            live,
+            "Run separate comparison",
+            async () => {
+              if (running) return;
+              const job = new AbortController();
+              running = job;
+              left.disabled = right.disabled = true;
+              cancel.disabled = false;
+              status.textContent = "Running…";
+              outputs.replaceChildren();
+              try {
+                const results = await host.runLessonComparison(
+                  recipe(),
+                  {
+                    source: exercise.source,
+                    sourceLang: pack.languages.source,
+                    targetLang: pack.languages.target,
+                    exerciseId: exercise.id
+                  },
+                  {
+                    signal: job.signal,
+                    active: () => live.isConnected && !exerciseSignal.aborted && active()
+                  }
+                );
+                if (!job.signal.aborted && live.isConnected && active()) {
+                  status.textContent = "";
+                  for (const r of results) {
+                    const result = el(outputs, "article", "", "exchange-workflow-result");
+                    el(result, "h5", r.providerId + " · " + r.model).dir = "auto";
+                    el(result, "p", r.text).dir = "auto";
+                  }
                 }
-              );
-              if (!job.signal.aborted && live.isConnected)
-                for (const r of results) {
-                  el(detail, "h5", r.providerId + " · " + r.model);
-                  el(detail, "p", r.text).dir = "auto";
-                }
-            } finally {
-              running = null;
-            }
-          });
-          action(live, "Cancel live comparison", () => running?.abort());
+              } catch (e) {
+                if (live.isConnected && active()) status.textContent = job.signal.aborted ? "Canceled." : e.message;
+              } finally {
+                running = null;
+                left.disabled = right.disabled = false;
+                cancel.disabled = true;
+              }
+            },
+            () => blocked
+          );
+          comparisonButton.disabled = blocked;
+          cancel = action(
+            live,
+            "Cancel live comparison",
+            () => {
+              running?.abort();
+              status.textContent = "Canceled.";
+            },
+            () => !running || running.signal.aborted
+          );
+          cancel.disabled = true;
         });
       }
       if (state.choice === null) {
@@ -215,7 +291,16 @@ function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active)
           show();
         });
       } else {
-        el(panel, "p", `Recorded: candidate ${"ABCD"[state.choice]}. ${state.reason}`).dir = "auto";
+        const saved = el(
+          panel,
+          "p",
+          `Recorded: candidate ${"ABCD"[state.choice]}. ${state.reason}`,
+          "exchange-lab-recorded"
+        );
+        saved.dir = "auto";
+        const focusTarget = state.revealed ? firstCandidate : saved;
+        focusTarget.tabIndex = -1;
+        focusTarget.focus?.();
         if (!state.revealed)
           action(panel, "Reveal candidate identities", () => {
             if (!active()) throw new Error("This pack is unavailable or withdrawn.");
@@ -227,13 +312,19 @@ function lesson(root, pack, pin, storage, loadAiHost, signal, translate, active)
     show();
   }
   action(control, "Open exercise", start);
-  selected.addEventListener("change", () => panel.replaceChildren());
-  group.addEventListener("change", () => panel.replaceChildren());
+  selected.addEventListener("change", clearExercise);
+  group.addEventListener("change", clearExercise);
 }
 
 function engine(root, entry, host, active, signal) {
-  el(root, "h4", entry.operation);
-  const info = el(root, "div");
+  const card = el(root, "section", "", "exchange-workflow exchange-ai-workflow");
+  const titles = {
+    generate: "Generate a translation",
+    compare: "Compare translations",
+    "terminology-critique": "Review terminology"
+  };
+  el(card, "h4", titles[entry.operation]);
+  const info = el(card, "div", "", "exchange-workflow-content");
   if (!host) {
     el(info, "p", "AI host unavailable.");
     return;
@@ -245,37 +336,61 @@ function engine(root, entry, host, active, signal) {
   source.checked = true;
   if (entry.operation === "terminology-critique")
     el(info, "p", "Terminology critique requires sharing the current draft and matching native terminology.");
-  const disclosure = el(info, "div");
+  const disclosure = el(info, "div", "", "exchange-workflow-disclosure");
   disclosure.setAttribute("aria-live", "polite");
   const sharing = () => ({ source: source.checked, adjacent: adjacent.checked, terminology: terminology.checked });
-  const outputs = el(info, "div");
+  const outputs = el(info, "div", "", "exchange-workflow-outputs");
   outputs.setAttribute("aria-live", "polite");
   let job = null;
+  let cancel;
+  let blocked = false;
   signal.addEventListener("abort", () => job?.abort(), { once: true });
-  const run = action(info, "Run workflow", async () => {
-    if (job) return;
-    const own = new AbortController();
-    job = own;
-    for (const input of [source, adjacent, terminology]) input.disabled = true;
-    outputs.replaceChildren();
-    el(outputs, "p", "Running…");
-    try {
-      const results = await host.run(entry, { signal: own.signal, active, sharing: sharing() });
-      if (!active() || own.signal.aborted) return;
+  const run = action(
+    info,
+    "Run workflow",
+    async () => {
+      if (job) return;
+      const own = new AbortController();
+      job = own;
+      cancel.disabled = false;
+      for (const input of [source, adjacent, terminology]) input.disabled = true;
       outputs.replaceChildren();
-      for (const item of results) {
-        el(outputs, "h5", item.providerId + " · " + item.model);
-        el(outputs, "p", item.text).dir = "auto";
-        if (item.kind === "candidate") action(outputs, "Apply this draft", () => host.apply(item));
+      el(outputs, "p", "Running…");
+      try {
+        const results = await host.run(entry, { signal: own.signal, active, sharing: sharing() });
+        if (!active() || own.signal.aborted) return;
+        outputs.replaceChildren();
+        for (const item of results) {
+          const result = el(outputs, "article", "", "exchange-workflow-result");
+          el(result, "h5", item.providerId + " · " + item.model).dir = "auto";
+          el(result, "p", item.text).dir = "auto";
+          if (item.kind === "candidate") {
+            let applied = false;
+            action(
+              result,
+              "Apply this draft",
+              async () => {
+                if ((await host.apply(item)) !== true)
+                  throw new Error("The draft was not applied. Check the segment and save status.");
+                if (!active()) return;
+                applied = true;
+                el(result, "p", "Draft applied.").setAttribute("role", "status");
+              },
+              () => applied
+            );
+          }
+        }
+      } catch (e) {
+        if (active())
+          outputs.replaceChildren(outputs.ownerDocument.createTextNode(own.signal.aborted ? "Canceled." : e.message));
+      } finally {
+        job = null;
+        cancel.disabled = true;
+        for (const input of [source, adjacent, terminology]) input.disabled = false;
       }
-    } catch (e) {
-      if (active())
-        outputs.replaceChildren(outputs.ownerDocument.createTextNode(own.signal.aborted ? "Canceled." : e.message));
-    } finally {
-      job = null;
-      for (const input of [source, adjacent, terminology]) input.disabled = false;
-    }
-  });
+    },
+    () => blocked
+  );
   function preview() {
     job?.abort();
     outputs.replaceChildren();
@@ -294,15 +409,27 @@ function engine(root, entry, host, active, signal) {
           `${d.id} · ${d.model} · ${d.baseUrl} · ${d.external ? "External processing" : "Local runtime"}`
         );
       if (plan.blocked) el(disclosure, "p", plan.blocked);
-      run.disabled = Boolean(plan.blocked);
+      blocked = Boolean(plan.blocked);
+      run.disabled = blocked;
     } catch (e) {
       el(disclosure, "p", e.message);
+      blocked = true;
       run.disabled = true;
     }
   }
   for (const input of [source, adjacent, terminology]) input.addEventListener("change", preview);
   preview();
-  action(info, "Cancel run", () => job?.abort());
+  cancel = action(
+    info,
+    "Cancel run",
+    () => {
+      job?.abort();
+      outputs.replaceChildren();
+      el(outputs, "p", "Canceled.");
+    },
+    () => !job || job.signal.aborted
+  );
+  cancel.disabled = true;
 }
 
 /** Mount inside a disposable host surface. Call the returned function whenever the active project or pack changes. */
@@ -320,7 +447,7 @@ export function renderAdvancedPack({
   refresh = () => {},
   storage = root.ownerDocument.defaultView.localStorage
 }) {
-  const section = el(root, "section");
+  const section = el(root, "section", "", "exchange-workflow-area");
   if (!repository.isUsable(pin)) throw new Error("This pack is unavailable or withdrawn.");
   let live = true;
   const ctl = new AbortController();
@@ -418,27 +545,33 @@ export function renderAdvancedPack({
   };
 }
 
-export function renderAdvancedAuthor({ root, kind, onCreate, repository = undefined }) {
-  const box = el(root, "section");
+export function renderAdvancedAuthor({ root, kind, onCreate, repository = undefined, initial = undefined }) {
+  const box = el(root, "section", "", "exchange-workflow exchange-workflow-author");
   el(box, "h3", "Create " + kind + " pack");
-  const name = field(box, "Pack name"),
-    id = field(box, "Unique publisher.name"),
-    publisher = field(box, "Publisher"),
-    version = field(box, "Version", "1.0.0"),
-    license = field(box, "License or usage terms"),
-    src = field(box, "Source language", "en"),
-    tgt = field(box, "Target language", "ca");
+  const metadata = el(box, "div", "", "exchange-workflow-metadata");
+  const name = field(metadata, "Pack name", initial?.name || ""),
+    id = field(metadata, "Unique publisher.name", initial?.id || ""),
+    publisher = field(metadata, "Publisher", initial?.publisher || ""),
+    version = field(metadata, "Version", initial?.version || "1.0.0"),
+    license = field(metadata, "License or usage terms", initial?.license || ""),
+    src = field(metadata, "Source language", initial?.languages?.source || "en"),
+    tgt = field(metadata, "Target language", initial?.languages?.target || "ca");
   let entries;
   if (kind === "lesson") {
-    const exercise = field(box, "Source text", BLIND_LAB_SAMPLE.entries[0].source, true);
-    const rubric = field(box, "Rubric criteria, one per line", BLIND_LAB_SAMPLE.entries[0].rubric.join("\n"), true);
-    const candidates = BLIND_LAB_SAMPLE.entries[0].candidates.map((c, i) => ({
-      label: field(box, `Candidate ${i + 1} reveal label`, c.label),
-      text: field(box, `Candidate ${i + 1} frozen text`, c.text, true)
-    }));
+    const example = initial?.entries?.[0] || BLIND_LAB_SAMPLE.entries[0];
+    const exercise = field(box, "Source text", example.source, true);
+    const rubric = field(box, "Rubric criteria, one per line", example.rubric.join("\n"), true);
+    const examples = el(box, "div", "", "exchange-lab-candidates");
+    const candidates = example.candidates.map((c, i) => {
+      const candidate = el(examples, "div", "", "exchange-lab-candidate");
+      return {
+        label: field(candidate, `Candidate ${i + 1} reveal label`, c.label),
+        text: field(candidate, `Candidate ${i + 1} frozen text`, c.text, true)
+      };
+    });
     entries = () => [
       {
-        id: "trial",
+        id: initial?.entries?.[0]?.id || "trial",
         source: exercise.value,
         rubric: rubric.value.split("\n").filter(Boolean),
         candidates: candidates.map((c) => ({ label: c.label.value, text: c.text.value }))
@@ -446,7 +579,12 @@ export function renderAdvancedAuthor({ root, kind, onCreate, repository = undefi
     ];
   } else if (kind === "ai") {
     const op = select(box, "Workflow", ["generate", "compare", "terminology-critique"]),
-      ids = field(box, "Approved provider IDs, separated by commas", "ollama");
+      ids = field(
+        box,
+        "Approved provider IDs, separated by commas",
+        initial?.entries?.[0]?.providerIds.join(", ") || "ollama"
+      );
+    op.value = initial?.entries?.[0]?.operation || "generate";
     entries = () => {
       const providers = ids.value.split(",").map((s) => s.trim());
       return [{ operation: op.value, providerIds: providers, maxRequests: providers.length }];
@@ -460,13 +598,18 @@ export function renderAdvancedAuthor({ root, kind, onCreate, repository = undefi
         const allowed = records.filter((r) => r.pack.kind !== "client");
         if (!allowed.length) el(rows, "p", "Install a pack first.");
         for (const r of allowed) {
+          const saved = initial?.entries?.find(
+            (entry) => entry.id === r.id && entry.version === r.version && entry.digest === r.digest
+          );
           const item = el(rows, "fieldset");
           el(item, "legend", r.pack.name + " · " + r.version);
           const include = field(item, "Include this resource"),
             required = field(item, "Required in project"),
-            priority = field(item, "Priority (0–100)", String(Math.min(chosen.length, 100)));
+            priority = field(item, "Priority (0–100)", String(saved?.priority ?? Math.min(chosen.length, 100)));
           include.type = "checkbox";
+          include.checked = Boolean(saved);
           required.type = "checkbox";
+          required.checked = Boolean(saved?.required);
           priority.type = "number";
           priority.min = "0";
           priority.max = "100";
@@ -518,6 +661,7 @@ export function renderAdvancedAuthor({ root, kind, onCreate, repository = undefi
       name: name.value,
       publisher: publisher.value,
       license: license.value,
+      ...(initial?.attribution ? { attribution: initial.attribution } : {}),
       languages: { source: src.value, target: tgt.value },
       entries: validateWorkflowEntries(kind, entries())
     });

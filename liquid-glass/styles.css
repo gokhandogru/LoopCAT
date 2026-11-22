@@ -1,46 +1,5 @@
-:root {
-  --glass-canvas: #fbf7ef;
-  --glass-canvas-deep: #f2ece1;
-  --glass-panel: rgba(255, 253, 248, 0.72);
-  --glass-panel-strong: rgba(255, 253, 248, 0.88);
-  --glass-surface: #fffdf8;
-  --glass-surface-soft: #eef8f5;
-  --glass-text: #0b3f3a;
-  --glass-muted: #58716d;
-  --glass-line: rgba(201, 217, 211, 0.82);
-  --glass-line-solid: #c9d9d3;
-  --glass-accent: #0b8f83;
-  --glass-accent-strong: #0b756d;
-  --glass-accent-soft: #b7e4d8;
-  --glass-confirm: #0b756d;
-  --glass-confirm-strong: #0b3f3a;
-  --glass-success: #16745f;
-  --glass-warning: #a45a18;
-  --glass-danger: #b6434e;
-  --glass-shadow: 0 24px 64px rgba(11, 63, 58, 0.16), 0 3px 12px rgba(11, 63, 58, 0.08);
-  --glass-shadow-soft: 0 16px 36px rgba(11, 63, 58, 0.12), 0 2px 8px rgba(11, 63, 58, 0.06);
-  --glass-radius-xl: 28px;
-  --glass-radius-lg: 22px;
-  --glass-radius-md: 15px;
-  --glass-radius-sm: 11px;
-  --glass-blur: 24px;
-
-  --bg: var(--glass-canvas);
-  --surface: var(--glass-surface);
-  --surface-2: var(--glass-surface-soft);
-  --text: var(--glass-text);
-  --muted: var(--glass-muted);
-  --line: var(--glass-line-solid);
-  --accent: var(--glass-accent);
-  --accent-strong: var(--glass-accent-strong);
-  --warn: var(--glass-warning);
-  --ok: var(--glass-success);
-  --focus: var(--glass-accent);
-  --shadow: var(--glass-shadow-soft);
-}
-
 * {
-  scrollbar-color: rgba(103, 113, 134, 0.42) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
   scrollbar-width: thin;
 }
 
@@ -57,13 +16,13 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition ::selection {
-  background: rgba(11, 143, 131, 0.2);
+  background: var(--color-accent-soft);
 }
 
 .liquid-glass-edition :focus-visible {
-  outline: 3px solid #00665e !important;
+  outline: 3px solid var(--color-focus) !important;
   outline-offset: 3px;
-  box-shadow: 0 0 0 1px #fffdf8;
+  box-shadow: var(--focus-ring);
 }
 
 .liquid-glass-edition .app-shell {
@@ -93,25 +52,20 @@ body.liquid-glass-edition {
 .liquid-glass-edition summary,
 .liquid-glass-edition .file-button {
   min-height: 40px;
-  border: 1px solid rgba(132, 145, 165, 0.24);
+  border: 1px solid var(--color-line);
   border-radius: var(--glass-radius-sm);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--color-surface);
   color: var(--glass-text);
-  box-shadow: 0 1px 2px rgba(45, 55, 72, 0.04);
+  box-shadow: none;
   transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .liquid-glass-edition button:hover,
 .liquid-glass-edition summary:hover,
 .liquid-glass-edition .file-button:hover {
-  border-color: rgba(11, 143, 131, 0.3);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 6px 16px rgba(67, 82, 105, 0.1);
-}
-
-.liquid-glass-edition button:active,
-.liquid-glass-edition .file-button:active {
-  transform: translateY(1px);
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
+  box-shadow: none;
 }
 
 .liquid-glass-edition button:disabled {
@@ -124,8 +78,8 @@ body.liquid-glass-edition {
 .liquid-glass-edition #confirmBtn {
   border-color: var(--glass-confirm);
   background: var(--glass-confirm);
-  color: #ffffff;
-  box-shadow: 0 9px 22px rgba(11, 117, 109, 0.24);
+  color: var(--color-on-accent);
+  box-shadow: none;
 }
 
 .liquid-glass-edition button.primary:hover,
@@ -139,26 +93,26 @@ body.liquid-glass-edition {
 .liquid-glass-edition select,
 .liquid-glass-edition textarea {
   min-height: 42px;
-  border: 1px solid rgba(132, 145, 165, 0.28);
+  border: 1px solid var(--color-line);
   border-radius: var(--glass-radius-sm);
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--color-input);
   color: var(--glass-text);
-  box-shadow: inset 0 1px 2px rgba(67, 82, 105, 0.035);
+  box-shadow: none;
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
 .liquid-glass-edition input:hover,
 .liquid-glass-edition select:hover,
 .liquid-glass-edition textarea:hover {
-  border-color: rgba(11, 143, 131, 0.34);
+  border-color: var(--color-line-strong);
 }
 
 .liquid-glass-edition input:focus,
 .liquid-glass-edition select:focus,
 .liquid-glass-edition textarea:focus {
   border-color: var(--glass-accent);
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(11, 143, 131, 0.1);
+  background: var(--color-input);
+  box-shadow: var(--focus-ring);
   outline: none;
 }
 
@@ -183,8 +137,6 @@ body.liquid-glass-edition {
   border-radius: 24px;
   background: var(--glass-panel);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
 }
 
 .liquid-glass-edition .brand {
@@ -239,20 +191,20 @@ body.liquid-glass-edition {
 .liquid-glass-edition .topbar-actions > details > summary {
   padding-inline: 14px;
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.44);
+  background: var(--color-surface);
   font-weight: 650;
 }
 
 .liquid-glass-edition .topbar-actions > button:hover,
 .liquid-glass-edition .topbar-actions > details > summary:hover {
-  border-color: rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.82);
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
 }
 
 .liquid-glass-edition .topbar-actions > #newProjectBtn {
   border-color: var(--glass-confirm);
   background: var(--glass-confirm);
-  box-shadow: 0 9px 22px rgba(11, 117, 109, 0.22);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .topbar-actions > #newProjectBtn:hover {
@@ -267,9 +219,9 @@ body.liquid-glass-edition {
   min-width: 68px;
   min-height: 28px;
   padding: 5px 9px;
-  border: 1px solid rgba(39, 135, 103, 0.18);
+  border: 1px solid var(--color-success);
   border-radius: 999px;
-  background: rgba(234, 248, 242, 0.8);
+  background: var(--color-success-soft);
   color: var(--glass-success);
   font-size: 11px;
   font-weight: 700;
@@ -298,8 +250,6 @@ body.liquid-glass-edition {
   border-radius: var(--glass-radius-xl);
   background: var(--glass-panel);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
 }
 
 .liquid-glass-edition .project-rail {
@@ -337,14 +287,14 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .project-item:hover {
-  border-color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.56);
+  border-color: var(--color-line-strong);
+  background: var(--color-hover);
 }
 
 .liquid-glass-edition .project-item.active {
-  border-color: rgba(11, 143, 131, 0.15);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 8px 20px rgba(67, 82, 105, 0.1);
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .project-item span,
@@ -356,10 +306,10 @@ body.liquid-glass-edition {
   min-width: 0;
   height: 100%;
   container-type: inline-size;
-  border: 1px solid rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--color-line);
   border-radius: var(--glass-radius-xl);
   background: var(--glass-surface);
-  box-shadow: var(--glass-shadow);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -369,7 +319,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-home-view {
   height: 100%;
   padding: 24px;
-  background: #f9fafc;
+  background: var(--color-surface-subtle);
   overflow-y: auto;
 }
 
@@ -402,8 +352,8 @@ body.liquid-glass-edition {
   padding: 14px;
   border: 1px solid var(--glass-line-solid);
   border-radius: var(--glass-radius-md);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.055);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .project-dashboard,
@@ -418,17 +368,16 @@ body.liquid-glass-edition {
 .liquid-glass-edition .resource-detail {
   border: 1px solid var(--glass-line-solid);
   border-radius: var(--glass-radius-md);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.06);
+  background: var(--color-surface);
+  box-shadow: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .liquid-glass-edition .project-tile:hover,
 .liquid-glass-edition .file-card:hover,
 .liquid-glass-edition .resource-card:hover {
-  border-color: rgba(11, 143, 131, 0.26);
-  box-shadow: 0 15px 34px rgba(67, 82, 105, 0.11);
-  transform: translateY(-1px);
+  border-color: var(--color-line-strong);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .project-stats,
@@ -440,9 +389,9 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-stats div,
 .liquid-glass-edition .project-home-stats div,
 .liquid-glass-edition .analysis-grid div {
-  border: 1px solid #e9edf3;
+  border: 1px solid var(--color-line);
   border-radius: 13px;
-  background: #f8f9fc;
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .project-stats strong,
@@ -454,7 +403,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .language-badge,
 .liquid-glass-edition .quality-category-pill,
 .liquid-glass-edition .severity-pill {
-  border-color: rgba(11, 143, 131, 0.14);
+  border-color: var(--color-line);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
 }
@@ -466,7 +415,7 @@ body.liquid-glass-edition {
   padding: 4px;
   border: 1px solid var(--glass-line-solid);
   border-radius: 14px;
-  background: #eef1f6;
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .resource-tabs button {
@@ -476,9 +425,9 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .resource-tabs button.active {
-  background: #ffffff;
+  background: var(--color-surface);
   color: var(--glass-accent-strong);
-  box-shadow: 0 5px 14px rgba(67, 82, 105, 0.1);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .resource-table {
@@ -488,33 +437,33 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .resource-row {
-  border-color: #edf0f4;
-  background: #ffffff;
+  border-color: var(--color-line);
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .resource-row:hover {
-  background: #f2fbf8;
+  background: var(--color-hover);
 }
 
 .liquid-glass-edition .analysis-panel,
 .liquid-glass-edition .file-list-header {
   border: 1px solid var(--glass-line-solid);
   border-radius: var(--glass-radius-md);
-  background: #ffffff;
-  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.05);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 /* Editor: opaque center for sustained reading */
 .liquid-glass-edition .editor-view {
   height: 100%;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .project-toolbar {
   min-height: 0;
   padding: 13px 16px 12px 20px;
   border-bottom: 1px solid var(--glass-line-solid);
-  background: #ffffff;
+  background: var(--color-surface);
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 10px;
@@ -540,7 +489,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-toolbar .toolbar-actions > details > summary {
   min-height: 38px;
   padding-inline: 11px;
-  background: #f7f8fb;
+  background: var(--color-surface-subtle);
   font-size: 13px;
   font-weight: 650;
 }
@@ -566,7 +515,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .progress-wrap {
   padding: 10px 20px 9px;
   border-bottom: 1px solid var(--glass-line-solid);
-  background: #fbfcfe;
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .progress-label {
@@ -578,7 +527,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .progress-bar {
   height: 5px;
   border-radius: 999px;
-  background: #e8ebf1;
+  background: var(--color-line);
   overflow: hidden;
 }
 
@@ -591,7 +540,7 @@ body.liquid-glass-edition {
   gap: 7px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--glass-line-solid);
-  background: #f7f9fc;
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .segment-controls input,
@@ -600,7 +549,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .segment-controls summary {
   min-height: 36px;
   border-radius: 9px;
-  background: #ffffff;
+  background: var(--color-surface);
   font-size: 12px;
 }
 
@@ -610,7 +559,7 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition #nextOpenBtn {
   margin-inline-start: auto;
-  border-color: rgba(11, 143, 131, 0.18);
+  border-color: var(--color-line);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
   font-weight: 700;
@@ -618,7 +567,7 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .segment-grid-wrap {
   min-height: 0;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .segment-grid {
@@ -629,8 +578,8 @@ body.liquid-glass-edition {
 .liquid-glass-edition .segment-grid th {
   height: 42px;
   padding: 9px 12px;
-  border-color: #e8ecf2;
-  background: #f7f9fc;
+  border-color: var(--color-line);
+  background: var(--color-surface-subtle);
   color: var(--glass-muted);
   font-size: 11px;
   font-weight: 760;
@@ -640,21 +589,21 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .segment-grid td {
   padding: 12px;
-  border-color: #e9edf3;
-  background: #ffffff;
+  border-color: var(--color-line);
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .segment-grid tr:hover td {
-  background: #fbfbfe;
+  background: var(--color-hover);
 }
 
 .liquid-glass-edition .segment-grid tr.active td {
-  background: #f2fbf8;
-  box-shadow: inset 0 1px rgba(11, 143, 131, 0.15), inset 0 -1px rgba(11, 143, 131, 0.15);
+  background: var(--color-hover);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .segment-grid tr.active td:first-child {
-  box-shadow: inset 3px 0 var(--glass-accent), inset 0 1px rgba(11, 143, 131, 0.15), inset 0 -1px rgba(11, 143, 131, 0.15);
+  box-shadow: inset 3px 0 var(--color-accent);
 }
 
 .liquid-glass-edition .source-cell {
@@ -667,7 +616,7 @@ body.liquid-glass-edition {
   padding: 11px 12px;
   border-color: transparent;
   border-radius: 10px;
-  background: #f7f9fc;
+  background: var(--color-surface-subtle);
   font-size: 14px;
   line-height: 1.5;
   resize: vertical;
@@ -675,7 +624,7 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .target-cell :is(textarea, .target-editor):focus {
   border-color: var(--glass-accent);
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .tag-chip {
@@ -692,7 +641,7 @@ body.liquid-glass-edition {
   min-height: 22px;
   padding: 2px 6px;
   border-radius: 6px;
-  background: #f7faf9;
+  background: var(--color-surface-subtle);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.15;
@@ -715,17 +664,17 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .status-pill.confirmed {
-  background: #e8f6f0;
+  background: var(--color-success-soft);
   color: var(--glass-success);
 }
 
 .liquid-glass-edition .status-pill.draft {
-  background: #fff2e1;
+  background: var(--color-warning-soft);
   color: var(--glass-warning);
 }
 
 .liquid-glass-edition .status-pill.empty {
-  background: #edf0f5;
+  background: var(--color-surface-subtle);
   color: var(--glass-muted);
 }
 
@@ -747,17 +696,17 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .side-panel {
-  border: 1px solid rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--color-line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 9px 24px rgba(67, 82, 105, 0.08);
+  background: var(--color-surface);
+  box-shadow: none;
   overflow: visible;
 }
 
 .liquid-glass-edition .side-panel > .panel-header {
   min-height: 50px;
   padding: 8px 10px;
-  border-bottom-color: rgba(132, 145, 165, 0.16);
+  border-bottom-color: var(--color-line);
   background: transparent;
 }
 
@@ -777,7 +726,7 @@ body.liquid-glass-edition {
   height: 28px;
   padding: 0;
   border: 0;
-  background: rgba(255, 255, 255, 0.44);
+  background: var(--color-surface);
   box-shadow: none;
 }
 
@@ -793,25 +742,25 @@ body.liquid-glass-edition {
 .liquid-glass-edition .revision-card,
 .liquid-glass-edition .ai-suggestion-card,
 .liquid-glass-edition .quality-category-row {
-  border: 1px solid rgba(132, 145, 165, 0.18);
+  border: 1px solid var(--color-line);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 5px 14px rgba(67, 82, 105, 0.055);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .tm-panel .match-card {
-  border-color: rgba(39, 135, 103, 0.18);
-  background: rgba(239, 249, 245, 0.88);
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
 }
 
 .liquid-glass-edition .tb-panel .term-card {
-  border-color: rgba(169, 104, 22, 0.18);
-  background: rgba(255, 249, 240, 0.9);
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
 }
 
 .liquid-glass-edition .tb-panel .forbidden-term-card {
-  border-color: rgba(182, 73, 73, 0.2);
-  background: rgba(255, 244, 244, 0.9);
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
 .liquid-glass-edition .term-form,
@@ -844,7 +793,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .local-ai-progress,
 .liquid-glass-edition .local-ai-provider-summary {
   border-radius: 12px;
-  background: rgba(247, 249, 252, 0.9);
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .local-ai-centre {
@@ -852,9 +801,9 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .local-ai-group {
-  border-color: rgba(132, 145, 165, 0.18);
+  border-color: var(--color-line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .local-ai-group h3,
@@ -864,29 +813,27 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .local-ai-section-number {
   background: var(--glass-confirm);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 .liquid-glass-edition .local-ai-status.connected {
-  border-color: rgba(39, 135, 103, 0.2);
-  background: #edf8f3;
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
 }
 
 .liquid-glass-edition .local-ai-status.disconnected {
-  border-color: rgba(182, 73, 73, 0.15);
-  background: #fff3f3;
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
 /* Menus, overlays, dialogs, and system states */
 .liquid-glass-edition .menu-panel {
   z-index: 100;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--color-line);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
 }
 
 .liquid-glass-edition .menu-panel button,
@@ -900,7 +847,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .menu-panel button:hover,
 .liquid-glass-edition .menu-panel .menu-item:hover,
 .liquid-glass-edition .workspace-submenu > summary:hover {
-  background: rgba(11, 143, 131, 0.08);
+  background: var(--color-accent-soft);
 }
 
 /*
@@ -928,9 +875,9 @@ body.liquid-glass-edition {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 12px;
-  border-color: rgba(11, 143, 131, 0.16);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 48px rgba(55, 70, 92, 0.2);
+  border-color: var(--color-line);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-transient);
 }
 
 .liquid-glass-edition .replace-panel input,
@@ -941,7 +888,7 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition .replace-panel button {
-  border-color: rgba(11, 143, 131, 0.16);
+  border-color: var(--color-line);
   background: var(--glass-accent-soft);
   color: var(--glass-accent-strong);
   font-weight: 720;
@@ -950,7 +897,7 @@ body.liquid-glass-edition {
 .liquid-glass-edition .replace-panel #replaceAllBtn {
   border-color: var(--glass-confirm-strong);
   background: var(--glass-confirm-strong);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 .liquid-glass-edition .workspace-menu-panel {
@@ -959,45 +906,41 @@ body.liquid-glass-edition {
 
 .liquid-glass-edition .workspace-health,
 .liquid-glass-edition .workspace-submenu-body {
-  border-color: rgba(132, 145, 165, 0.16);
+  border-color: var(--color-line);
   border-radius: 12px;
-  background: rgba(247, 249, 252, 0.72);
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .workspace-recovery,
 .liquid-glass-edition .backup-reminder,
 .liquid-glass-edition .validation-report {
   margin: 14px 14px 0;
-  border: 1px solid rgba(169, 104, 22, 0.2);
+  border: 1px solid var(--color-warning);
   border-radius: var(--glass-radius-md);
-  background: #fff8ee;
-  box-shadow: 0 8px 22px rgba(67, 82, 105, 0.06);
+  background: var(--color-warning-soft);
+  box-shadow: none;
 }
 
 .liquid-glass-edition .empty-state,
 .liquid-glass-edition .empty-file-state {
-  border: 1px dashed rgba(11, 143, 131, 0.28);
+  border: 1px dashed var(--color-line);
   border-radius: var(--glass-radius-md);
-  background: #f8f7ff;
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .concordance-overlay,
 .liquid-glass-edition .quick-insert-overlay,
 .liquid-glass-edition .command-palette-overlay {
-  background: rgba(43, 51, 66, 0.24);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--color-overlay);
 }
 
 .liquid-glass-edition .concordance-popover,
 .liquid-glass-edition .quick-insert-popover,
 .liquid-glass-edition .command-palette {
-  border: 1px solid rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--color-line);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(145%);
-  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
 }
 
 .liquid-glass-edition .command-results button,
@@ -1007,18 +950,14 @@ body.liquid-glass-edition {
 }
 
 .liquid-glass-edition dialog {
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--color-line);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(28px) saturate(145%);
-  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-transient);
 }
 
 .liquid-glass-edition dialog::backdrop {
-  background: rgba(43, 51, 66, 0.28);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: var(--color-overlay);
 }
 
 .liquid-glass-edition .dialog-card {
@@ -1030,45 +969,43 @@ body.liquid-glass-edition {
 .liquid-glass-edition .project-storage-config,
 .liquid-glass-edition .project-resource-config,
 .liquid-glass-edition .resource-picker-block {
-  border-color: rgba(132, 145, 165, 0.2);
+  border-color: var(--color-line);
   border-radius: 14px;
-  background: rgba(247, 249, 252, 0.78);
+  background: var(--color-surface-subtle);
 }
 
 .liquid-glass-edition .project-advanced-body {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition #projectForm > .dialog-actions {
-  border-color: rgba(132, 145, 165, 0.18);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  border-color: var(--color-line);
+  background: var(--color-surface);
 }
 
 .liquid-glass-edition .focus-exit-btn {
   border-color: var(--glass-confirm);
   border-radius: 999px;
   background: var(--glass-confirm);
-  color: #ffffff;
+  color: var(--color-on-accent);
   box-shadow: var(--glass-shadow-soft);
 }
 
 .liquid-glass-edition .focus-exit-btn:hover {
   border-color: var(--glass-confirm-strong);
   background: var(--glass-confirm-strong);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 .liquid-glass-edition .danger-small {
-  border-color: rgba(182, 73, 73, 0.18);
-  background: #fff5f5;
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
   color: var(--glass-danger);
 }
 
 .liquid-glass-edition .danger-small:hover {
-  border-color: rgba(182, 73, 73, 0.34);
-  background: #ffebeb;
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 
 @media (max-width: 1480px) {
@@ -1263,51 +1200,11 @@ body.liquid-glass-edition {
  * respect. Keep the functional layer distinct, but make it fully opaque when
  * transparency is reduced so controls never depend on blur for legibility.
  */
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass-panel: #f8fafc;
-    --glass-panel-strong: #ffffff;
-    --glass-line: #cbd5e1;
-    --glass-shadow: 0 12px 28px rgba(67, 82, 105, 0.16);
-    --glass-shadow-soft: 0 6px 18px rgba(67, 82, 105, 0.12);
-  }
-
-  .liquid-glass-edition .topbar,
-  .liquid-glass-edition .project-rail,
-  .liquid-glass-edition .sidebar,
-  .liquid-glass-edition .menu-panel,
-  .liquid-glass-edition .concordance-popover,
-  .liquid-glass-edition .quick-insert-popover,
-  .liquid-glass-edition .command-palette,
-  .liquid-glass-edition dialog,
-  .liquid-glass-edition #projectForm > .dialog-actions {
-    background: var(--glass-panel-strong);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
-  .liquid-glass-edition .concordance-overlay,
-  .liquid-glass-edition .quick-insert-overlay,
-  .liquid-glass-edition .command-palette-overlay,
-  .liquid-glass-edition dialog::backdrop {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
 
 @media (prefers-contrast: more) {
-  :root {
-    --glass-muted: #435d59;
-    --glass-line: #829f99;
-    --glass-line-solid: #829f99;
-    --glass-accent: #0b756d;
-    --glass-accent-strong: #0b3f3a;
-    --glass-confirm: #0b3f3a;
-    --glass-confirm-strong: #062e2a;
-  }
 
   .liquid-glass-edition :focus-visible {
-    outline-color: #0b3f3a !important;
+    outline-color: var(--color-focus) !important;
     outline-width: 4px !important;
   }
 
@@ -1345,7 +1242,7 @@ body.liquid-glass-edition {
 body.liquid-glass-edition.focus-mode {
   height: 100vh;
   overflow: hidden;
-  background: #f4f7fa;
+  background: var(--color-surface-subtle);
 }
 
 body.liquid-glass-edition.focus-mode .app-shell {

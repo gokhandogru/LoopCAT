@@ -1,6 +1,7 @@
 import "../../../statistics-core.js";
 import "../linguistics/core.js";
 import { withStatisticsPricing } from "./statistics-pricing.js";
+import { bindSegmentSelectionToSession } from "../editor/segment-selection-store.js";
 
 /** @param {any} options */
 export function createStatisticsController(options) {
@@ -8,17 +9,7 @@ export function createStatisticsController(options) {
   const t = (text, values = {}) =>
     String(translate(text, values)).replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match);
   const domain = globalThis.LoopCATStatistics;
-  const labels = {
-    context: "Context matches",
-    exact: "100% matches",
-    repetition: "Repetitions",
-    "95-99": "95–99%",
-    "85-94": "85–94%",
-    "75-84": "75–84%",
-    "50-74": "50–74%",
-    new: "New / no match",
-    incomplete: "Incomplete"
-  };
+  const labels = domain.bandLabels;
   const node = (tag, text = "", parent = null) => {
     const element = doc.createElement(tag);
     if (text) element.textContent = t(text);
@@ -46,12 +37,14 @@ export function createStatisticsController(options) {
   let snapshot = null,
     abort = null,
     openSelection = [],
-    resources = [],
     links = [],
+    sourcePreview = null,
     changed = true,
     timer = null,
     run = 0,
     historical = false,
+    saving = false,
+    retryAnalysis = false,
     pricingInvalid = false;
   const close = button("Close", header, () => dialog.close());
   const bodyArea = node("div", "", dialog);
@@ -71,13 +64,20 @@ export function createStatisticsController(options) {
   }
   const scopeSummary = node("span", "", controls);
   scopeSummary.className = "statistics-scope-summary";
-  const fileChoices = node("fieldset", "", bodyArea);
+  scopeSummary.id = "statisticsScopeSummary";
+  scopeSelect.setAttribute("aria-describedby", scopeSummary.id);
+  const filePicker = node("details", "", bodyArea);
+  filePicker.className = "statistics-disclosure";
+  node("summary", "Files to analyze", filePicker);
+  const fileChoices = node("fieldset", "", filePicker);
   fileChoices.className = "statistics-file-choices";
   node("legend", "Files to analyze", fileChoices);
-  fileChoices.hidden = true;
+  filePicker.hidden = true;
   const results = node("section", "", bodyArea);
   const drilldown = node("section", "", bodyArea);
   drilldown.className = "statistics-drilldown";
+  drilldown.id = "statisticsDrilldown";
+  drilldown.setAttribute("aria-labelledby", "statisticsDrilldownTitle");
   drilldown.hidden = true;
   const disclosure = (label) => {
     const section = node("details", "", bodyArea);
@@ -158,25 +158,38 @@ export function createStatisticsController(options) {
   const primaryActions = node("div", "", actions);
   primaryActions.className = "statistics-footer-primary";
   const calculateButton = button("Calculate", primaryActions, calculate);
+  calculateButton.id = "statisticsCalculate";
   calculateButton.className = "primary";
   const cancel = button("Cancel calculation", primaryActions, () => {
     run++;
     abort?.abort();
     abort = null;
-    calculateButton.disabled = false;
     cancel.hidden = true;
     meta.textContent = t("Calculation canceled. Previous results retained.");
+    if (!changed) sourcePreview = null;
     render();
   });
   cancel.hidden = true;
   const saveButton = button("Save snapshot", secondaryActions, async () => {
+    if (saving) return;
     if (!snapshot || changed || pricingInvalid || abort)
       throw Error(t("Calculate current settings before saving a snapshot."));
     if (!snapshot.complete)
       throw Error(t("Complete the analysis before saving a quote snapshot. Partial reports can be exported."));
-    await options.save(snapshot);
-    await renderSaved();
-    meta.textContent = t("Snapshot saved. Later TM changes will not change this report.");
+    const report = snapshot;
+    saving = true;
+    setAvailability();
+    try {
+      if (!(await checkFreshness(report))) return;
+      await options.save(report);
+      if (session.getProject()?.id !== report.projectId) return;
+      renderSaved();
+      if (report === snapshot && !changed)
+        meta.textContent = t("Snapshot saved. Later TM changes will not change this report.");
+    } finally {
+      saving = false;
+      setAvailability();
+    }
   });
   const exportFormat = node("select", "", secondaryActions);
   exportFormat.id = "statisticsExportFormat";
@@ -185,12 +198,18 @@ export function createStatisticsController(options) {
     const option = node("option", format.toUpperCase(), exportFormat);
     option.value = format;
   }
-  const exportButton = button("Export", secondaryActions, () => {
+  const exportButton = button("Export", secondaryActions, async () => {
     if (!snapshot) throw Error(t("Calculate statistics first."));
     const format = exportFormat.value;
+    const report = snapshot;
+    if (!historical && !(await checkFreshness(report))) return;
     options.download(
-      `LoopCAT-Statistics-${snapshot.id}.${format}`,
-      domain.exportReport(snapshot, format),
+      `LoopCAT-Statistics-${report.id}.${format}`,
+      domain.exportReport(report, format, {
+        locale: doc.documentElement.lang || "en",
+        direction: doc.documentElement.dir,
+        translate: t
+      }),
       format === "json" ? "application/json" : format === "html" ? "text/html" : "text/csv"
     );
   });
@@ -199,14 +218,15 @@ export function createStatisticsController(options) {
   }
   function dirty() {
     changed = true;
+    historical = false;
+    retryAnalysis = false;
     run++;
     abort?.abort();
     abort = null;
-    calculateButton.disabled = false;
     cancel.hidden = true;
     meta.textContent = t("Settings changed. Calculate again.");
-    saveButton.disabled = true;
     updateScopeSummary();
+    updateSourcePreview();
     render();
   }
   function scope() {
@@ -220,13 +240,41 @@ export function createStatisticsController(options) {
     return { kind: "project" };
   }
   scopeSelect.addEventListener("change", () => {
-    fileChoices.hidden = scopeSelect.value !== "files";
+    filePicker.hidden = scopeSelect.value !== "files";
+    filePicker.open = !filePicker.hidden;
     dirty();
-    updateScopeSummary();
   });
+  function emptyFileScope() {
+    return scopeSelect.value === "files" && !fileChoices.querySelector("input:checked");
+  }
+  function analysisOptions() {
+    return Object.fromEntries(Object.entries(checks).map(([key, input]) => [key, input.checked]));
+  }
+  function updateSourcePreview() {
+    sourcePreview = null;
+    if (emptyFileScope()) {
+      meta.textContent = t("Select at least one file to calculate statistics.");
+      return;
+    }
+    try {
+      sourcePreview = domain.sourceSummary({
+        project: session.getProject(),
+        segments: session.getSegments(),
+        scope: scope(),
+        options: analysisOptions()
+      });
+    } catch (error) {
+      fail(error);
+    }
+  }
   function updateScopeSummary() {
     const p = session.getProject();
-    projectSummary.textContent = `${p?.name || ""} · ${p?.sourceLang || ""} → ${p?.targetLang || ""}`;
+    const projectName = doc.createElement("bdi");
+    projectName.textContent = p?.name || "";
+    const languagePair = doc.createElement("bdi");
+    languagePair.dir = "ltr";
+    languagePair.textContent = `${p?.sourceLang || ""} → ${p?.targetLang || ""}`;
+    projectSummary.replaceChildren(projectName, " · ", languagePair);
     const scopeNotes = [];
     if (scopeSelect.value === "file") {
       const file = p?.documents?.find((item) => item.id === options.getDocumentId());
@@ -247,7 +295,7 @@ export function createStatisticsController(options) {
   }
   function settingsValue() {
     return {
-      ...Object.fromEntries(Object.entries(checks).map(([key, input]) => [key, input.checked])),
+      ...analysisOptions(),
       weighted: true,
       ...pricingValue()
     };
@@ -264,8 +312,11 @@ export function createStatisticsController(options) {
     return { weights, rate: Number(rate.value || 0), currency: currency.value.trim(), rateProvided: rate.value !== "" };
   }
   function setAvailability() {
-    saveButton.disabled = !snapshot || changed || pricingInvalid || !snapshot.complete || !!abort;
-    exportButton.disabled = !snapshot || pricingInvalid || (!!changed && !historical) || !!abort;
+    calculateButton.textContent = t(retryAnalysis ? "Retry analysis" : snapshot ? "Recalculate" : "Calculate");
+    calculateButton.disabled = !!abort || emptyFileScope();
+    saveButton.disabled =
+      saving || !snapshot || changed || !!sourcePreview || pricingInvalid || !snapshot.complete || !!abort;
+    exportButton.disabled = !snapshot || !!sourcePreview || pricingInvalid || (!!changed && !historical) || !!abort;
     // Pending analysis settings must not trap an invalid rate in a disabled
     // field. Keep pricing correctable while retaining the previous estimate.
     const disabled = historical || !!abort;
@@ -348,14 +399,17 @@ export function createStatisticsController(options) {
     });
     return body;
   }
-  function showRows(band) {
+  function showRows(band, trigger) {
     drilldown.replaceChildren();
     drilldown.hidden = false;
     const heading = node("div", "", drilldown);
     heading.className = "statistics-section-heading";
-    node("h3", labels[band], heading);
+    const title = node("h3", labels[band], heading);
+    title.id = "statisticsDrilldownTitle";
+    title.tabIndex = -1;
     button("Close details", heading, () => {
       drilldown.hidden = true;
+      trigger.focus();
     });
     const matching = snapshot.rows.filter((row) => row.band === band);
     node("p", t("{count} segments", { count: number(matching.length) }), drilldown).className = "statistics-muted";
@@ -368,8 +422,12 @@ export function createStatisticsController(options) {
       for (const row of matching.slice(page * 50, page * 50 + 50)) {
         const item = node("div", "", area);
         item.className = "statistics-drilldown-row";
+        const words =
+          row.countingComplete === false || row.words == null
+            ? `${t("Known source words")} · ${number(row.words)}`
+            : t("{count} words", { count: number(row.words) });
         button(
-          `${snapshot.files.find((f) => f.id === row.documentId)?.name || "Document"} · ${(row.index ?? 0) + 1} · ${row.words} words`,
+          `${snapshot.files.find((f) => f.id === row.documentId)?.name || t("Document")} · ${(row.index ?? 0) + 1} · ${words}`,
           item,
           () => {
             dialog.close();
@@ -391,7 +449,22 @@ export function createStatisticsController(options) {
         });
     };
     draw();
-    drilldown.scrollIntoView({ block: "nearest" });
+    title.focus();
+  }
+  function sourceCard(report, totals) {
+    const card = node("div", "", totals);
+    card.className = "statistics-metric is-primary";
+    node("span", report.countingComplete ? "Source words" : "Known source words", card);
+    node("strong", number(report.totals.words), card).dataset.metric = "source";
+    const note = node(
+      "small",
+      t("{segments} segments · {files} files", {
+        segments: number(report.totals.segments),
+        files: number(report.files.length)
+      }),
+      card
+    );
+    note.dir = "auto";
   }
   function render() {
     results.replaceChildren();
@@ -399,8 +472,34 @@ export function createStatisticsController(options) {
     memoryDetails.replaceChildren();
     drilldown.hidden = true;
     setAvailability();
-    fileSection.hidden = !snapshot?.files.length;
-    memorySection.hidden = !snapshot?.memories.length;
+    const preview = sourcePreview || (changed && !historical);
+    fileSection.hidden = preview ? !sourcePreview?.files.length : !snapshot?.files.length;
+    memorySection.hidden = !!preview || !snapshot?.memories.length;
+    if (preview) {
+      if (sourcePreview) {
+        const totals = node("div", "", results);
+        totals.className = "statistics-metrics";
+        sourceCard(sourcePreview, totals);
+        if (!sourcePreview.countingComplete)
+          node("p", "Source count incomplete. Some segments could not be counted.", results).className =
+            "statistics-notice";
+        if (!abort) node("p", "Calculate to update the match breakdown.", results).className = "statistics-muted";
+        if (sourcePreview.files.length)
+          table(
+            fileDetails,
+            ["File", sourcePreview.countingComplete ? "Source words" : "Known source words"],
+            sourcePreview.files.map((file) => [file.name, number(file.totals.words)])
+          );
+      }
+      if (pricingInvalid || snapshot) results.append(quote);
+      for (const [band, input] of Object.entries(weightInputs)) {
+        if (!input.value.trim() || !input.validity.valid) {
+          const label = node("label", t("Payable percentage: {category}", { category: t(labels[band]) }), results);
+          label.append(input);
+        }
+      }
+      return;
+    }
     if (!snapshot) return;
     if (changed) {
       const originalScope =
@@ -418,27 +517,28 @@ export function createStatisticsController(options) {
     if (!snapshot.complete) {
       node(
         "p",
-        "Analysis incomplete. Counts and cost are provisional; complete the analysis before quoting.",
+        !snapshot.countingComplete
+          ? "Source count incomplete. Some segments could not be counted."
+          : snapshot.searchComplete && snapshot.estimatedComplete === false
+            ? "Source count and TM search complete. Internal fuzzy estimates are incomplete."
+            : "Source count complete. Match analysis is incomplete.",
         results
       ).className = "statistics-notice";
     }
     const totals = node("div", "", results);
     totals.className = "statistics-metrics";
+    sourceCard(snapshot, totals);
     for (const [key, label, value, note] of [
       [
-        "source",
-        snapshot.countingComplete ? "Source words" : "Known source words",
-        number(snapshot.totals.words),
-        t("{segments} segments · {files} files", {
-          segments: number(snapshot.totals.segments),
-          files: number(snapshot.files.length)
-        })
+        "weighted",
+        "Weighted words",
+        number(snapshot.weightedWords, 2),
+        t(snapshot.complete ? "After match discounts" : "Provisional · analysis incomplete")
       ],
-      ["weighted", "Weighted words", number(snapshot.weightedWords, 2), t("After match discounts")],
       ["cost", "Estimated cost", "—", ""]
     ]) {
       const card = node("div", "", totals);
-      card.className = `statistics-metric${key === "source" ? " is-primary" : ""}`;
+      card.className = "statistics-metric";
       node("span", label, card);
       node("strong", value, card).dataset.metric = key;
       const metricNote = node("small", note, card);
@@ -454,7 +554,7 @@ export function createStatisticsController(options) {
     );
     const body = table(
       breakdown,
-      ["Category", "Source words", "Payable %", "Weighted words"],
+      ["Category", snapshot.countingComplete ? "Source words" : "Known source words", "Payable %", "Weighted words"],
       list.map((b) => [labels[b.band], number(b.words), "", ""])
     );
     [...body.children].forEach((row, index) => {
@@ -462,23 +562,35 @@ export function createStatisticsController(options) {
       const cell = row.firstChild;
       if (bucket.segments) {
         cell.textContent = "";
-        button(labels[bucket.band], cell, () => showRows(bucket.band)).className = "statistics-band-button";
+        const trigger = button(labels[bucket.band], cell, () => showRows(bucket.band, trigger));
+        trigger.className = "statistics-band-button";
+        trigger.setAttribute("aria-controls", drilldown.id);
       }
       row.children[2].append(weightInputs[bucket.band]);
       row.children[3].dataset.weightedBand = bucket.band;
     });
     updatePricingDisplay();
+    const incompleteFiles = new Set(
+      snapshot.rows.filter((row) => row.countingComplete === false || row.words == null).map((row) => row.documentId)
+    );
     for (const file of snapshot.files) {
       const exp = node("details", "", fileDetails);
       exp.className = "statistics-file-detail";
       const summary = node("summary", "", exp);
       node("span", file.name, summary);
-      node("span", t("{count} words", { count: number(file.totals.words) }), summary).className = "numeric";
+      const knownOnly = !snapshot.countingComplete && (!incompleteFiles.size || incompleteFiles.has(file.id));
+      node(
+        "span",
+        knownOnly
+          ? `${t("Known source words")} · ${number(file.totals.words)}`
+          : t("{count} words", { count: number(file.totals.words) }),
+        summary
+      ).className = "numeric";
       const current = session.getProject()?.documents?.find((d) => d.id === file.id);
       if (current && !changed) options.mountFileActions?.(exp, current);
       table(
         exp,
-        ["Category", "Source words"],
+        ["Category", knownOnly ? "Known source words" : "Source words"],
         file.buckets.filter((b) => b.words || b.segments).map((b) => [labels[b.band], number(b.words)])
       );
     }
@@ -486,7 +598,7 @@ export function createStatisticsController(options) {
       node("p", "Each segment is counted once, using its best match.", memoryDetails).className = "statistics-muted";
       table(
         memoryDetails,
-        ["Translation memory", "Source words", "Segments"],
+        ["Translation memory", snapshot.countingComplete ? "Source words" : "Known source words", "Segments"],
         snapshot.memories.map((m) => [m.name, number(m.words), number(m.segments)])
       );
     }
@@ -511,18 +623,41 @@ export function createStatisticsController(options) {
       ).className = "statistics-muted";
   }
   async function calculate() {
+    if (emptyFileScope()) {
+      dirty();
+      return;
+    }
     const current = ++run;
     abort?.abort();
     abort = new AbortController();
     const signal = abort.signal;
+    const projectId = session.getProject()?.id;
+    const obsolete = () => signal.aborted || current !== run || session.getProject()?.id !== projectId;
+    let matching = false;
     cancel.hidden = false;
-    calculateButton.disabled = true;
     setAvailability();
     meta.textContent = t("Analyzing…");
     try {
       await options.flush();
-      const project = structuredClone(session.getProject()),
+      if (obsolete()) return;
+      // Original document binaries and saved reports are irrelevant to word counts.
+      const { id, name, sourceLang, targetLang, documents, resourceLinks } = session.getProject();
+      const project = structuredClone({ id, name, sourceLang, targetLang, documents, resourceLinks }),
         segments = structuredClone(session.getSegments());
+      const countRequest = { project, segments, scope: scope(), options: analysisOptions() };
+      sourcePreview = domain.sourceSummary(countRequest);
+      historical = false;
+      render();
+      let calculationOptions;
+      try {
+        calculationOptions = settingsValue();
+        pricingInvalid = false;
+      } catch (error) {
+        pricingInvalid = true;
+        throw error;
+      }
+      matching = true;
+      meta.textContent = t("Matching translation memories…");
       const selectedLinks = [...tmChoices.querySelectorAll("input[data-tm]:checked")].map((input) => ({
         ...links.find((l) => l.resourceId === input.dataset.tm),
         lookup: true,
@@ -535,39 +670,44 @@ export function createStatisticsController(options) {
           Number(input.closest(".statistics-tm-choice").querySelector("input[data-priority]").value) || 0
         )
       }));
-      resources = await options.listResources();
-      const ids = new Set(selectedLinks.map((l) => l.resourceId));
-      const entries = (await options.listEntries(project)).filter((e) => ids.has(e.resourceId));
+      const ids = selectedLinks.map((link) => link.resourceId);
+      const resources = ids.length ? await options.listResources(ids) : [];
+      if (obsolete()) return;
+      const entries = ids.length ? await options.listEntries(project, ids) : [];
+      if (obsolete()) return;
       const request = {
-        project,
-        segments,
+        ...countRequest,
         entries,
         resources,
         resourceLinks: selectedLinks,
-        scope: scope(),
-        options: settingsValue(),
+        options: calculationOptions,
         id: `analysis-${crypto.randomUUID()}`,
         runtimeVersion: navigator.userAgent,
         generation: domain.fingerprint(project, segments, resources)
       };
-      domain.resolveScope(project, segments, request.scope);
       const value = await options.analyze(request, signal, (progress) => {
-        if (current === run) meta.textContent = `${t("Analyzing")} ${progress.scanned}/${progress.total}`;
+        if (!obsolete()) meta.textContent = `${t("Analyzing")} ${progress.scanned}/${progress.total}`;
       });
-      if (signal.aborted || current !== run || session.getProject()?.id !== project.id) return;
+      if (obsolete()) return;
+      const latestResources = ids.length ? await options.listResources(ids) : [];
+      if (obsolete()) return;
       snapshot = withStatisticsPricing(value, request.options);
-      historical = false;
       pricingInvalid = false;
-      const latestResources = await options.listResources();
-      if (signal.aborted || current !== run) return;
+      retryAnalysis = false;
       changed = domain.fingerprint(session.getProject(), session.getSegments(), latestResources) !== value.generation;
+      if (changed) updateSourcePreview();
+      else sourcePreview = null;
       render();
       meta.textContent = `${t(changed ? "Out of date — calculate again." : value.complete ? "Complete" : "Incomplete analysis")} · ${dateLabel(value.createdAt)}`;
     } catch (error) {
-      if (current === run && error.name !== "AbortError") fail(error);
+      if (!obsolete() && error.name !== "AbortError") {
+        changed = true;
+        retryAnalysis = matching;
+        render();
+        fail(matching ? t("Match analysis failed: {error}", { error: error.message || String(error) }) : error);
+      }
     } finally {
       if (current === run) {
-        calculateButton.disabled = false;
         cancel.hidden = true;
         abort = null;
         setAvailability();
@@ -592,14 +732,38 @@ export function createStatisticsController(options) {
         calculateButton.disabled = false;
         cancel.hidden = true;
         snapshot = report;
+        sourcePreview = null;
         changed = true;
         historical = true;
+        retryAnalysis = false;
         pricingInvalid = false;
         rate.value = (report.options.rateProvided ?? report.options.rate > 0) ? String(report.options.rate || 0) : "";
         currency.value = report.options.currency || "";
         for (const [band, input] of Object.entries(weightInputs))
           input.value = String(report.options.weights?.[band] ?? 100);
         for (const [key, input] of Object.entries(checks)) input.checked = Boolean(report.options[key]);
+        scopeSelect.value = report.scope.kind;
+        if (report.scope.kind === "segments") {
+          openSelection = [...report.scope.segmentIds];
+          scopeSelect.querySelector('option[value="segments"]').disabled = false;
+        }
+        if (report.scope.kind === "files") {
+          const ids = new Set(report.scope.documentIds);
+          for (const input of fileChoices.querySelectorAll("input")) input.checked = ids.has(input.value);
+        }
+        filePicker.hidden = report.scope.kind !== "files";
+        filePicker.open = false;
+        const memories = new Map(report.memories.map((memory) => [memory.id, memory]));
+        for (const input of tmChoices.querySelectorAll("input[data-tm]")) {
+          const memory = memories.get(input.dataset.tm);
+          input.checked = !!memory;
+          if (memory) {
+            const row = input.closest(".statistics-tm-choice");
+            row.querySelector("[data-penalty]").value = String(memory.penalty || 0);
+            if (memory.priority != null) row.querySelector("[data-priority]").value = String(memory.priority);
+          }
+        }
+        updateScopeSummary();
         render();
         meta.textContent = t("Saved snapshot — original calculation and settings.");
       });
@@ -609,11 +773,22 @@ export function createStatisticsController(options) {
       });
     }
   }
-  async function open(kind = "project", documentIds = null) {
+  async function open(kind = "", documentIds = null) {
     if (!session.getProject()) return;
+    if (!kind) {
+      const preferred = options.defaultScope?.() || { kind: "project" };
+      kind = preferred.kind;
+      documentIds = preferred.documentIds || null;
+    }
+    clearInterval(timer);
+    run++;
+    abort?.abort();
+    abort = null;
+    sourcePreview = null;
     if (snapshot?.projectId !== session.getProject().id) snapshot = null;
     changed = true;
     historical = false;
+    retryAnalysis = false;
     pricingInvalid = false;
     render();
     openSelection = selection.ids();
@@ -631,7 +806,8 @@ export function createStatisticsController(options) {
       input.addEventListener("change", dirty);
       label.append(doc.createTextNode(file.name));
     }
-    fileChoices.hidden = kind !== "files";
+    filePicker.hidden = kind !== "files";
+    filePicker.open = kind === "files" && !documentIds?.length;
     links = (session.getProject().resourceLinks || []).filter((l) => l.type === "tm");
     tmChoices.replaceChildren();
     node("legend", "Translation memories for this analysis", tmChoices);
@@ -668,30 +844,37 @@ export function createStatisticsController(options) {
     await calculate();
     clearInterval(timer);
     if (!dialog.open) return;
-    timer = setInterval(async () => {
+    timer = setInterval(() => {
       if (!dialog.open || !snapshot || abort || changed) return;
-      let latest;
-      try {
-        latest = await options.listResources();
-      } catch (error) {
-        fail(error);
-        return;
-      }
-      if (domain.fingerprint(session.getProject(), session.getSegments(), latest) !== snapshot.generation) {
-        changed = true;
-        render();
-        meta.textContent = t("Out of date — project or TM changed. Calculate again.");
-      }
+      const report = snapshot,
+        current = run;
+      void checkFreshness(report).catch((error) => {
+        if (dialog.open && current === run && report === snapshot) fail(error);
+      });
     }, 2000);
   }
+  async function checkFreshness(report) {
+    const current = run;
+    const ids = report.memories.map((memory) => memory.id);
+    const latest = ids.length ? await options.listResources(ids) : [];
+    if (!dialog.open || current !== run || report !== snapshot || changed || abort) return false;
+    if (domain.fingerprint(session.getProject(), session.getSegments(), latest) === report.generation) return true;
+    changed = true;
+    updateSourcePreview();
+    render();
+    meta.textContent = t("Out of date — project or TM changed. Calculate again.");
+    return false;
+  }
   dialog.addEventListener("close", () => {
+    // Native close events are queued. A new dialog session may already be open.
+    if (dialog.open) return;
     run++;
     abort?.abort();
     abort = null;
     clearInterval(timer);
   });
   const { projectStatistics, statisticsMenu, selectionHost, selectAll } = options.hosts;
-  const projectButton = button("Statistics", projectStatistics, () => open("project"));
+  const projectButton = button("Statistics", projectStatistics, () => open());
   projectButton.id = "statisticsBtn";
   const fileButton = button("File statistics", statisticsMenu, () => open("file"));
   button("Project statistics", statisticsMenu, () => open("project"));
@@ -730,6 +913,9 @@ export function createStatisticsController(options) {
   }
   selection.subscribe(refreshControls);
   refreshControls();
-  session.subscribe?.(() => selection.sync(session.getProject()?.id || "", session.getSegments()));
+  bindSegmentSelectionToSession(session, selection, {
+    getVisibleIndexes: options.getVisibleIndexes,
+    onVisibleChange: refreshControls
+  });
   return { open, calculate, refreshControls, getSnapshot: () => snapshot };
 }

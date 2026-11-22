@@ -4,7 +4,7 @@
  * resource selection, target commands, and browser DOM primitives are injected.
  *
  * @param {{
- *   elements: { overlay: any, closeButton: any, meta: any, results: any, queryInput?: any, scopeSelect?: any, resourceSelect?: any, searchButton?: any },
+ *   elements: { overlay: any, closeButton: any, meta: any, results: any, openButton?: any, queryInput?: any, scopeSelect?: any, resourceSelect?: any, searchButton?: any },
  *   session: { getProject: () => any },
  *   navigation: { getView: () => string },
  *   tm: { listEntries: () => Promise<any[]>, getNames: () => string[], getLinks?: () => any[] },
@@ -75,6 +75,7 @@ export function createConcordanceController(options) {
 
   let mounted = false;
   let activeIndex = 0;
+  let searchVersion = 0;
   let visibleButtons = [];
   let returnTarget = null;
   const handleSearchClick = () => void search();
@@ -98,23 +99,29 @@ export function createConcordanceController(options) {
   }
 
   function close() {
+    searchVersion++;
     elements.overlay.classList.add("hidden");
+    if (elements.overlay.open) elements.overlay.close();
     elements.results.replaceChildren();
     visibleButtons = [];
     activeIndex = 0;
     returnTarget?.focus?.();
   }
 
-  function syncActive() {
+  function reveal() {
+    elements.overlay.classList.remove("hidden");
+    if (!elements.overlay.open) elements.overlay.showModal?.();
+  }
+
+  function syncActive(focus = true) {
     if (!visibleButtons.length) return;
     activeIndex = Math.max(0, Math.min(activeIndex, visibleButtons.length - 1));
     visibleButtons.forEach((button, index) => {
       const active = index === activeIndex;
       button.classList?.toggle?.("active", active);
-      button.setAttribute?.("aria-selected", String(active));
-      button.tabIndex = active ? 0 : -1;
+      button.setAttribute?.("aria-current", String(active));
     });
-    visibleButtons[activeIndex]?.focus?.();
+    if (focus) visibleButtons[activeIndex]?.focus?.();
   }
 
   function selectedResourceEntries(entries) {
@@ -159,16 +166,28 @@ export function createConcordanceController(options) {
   async function search(keyword = elements.queryInput?.value || selectedKeyword()) {
     const project = session.getProject();
     if (!project) return;
+    const version = ++searchVersion;
     keyword = String(keyword || "")
       .trim()
       .replace(/\s+/g, " ");
     if (!keyword) {
+      if (elements.queryInput) {
+        visibleButtons = [];
+        elements.results.replaceChildren();
+        elements.results.removeAttribute?.("role");
+        elements.meta.textContent = languages.display();
+        elements.queryInput.value = "";
+        reveal();
+        elements.queryInput.focus();
+        return;
+      }
       status.set("Select source or target text, then press F4 or Ctrl/Cmd+Shift+K.", "dirty");
       return;
     }
     if (elements.queryInput) elements.queryInput.value = keyword;
     const query = text.normalizeCase(keyword);
     const entries = await tm.listEntries();
+    if (version !== searchVersion || session.getProject()?.id !== project.id) return;
     const scope = elements.scopeSelect?.value || "source";
     const results = selectedResourceEntries(entries)
       .filter((entry) => entry.sourceLang === project.sourceLang && entry.targetLang === project.targetLang)
@@ -190,6 +209,7 @@ export function createConcordanceController(options) {
     });
     if (!results.length) {
       visibleButtons = [];
+      elements.results.removeAttribute?.("role");
       safeHtml.replace(
         elements.results,
         `<div class="muted">${localization.sourceHtml("No TM units contain this keyword.")}</div>`
@@ -197,22 +217,32 @@ export function createConcordanceController(options) {
     } else {
       const fragment = dom.createFragment();
       visibleButtons = [];
+      elements.results.setAttribute?.("role", "list");
+      elements.results.setAttribute?.("aria-label", localization.source("Concordance"));
       results.forEach((entry) => {
-        const card = dom.createElement("article");
+        const card = dom.createElement("div");
         card.className = "concordance-card";
+        card.setAttribute?.("role", "listitem");
+        const provenance = [...new Set([entry.tmName, entry.projectName].filter(Boolean))].join(" · ");
         safeHtml.replace(
           card,
           `
-        <p class="concordance-source">${highlight(entry.source, keyword)}</p>
-        <p class="concordance-target">${highlight(entry.target, keyword)}</p>
-        <footer><span>${text.escapeHtml(entry.projectName || entry.tmName || "")}</span></footer>
+        <p class="concordance-source" dir="auto">${highlight(entry.source, keyword)}</p>
+        <p class="concordance-target" dir="auto">${highlight(entry.target, keyword)}</p>
+        <footer><span>${text.escapeHtml(provenance)}</span></footer>
       `
         );
+        card.querySelectorAll?.(".concordance-source, .concordance-target").forEach((line) => {
+          line.dir = "auto";
+        });
         const insertButton = dom.createElement("button");
         insertButton.type = "button";
         insertButton.textContent = localization.source("Insert target");
-        insertButton.setAttribute?.("role", "option");
-        insertButton.setAttribute?.("aria-selected", "false");
+        insertButton.setAttribute?.("aria-label", `${localization.source("Insert target")} · ${entry.target}`);
+        insertButton.addEventListener("focus", () => {
+          activeIndex = visibleButtons.indexOf(insertButton);
+          syncActive(false);
+        });
         insertButton.addEventListener("click", () => {
           target.insert(entry.target, {
             channel: "concordance",
@@ -226,9 +256,10 @@ export function createConcordanceController(options) {
       });
       elements.results.replaceChildren(fragment);
     }
-    elements.overlay.classList.remove("hidden");
+    reveal();
     activeIndex = 0;
     syncActive();
+    if (!visibleButtons.length) elements.queryInput?.focus?.();
   }
 
   async function open() {
@@ -240,12 +271,19 @@ export function createConcordanceController(options) {
   }
 
   const handleClose = () => close();
+  const handleOpen = () => void open();
   const handleOverlayClick = (event) => {
     if (event.target === elements.overlay) close();
   };
   const handleKeydown = (event) => {
     if (elements.overlay.classList.contains("hidden") || event.isComposing || event.getModifierState?.("AltGraph"))
       return;
+    if (event.key === "Escape") {
+      event.preventDefault?.();
+      close();
+      return;
+    }
+    if (!visibleButtons.length || (event.target !== elements.overlay && !visibleButtons.includes(event.target))) return;
     if (event.key === "ArrowDown") activeIndex = (activeIndex + 1) % visibleButtons.length;
     else if (event.key === "ArrowUp") activeIndex = (activeIndex - 1 + visibleButtons.length) % visibleButtons.length;
     else if (event.key === "Home") activeIndex = 0;
@@ -253,10 +291,6 @@ export function createConcordanceController(options) {
     else if (event.key === "Enter" && visibleButtons.length) {
       event.preventDefault?.();
       visibleButtons[activeIndex]?.click?.();
-      return;
-    } else if (event.key === "Escape") {
-      event.preventDefault?.();
-      close();
       return;
     } else return;
     if (!visibleButtons.length) return;
@@ -267,6 +301,7 @@ export function createConcordanceController(options) {
   function mount() {
     if (mounted) return false;
     elements.closeButton.addEventListener("click", handleClose);
+    elements.openButton?.addEventListener("click", handleOpen);
     elements.overlay.addEventListener("click", handleOverlayClick);
     elements.overlay.addEventListener("keydown", handleKeydown);
     elements.searchButton?.addEventListener?.("click", handleSearchClick);
@@ -278,6 +313,7 @@ export function createConcordanceController(options) {
   function unmount() {
     if (!mounted) return false;
     elements.closeButton.removeEventListener("click", handleClose);
+    elements.openButton?.removeEventListener("click", handleOpen);
     elements.overlay.removeEventListener("click", handleOverlayClick);
     elements.overlay.removeEventListener("keydown", handleKeydown);
     elements.searchButton?.removeEventListener?.("click", handleSearchClick);
@@ -287,8 +323,9 @@ export function createConcordanceController(options) {
   }
 
   function handleSearchKeydown(event) {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || event.isComposing) return;
     event.preventDefault?.();
+    event.stopPropagation?.();
     void search();
   }
 

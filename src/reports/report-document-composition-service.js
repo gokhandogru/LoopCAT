@@ -1,3 +1,29 @@
+import { qualityReasonText } from "../features/quality/quality-presentation-service.js";
+
+// The exported HTML also opens offline, without the application stylesheets.
+const reportStyles = `:root { color-scheme: light; --canvas: #f7f7f2; --paper: white; --subtle: #f2f5f2; --text: #183932; --muted: #536860; --line: #d7dfd8; --accent: #086959; font: 1rem/1.5 system-ui, sans-serif; color: var(--text); background: var(--canvas); }
+* { box-sizing: border-box; }
+body { margin: 0; padding: clamp(.5rem, 3vw, 2rem); overflow-wrap: anywhere; }
+main { max-width: 64rem; margin: auto; background: var(--paper); border: 1px solid var(--line); border-radius: .75rem; }
+header, section, footer { padding: clamp(1rem, 3vw, 2rem); }
+header { background: #133e39; color: white; border-radius: .75rem .75rem 0 0; }
+header .muted { color: #daebe4; }
+h1, h2, p { margin: 0 0 .5rem; }
+h1 { font-size: clamp(1.5rem, 3vw, 2.125rem); line-height: 1.2; }
+h2 { font-size: 1.2rem; }
+section, footer { border-block-start: 1px solid var(--line); }
+.meta, .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .625rem; }
+.card { border: 1px solid var(--line); border-radius: .625rem; padding: .875rem; background: var(--subtle); }
+.card strong { display: block; font-size: 1.35rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+.card span, .muted, footer { color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+th, td { border-block-end: 1px solid var(--line); padding: .5rem; text-align: start; vertical-align: top; }
+th { background: var(--subtle); } ul { margin: 0; padding-inline-start: 1.25rem; }
+footer { font-size: .8125rem; }
+@media screen and (prefers-color-scheme: dark) { :root { color-scheme: dark; --canvas: #15211e; --paper: #1c2c27; --subtle: #23362f; --text: #edf4eb; --muted: #b5c6bb; --line: #3c5046; --accent: #94e5c9; } }
+@media (max-width: 36rem) { section:has(table) { overflow-x: auto; } th, td { padding: .35rem; } }
+@media print { :root { --canvas: white; } body, main { padding: 0; background: white; border: 0; } header, header .muted { color: var(--text); background: white; } h2 { break-after: avoid; } tr, .card { break-inside: avoid; } }`;
+
 /**
  * Owns complete Project Report and Quality Passport HTML document composition.
  * Data collection, document finalization, download, persistence, and status
@@ -40,6 +66,28 @@ export function createReportDocumentCompositionService(options) {
     throw new TypeError(
       "ReportDocumentCompositionService requires localization, presentation, escaping, redaction, quality, validation, language, and date boundaries."
     );
+  }
+
+  const source = uiLocalizationService.source;
+  const riskLabel = (value) => (value === "clear" ? source("No risk") : qualityRiskLevelLabel(value));
+  const reviewLabel = (value) =>
+    source({ "needs-review": "Needs review", reviewed: "Reviewed", blocked: "Blocked" }[value] || value);
+  const validationLabel = (value) => source({ errors: "Errors", risk: "Risks", warnings: "Warnings", notes: "Notes" }[value]);
+
+  function readinessNotice(text) {
+    if (/^en(?:-|$)/i.test(uiLocalizationService.locale())) return text;
+    const match = /^(\d+) (empty target|non-empty unconfirmed target) segments? (will (?:export source text|remain empty in the exported interchange file|be reported as untranslated|export as written))\.$/.exec(text);
+    if (!match) return text;
+    return source(`{value1} ${match[2]} segment(s) ${match[3]}.`, { value1: match[1] });
+  }
+
+  function effortDriver(text) {
+    if (/^en(?:-|$)/i.test(uiLocalizationService.locale())) return text;
+    if (text === "No major unresolved quality signals.") return source("No major post-editing drivers.");
+    const match = /^(\d+) (high or critical risk segments?|QA issues?|untranslated segments?)\.$/.exec(text);
+    if (!match) return text;
+    const captions = { "high or critical risk segment": "High or critical risk segments", "QA issue": "QA issues", "untranslated segment": "Untranslated" };
+    return `${source(captions[match[2].replace(/s$/, "")])}: ${match[1]}`;
   }
 
   function projectReportHtml(data, options = {}) {
@@ -102,25 +150,7 @@ export function createReportDocumentCompositionService(options) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>${escapeHtml(projectTitle)} - ${escapeHtml(reportTitle)}</title>
-    <style>
-      :root { color-scheme: light; font-family: Arial, sans-serif; color: #1f2937; background: #f6f8fa; }
-      body { margin: 0; padding: 32px; }
-      main { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; overflow: hidden; }
-      header { padding: 28px 32px; background: #202936; color: #fff; }
-      h1, h2, h3, p { margin-top: 0; }
-      h1 { font-size: 26px; margin-bottom: 8px; }
-      h2 { font-size: 18px; margin-bottom: 12px; }
-      section { padding: 24px 32px; border-top: 1px solid #e5eaf0; }
-      .meta, .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-      .card { border: 1px solid #d9e0e7; border-radius: 8px; padding: 14px; background: #fbfcfd; }
-      .card strong { display: block; font-size: 22px; margin-bottom: 4px; }
-      .muted { color: #657386; }
-      table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: start; vertical-align: top; }
-      th { color: #405064; background: #f4f7f9; }
-      ul { margin: 0; padding-inline-start: 20px; }
-      footer { padding: 18px 32px; color: #657386; font-size: 12px; border-top: 1px solid #e5eaf0; }
-    </style>
+    <style>${reportStyles}</style>
   </head>
   <body>
     <main>
@@ -168,7 +198,7 @@ export function createReportDocumentCompositionService(options) {
           </tbody>
         </table>
         <h3>${uiLocalizationService.sourceHtml("Risk levels")}</h3>
-        ${reportPresentationService.countTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.")}
+        ${reportPresentationService.countTableHtml(qualityRiskQueue.byLevel || {}, "No unresolved quality risks.", riskLabel)}
         <h3>${uiLocalizationService.sourceHtml("Quality categories")}</h3>
         ${reportPresentationService.qualityCategoryCountTableHtml(qualityRiskQueue.byCategory || {}, "No categorized quality risks.")}
       </section>
@@ -238,9 +268,9 @@ export function createReportDocumentCompositionService(options) {
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Export Readiness")}</h2>
-        ${reportPresentationService.countTableHtml(validationCounts)}
+        ${reportPresentationService.countTableHtml(validationCounts, "None", validationLabel)}
         <h3>${uiLocalizationService.sourceHtml("Risk and warnings")}</h3>
-        ${reportPresentationService.listHtml([...validation.risky, ...validation.warnings], "No risk or warning notes.")}
+        ${reportPresentationService.listHtml([...validation.risky, ...validation.warnings].map(readinessNotice), "No risk or warning notes.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Recent Activity")}</h2>
@@ -298,25 +328,7 @@ export function createReportDocumentCompositionService(options) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>${escapeHtml(projectTitle)} - ${uiLocalizationService.sourceHtml("LoopCAT Quality Passport")}</title>
-    <style>
-      :root { color-scheme: light; font-family: Arial, sans-serif; color: #1f2937; background: #f6f8fa; }
-      body { margin: 0; padding: 32px; }
-      main { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #d9e0e7; border-radius: 8px; overflow: hidden; }
-      header { padding: 28px 32px; background: #202936; color: #fff; }
-      h1, h2, h3, p { margin-top: 0; }
-      h1 { font-size: 26px; margin-bottom: 8px; }
-      h2 { font-size: 18px; margin-bottom: 12px; }
-      section { padding: 24px 32px; border-top: 1px solid #e5eaf0; }
-      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-      .card { border: 1px solid #d9e0e7; border-radius: 8px; padding: 14px; background: #fbfcfd; }
-      .card strong { display: block; font-size: 22px; margin-bottom: 4px; }
-      .muted { color: #657386; }
-      table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { border-bottom: 1px solid #e5eaf0; padding: 9px 8px; text-align: start; vertical-align: top; }
-      th { color: #405064; background: #f4f7f9; }
-      ul { margin: 0; padding-inline-start: 20px; }
-      footer { padding: 18px 32px; color: #657386; font-size: 12px; border-top: 1px solid #e5eaf0; }
-    </style>
+    <style>${reportStyles}</style>
   </head>
   <body>
     <main>
@@ -326,7 +338,7 @@ export function createReportDocumentCompositionService(options) {
         <p class="muted">${uiLocalizationService.sourceHtml("Generated {date}", { date: formatDateTime(passport.generatedAt || data.generatedAt) })}</p>
       </header>
       <section>
-        ${passport.exchangeRuns?.length ? `<h2>LoopCAT Exchange — ${passport.exchangeIncomplete ? 'Incomplete' : 'Checks evaluated'}</h2><ul>${passport.exchangeRuns.map(r=>`<li>${escapeHtml(r.id)} ${escapeHtml(r.version)}: ${escapeHtml(r.status)}</li>`).join('')}</ul>` : ''}<h2>${uiLocalizationService.sourceHtml("Quality Contract")}</h2>
+        ${passport.exchangeRuns?.length ? `<h2>LoopCAT Exchange — ${uiLocalizationService.sourceHtml(passport.exchangeIncomplete ? "Incomplete" : "Checks evaluated")}</h2><ul>${passport.exchangeRuns.map((run) => `<li>${escapeHtml(run.id)} ${escapeHtml(run.version)}: ${uiLocalizationService.sourceHtml(run.status)}</li>`).join("")}</ul>` : ""}<h2>${uiLocalizationService.sourceHtml("Quality Contract")}</h2>
         <table>
           <tbody>
             <tr><th>${uiLocalizationService.sourceHtml("Standard")}</th><td>${escapeHtml(qualityLabel(profile.standard))}</td></tr>
@@ -335,7 +347,7 @@ export function createReportDocumentCompositionService(options) {
             <tr><th>${uiLocalizationService.sourceHtml("Terminology")}</th><td>${escapeHtml(qualityLabel(profile.terminologyStrictness))}</td></tr>
             <tr><th>${uiLocalizationService.sourceHtml("AI disclosure")}</th><td>${escapeHtml(qualityLabel(profile.aiDisclosure))}</td></tr>
             <tr><th>${uiLocalizationService.sourceHtml("Audience")}</th><td>${escapeHtml(reportPresentationService.safeLabel(profile.audience, uiLocalizationService.source("Not set")))}</td></tr>
-            <tr><th>${uiLocalizationService.sourceHtml("Tone")}</th><td>${escapeHtml(reportPresentationService.safeLabel(profile.tone, uiLocalizationService.source("Neutral")))}</td></tr>
+            <tr><th>${uiLocalizationService.sourceHtml("Tone")}</th><td>${escapeHtml(profile.tone === "Neutral" ? source("Neutral") : reportPresentationService.safeLabel(profile.tone, source("Neutral")))}</td></tr>
           </tbody>
         </table>
       </section>
@@ -353,7 +365,7 @@ export function createReportDocumentCompositionService(options) {
       <section>
         <h2>${uiLocalizationService.sourceHtml("Risk Queue")}</h2>
         <h3>${uiLocalizationService.sourceHtml("By level")}</h3>
-        ${reportPresentationService.countTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.")}
+        ${reportPresentationService.countTableHtml(riskQueue.byLevel || {}, "No unresolved quality risks.", riskLabel)}
         <h3>${uiLocalizationService.sourceHtml("Quality Categories")}</h3>
         ${reportPresentationService.qualityCategoryCountTableHtml(riskQueue.byCategory || {}, "No categorized quality risks.")}
         <h3>${uiLocalizationService.sourceHtml("Top risks")}</h3>
@@ -368,7 +380,7 @@ export function createReportDocumentCompositionService(options) {
             `<td>${escapeHtml(qualityRiskLevelLabel(item.level))} ${item.score}</td>`,
             `<td>${escapeHtml(
               item.reasons
-                .map((reason) => reason.label)
+                .map((reason) => qualityReasonText(reason, source, uiLocalizationService.locale()))
                 .slice(0, 3)
                 .join(" ")
             )}</td>`
@@ -397,7 +409,7 @@ export function createReportDocumentCompositionService(options) {
           <div class="card"><strong>${data.termCount}</strong><span>${uiLocalizationService.sourceHtml("Linked terms")}</span></div>
         </div>
         <h3>${uiLocalizationService.sourceHtml("Review states")}</h3>
-        ${reportPresentationService.countTableHtml(passport.reviewByState || {}, "No review states recorded.")}
+        ${reportPresentationService.countTableHtml(passport.reviewByState || {}, "No review states recorded.", reviewLabel)}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Export Readiness")}</h2>
@@ -406,11 +418,11 @@ export function createReportDocumentCompositionService(options) {
           <div class="card"><strong>${validation.risky.length}</strong><span>${uiLocalizationService.sourceHtml("Risks")}</span></div>
           <div class="card"><strong>${validation.warnings.length}</strong><span>${uiLocalizationService.sourceHtml("Warnings")}</span></div>
         </div>
-        ${reportPresentationService.listHtml([...validation.errors, ...validation.risky, ...validation.warnings], "No export-readiness findings.")}
+        ${reportPresentationService.listHtml([...validation.errors, ...validation.risky, ...validation.warnings].map(readinessNotice), "No export-readiness findings.")}
       </section>
       <section>
         <h2>${uiLocalizationService.sourceHtml("Effort Drivers")}</h2>
-        ${reportPresentationService.listHtml(effort.drivers || [], "No major post-editing drivers.")}
+        ${reportPresentationService.listHtml((effort.drivers || []).map(effortDriver), "No major post-editing drivers.")}
       </section>
       <footer>
         ${uiLocalizationService.sourceHtml("This passport contains quality settings, counts, risk signals, and readiness evidence. Segment text is not included.")}

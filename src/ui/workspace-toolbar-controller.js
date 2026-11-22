@@ -28,15 +28,19 @@ export function createWorkspaceToolbarController({ document: doc, translate: t, 
   const identity = node("div", "editor-identity");
   move(identity, "#projectFilesBtn");
   const heading = node("div", "editor-heading", identity);
-  heading.append(title);
+  const documentFilter = find("#documentFilter");
+  const picker = node("div", "editor-document-picker", heading);
+  const fileTitle = node("h2", "sr-only", picker);
+  fileTitle.id = "editorFileTitle";
+  picker.append(documentFilter);
   const pair = node("span", "editor-language-pair", heading);
   const information = menu("Project details", heading, "editorProjectDetails");
-  information.append(metadata);
+  information.append(title, metadata);
   const fileContext = node("div", "editor-file-context");
-  move(fileContext, "#documentFilter");
   const fileActions = node("div", "action-group", fileContext);
   fileActions.id = "editorFileActions";
   const contextActions = node("div", "action-group editor-context-actions");
+  move(contextActions, "#focusModeBtn");
   const statisticsMenu = menu("Statistics", contextActions, "editorStatisticsMenu");
   const exportMenu = find("#exportLocalizationBtn").closest("details");
   contextActions.append(exportMenu);
@@ -51,12 +55,10 @@ export function createWorkspaceToolbarController({ document: doc, translate: t, 
   const secondary = node("div", "action-group editor-secondary");
   move(secondary, "#segmentFiltersMenu");
   secondary.append(find("#segmentToolsMenuSummary").closest("details"));
-  const viewMenu = menu("View", secondary, "editorViewMenu");
-  move(viewMenu, "#focusModeBtn", "#inspectorToggleBtn");
   const overflow = menu("Tools", null, "editorOverflowMenu");
   const overflowRoot = overflow.parentElement;
   const commands = node("div", "action-group editor-confirm-actions");
-  move(commands, "#nextOpenBtn", "#confirmBtn");
+  move(commands, "#inspectorToggleBtn", "#nextOpenBtn", "#confirmBtn");
   translation.replaceChildren(search, status, secondary, overflowRoot, commands);
   context.replaceChildren(identity, fileContext, contextActions);
   oldActions?.remove();
@@ -70,6 +72,8 @@ export function createWorkspaceToolbarController({ document: doc, translate: t, 
   selectAll.type = "checkbox";
   selectAll.id = "selectFilteredSegments";
   selectAll.setAttribute("aria-label", t("Select filtered segments"));
+  const selectLabel = node("label", "editor-select-label", headingCell, "Select filtered segments");
+  selectLabel.htmlFor = selectAll.id;
   // Controls move as a group at a measured editor width; they are never cloned.
   let lastNarrow;
   const resize = () => {
@@ -94,14 +98,24 @@ export function createWorkspaceToolbarController({ document: doc, translate: t, 
           ? codes.join(" → ")
           : full;
     if (pair.textContent !== value) pair.textContent = value;
+    editor.style.setProperty(
+      "--editor-source-label",
+      JSON.stringify([t("Source"), project?.sourceLang].filter(Boolean).join(" · "))
+    );
+    editor.style.setProperty(
+      "--editor-target-label",
+      JSON.stringify([t("Target"), project?.targetLang].filter(Boolean).join(" · "))
+    );
     pair.title = full;
     title.title = title.textContent;
   };
   new MutationObserver(updateMetadata).observe(metadata, { childList: true, characterData: true, subtree: true });
-  const documentFilter = find("#documentFilter");
   const updateFilename = () => {
-    documentFilter.title = documentFilter.selectedOptions[0]?.textContent || "";
+    const name = documentFilter.selectedOptions[0]?.textContent || "";
+    if (fileTitle.textContent !== name) fileTitle.textContent = name;
+    documentFilter.title = name;
   };
+  updateFilename();
   documentFilter.addEventListener("change", updateFilename);
   new MutationObserver(updateFilename).observe(documentFilter, { childList: true, subtree: true });
   const homeActions = find("#projectHomeView .toolbar-actions");

@@ -76,7 +76,7 @@ function createHarness(createConcordanceController, overrides = {}) {
     overrides.project === undefined ? { id: "p1", sourceLang: "en", targetLang: "tr" } : overrides.project;
   const entries = overrides.entries || [];
   const controller = createConcordanceController({
-    elements: { overlay, closeButton, meta, results },
+    elements: { overlay, closeButton, meta, results, queryInput: overrides.queryInput },
     session: {
       getProject() {
         calls.push(["getProject"]);
@@ -265,6 +265,25 @@ test("ConcordanceController filters linked language-pair results, sorts newest f
   assert.deepEqual(harness.results.children, []);
 });
 
+test("Concordance opens a blank query and Enter in the search field leaves insertion to the focused result", async () => {
+  const { createConcordanceController } = await moduleAt("src/features/editor/concordance-controller.js");
+  const queryInput = fakeElement("INPUT");
+  const harness = createHarness(createConcordanceController, {
+    queryInput,
+    entries: [{ id: "one", source: "Alpha", target: "Bir", sourceLang: "en", targetLang: "tr", tmName: "Main TM" }]
+  });
+  await harness.controller.open();
+  assert.equal(harness.overlay.classList.contains("hidden"), false);
+  assert.equal(queryInput.focused, 1);
+  await harness.controller.search("Alpha");
+  harness.controller.handleKeydown({ key: "Enter", target: queryInput });
+  assert.equal(
+    harness.calls.some(([name]) => name === "insert"),
+    false
+  );
+  assert.equal(harness.overlay.classList.contains("hidden"), false);
+});
+
 test("ConcordanceController renders the localized safe empty state and opens the overlay", async () => {
   const { createConcordanceController } = await moduleAt("src/features/editor/concordance-controller.js");
   const harness = createHarness(createConcordanceController, { selectionText: "missing" });
@@ -291,10 +310,10 @@ test("ConcordanceController supports keyboard result navigation, insertion, canc
   const cards = harness.results.children[0].children;
   const firstButton = cards[0].footer.children[0];
   const secondButton = cards[1].footer.children[0];
-  assert.equal(firstButton.getAttribute("aria-selected"), "true");
+  assert.equal(firstButton.getAttribute("aria-current"), "true");
 
   harness.overlay.dispatch("keydown", { key: "ArrowDown", preventDefault() {} });
-  assert.equal(secondButton.getAttribute("aria-selected"), "true");
+  assert.equal(secondButton.getAttribute("aria-current"), "true");
   harness.overlay.dispatch("keydown", { key: "Enter", preventDefault() {} });
   assert.deepEqual(
     harness.calls.find(([name]) => name === "insert"),

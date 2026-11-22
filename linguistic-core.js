@@ -1,7 +1,7 @@
 // Adapted from Loopcat Pro source-analysis and scoring; shared by renderer and worker.
 (() => {
-  const COUNTING_VERSION = "loopcat-words/1";
-  const MATCHING_VERSION = "loopcat-match/2";
+  const COUNTING_VERSION = "loopcat-words/2";
+  const MATCHING_VERSION = "loopcat-match/3";
   const formatting = /* @__PURE__ */ new Set([
     "b",
     "i",
@@ -17,6 +17,20 @@
     "pc",
     "mrk"
   ]);
+  const blocks = new Set(
+    "address article aside blockquote caption dd div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr li main nav ol p pre section table tbody td tfoot th thead tr ul".split(
+      " "
+    )
+  );
+  const htmlInline = new Set(
+    "abbr bdi bdo cite code data del dfn font ins kbd mark q s samp small strike time tt var".split(" ")
+  );
+  const voidTags = new Set(
+    "area base br col embed hr img input link meta param source track wbr x bx ex cp sc ec sm".split(" ")
+  );
+  const nativeCode = new Set(["bpt", "ept", "it", "ph"]);
+  const markupTokens =
+    /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<\/?[A-Za-z][\w:.-]*(?:\s(?:[^"'<>]|"[^"]*"|'[^']*')*)?\s*\/?>|\{[A-Za-z_][\w.-]*\}|%(?:\d+\$)?[sdif]/gu;
   const entity = (value) =>
     value.replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/gi, (whole, id) => {
       const named = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\xA0" };
@@ -39,32 +53,56 @@
     let balanced = true;
     let countingComplete = true;
     let text = "",
-      offset = 0;
+      offset = 0,
+      boundary = false,
+      hidden = "";
+    const decode = descriptor?.encoded || /<\/?(?:p|h[1-6]|br|li|ul|ol|div|span|a|strong|em|b|i)\b/i.test(source);
+    function append(value) {
+      if (!value || hidden || !countingComplete) return;
+      const malformed = /<(?:\/?[A-Za-z][\w:.-]*(?=\s|\/|$)|!--|!\[CDATA\[|\?)/u.exec(value);
+      if (malformed) {
+        countingComplete = false;
+        value = value.slice(0, malformed.index);
+      }
+      if (decode) value = entity(value);
+      if (boundary && text && value && !/[\s\0]$/u.test(text) && !/^[\s\0]/u.test(value)) text += " ";
+      if (value) boundary = false;
+      text += value;
+    }
     const pairs = [];
     let serial = 0;
-    const pattern = /<\/?[A-Za-z][^<>]*>|\{[A-Za-z_][\w.-]*\}|%(?:\d+\$)?[sdif]/gu;
-    for (const match of source.matchAll(pattern)) {
+    for (const match of source.matchAll(markupTokens)) {
       const token = match[0],
-        tag = /^<\/?([\w:-]+)/.exec(token)?.[1]?.toLowerCase();
-      if (
-        tag &&
-        !supplied.has(token) &&
-        !formatting.has(tag) &&
-        !["x", "ph", "br", "img", "it", "bpt", "ept", "bx", "ex", "cp", "sc", "ec", "sm"].includes(tag)
-      ) {
-        countingComplete = false;
+        tag = /^<\/?([\w:.-]+)/.exec(token)?.[1]?.toLowerCase();
+      append(source.slice(offset, match.index));
+      offset = match.index + token.length;
+      if (!countingComplete) break;
+      if (hidden) {
+        if (token.startsWith("</") && tag === hidden) hidden = "";
+        else continue;
+      }
+      if (token.startsWith("<![CDATA[")) {
+        balanced = false;
+        text += token.slice(9, -3);
         continue;
       }
-      text += descriptor?.encoded ? entity(source.slice(offset, match.index)) : source.slice(offset, match.index);
-      offset = match.index + token.length;
+      if (token.startsWith("<!--") || token.startsWith("<?")) {
+        balanced = false;
+        continue;
+      }
+      const closing = token.startsWith("</");
+      const standalone =
+        token.endsWith("/>") || voidTags.has(tag) || nativeCode.has(tag) || tag === "script" || tag === "style";
+      if (!closing && !token.endsWith("/>") && (nativeCode.has(tag) || tag === "script" || tag === "style"))
+        hidden = tag;
+      if (blocks.has(tag)) boundary = true;
       const candidates = supplied.get(token);
       let code =
         candidates?.find((item) => item.kind === "close" && item.pair === structureStack.at(-1)?.pair) ??
         candidates?.[Math.min(used.get(token) ?? 0, candidates.length - 1)];
       used.set(token, (used.get(token) ?? 0) + 1);
       if (!code) {
-        const kind =
-          tag && formatting.has(tag) && !token.endsWith("/>") ? (token.startsWith("</") ? "close" : "open") : "opaque";
+        const kind = tag && !standalone ? (closing ? "close" : "open") : "opaque";
         const pair = kind === "open" ? String(serial++) : kind === "close" ? pairs.at(-1) : void 0;
         if (kind === "open") pairs.push(pair);
         else if (kind === "close") pairs.pop();
@@ -72,8 +110,8 @@
           token,
           kind,
           pair,
-          identity: kind === "opaque" ? token : tag,
-          known: (kind !== "opaque" && !/^<g\b/.test(token)) || !tag
+          identity: kind === "opaque" || !formatting.has(tag) ? token : tag,
+          known: (formatting.has(tag) && kind !== "opaque" && tag !== "g") || ["br", "hr", "wbr"].includes(tag) || !tag
         };
       }
       if (code.kind === "open") structureStack.push(code);
@@ -82,9 +120,10 @@
         if (!opening || (opening.pair ?? opening.identity) !== (code.pair ?? code.identity)) balanced = false;
       }
       codes.push({ ...code, offset: text.length });
-      if (code.kind === "opaque") text += "\0";
+      if (code.kind === "opaque" && !closing) text += "\0";
     }
-    text += descriptor?.encoded ? entity(source.slice(offset)) : source.slice(offset);
+    append(source.slice(offset));
+    if (hidden) countingComplete = false;
     const pairIds = /* @__PURE__ */ new Map();
     const canonicalCodes = codes.map((code) => {
       if (code.pair !== void 0 && !pairIds.has(code.pair)) pairIds.set(code.pair, pairIds.size);
@@ -176,24 +215,37 @@
     const projection = projectSource(descriptor?.literal ? source : choiceText(source), descriptor),
       linguistic = projection.text,
       text = linguistic.replaceAll("\0", " ");
-    const spans = [...metricsSegmenter(locale, "word").segment(text)].filter((part) => part.isWordLike);
-    let words = spans.length;
-    for (let i = 1; i < spans.length; i++) {
-      const previous = spans[i - 1],
-        current = spans[i],
-        between = text.slice(previous.index + previous.segment.length, current.index);
+    let words = 0,
+      previous;
+    for (const current of metricsSegmenter(locale, "word").segment(text)) {
+      if (!current.isWordLike) continue;
+      const between = previous && text.slice(previous.index + previous.segment.length, current.index);
       if (
-        /^[\u002d\u2010\u2011'\u2019]$/u.test(between) ||
-        (/^[.,/:]$/u.test(between) && /^\p{N}+$/u.test(previous.segment) && /^\p{N}+$/u.test(current.segment))
+        !previous ||
+        !(
+          /^[\u002d\u2010\u2011'\u2019]$/u.test(between) ||
+          (/^[.,/:]$/u.test(between) && /^\p{N}+$/u.test(previous.segment) && /^\p{N}+$/u.test(current.segment))
+        )
       )
-        words--;
+        words++;
+      previous = current;
     }
     const visible = linguistic.replaceAll("\0", "");
-    const graphemes = [...metricsSegmenter(locale, "grapheme").segment(visible)].map((part) => part.segment);
+    let characters = 0,
+      charactersWithoutWhitespace = 0;
+    if (/^[\x00-\x7f]*$/.test(visible)) {
+      characters = visible.length - (visible.match(/\r\n/g)?.length || 0);
+      charactersWithoutWhitespace = visible.replace(/\s/g, "").length;
+    } else {
+      for (const { segment } of metricsSegmenter(locale, "grapheme").segment(visible)) {
+        characters++;
+        if (!/^\s+$/u.test(segment)) charactersWithoutWhitespace++;
+      }
+    }
     return {
       words,
-      characters: graphemes.length,
-      charactersWithoutWhitespace: graphemes.filter((value) => !/^[\s]+$/u.test(value)).length,
+      characters,
+      charactersWithoutWhitespace,
       tags: projection.codes.length,
       countingComplete: projection.countingComplete !== false
     };
@@ -219,7 +271,7 @@
       if (mapping.has(from) && mapping.get(from) !== to) return;
       mapping.set(from, to);
     }
-    const targetCodes = projectSource(target, targetDescriptor ?? oldDescriptor).codes;
+    const targetCodes = targetProjection.codes;
     if (targetDescriptor) {
       const used = /* @__PURE__ */ new Set();
       const targetMapping = /* @__PURE__ */ new Map();
@@ -254,10 +306,7 @@
       if (code.kind === "close" && stack.pop() !== (code.pair ?? code.identity)) return;
     }
     if (stack.length) return;
-    return target.replace(
-      /<\/?[A-Za-z][^<>]*>|\{[A-Za-z_][\w.-]*\}|%(?:\d+\$)?[sdif]/gu,
-      (token) => mapping.get(token) ?? token
-    );
+    return target.replace(markupTokens, (token) => mapping.get(token) ?? token);
   }
   function languageLocale(locale = "en") {
     try {
@@ -393,14 +442,17 @@
       const opaque = projection.codes.filter((code) => code.kind === "opaque");
       return units(text, locale).map((unit) => (unit === "\0" ? "PLACEHOLDER:" + opaque[index++]?.identity : unit));
     };
-    let textScore;
+    let textScore,
+      limited = false;
     if (sameText && opaqueSame) textScore = 100;
     else if (a === b && opaqueSame) textScore = 99;
     else {
       const charsA = atomic(a, old),
         charsB = atomic(b, current);
-      if (charsA.length * charsB.length > 4e6) textScore = 0;
-      else {
+      if (charsA.length * charsB.length > 4e6) {
+        limited = true;
+        textScore = 0;
+      } else {
         const characterScore = Math.max(
           0,
           1 - editDistance(charsA, charsB) / Math.max(1, charsA.length, charsB.length)
@@ -451,7 +503,7 @@
       sourceDiff: differences ? sourceDifference(stored, active, locale) : [],
       algorithmVersion: MATCHING_VERSION,
       textScore,
-      limited: !sameText && [...a].length * [...b].length > 4e6,
+      limited,
       adjustments,
       compatibility: !known ? "unknown" : canonical ? (stored === active ? "identical" : "remappable") : "different",
       reuseEligibility: canonical
@@ -484,14 +536,19 @@
     const stack = [];
     const codes = [];
     let serial = 0;
-    for (const match of source.matchAll(/<\/?([A-Za-z][\w:-]*)([^<>]*)>/g)) {
+    for (const match of source.matchAll(markupTokens)) {
       const token = match[0],
-        tag = match[1].toLowerCase();
-      if (!formatting.has(tag)) continue;
+        tagMatch = /^<\/?([A-Za-z][\w:.-]*)/u.exec(token);
+      if (!tagMatch || token.endsWith("/>")) continue;
+      const tag = tagMatch[1].toLowerCase();
+      if ((!formatting.has(tag) && !blocks.has(tag) && !htmlInline.has(tag)) || voidTags.has(tag)) continue;
       const closing = token.startsWith("</");
       const id = /\bid=["']([^"']+)["']/.exec(token)?.[1];
       const info = inline.find((item) => item.id === id);
-      const attributes = match[2].replace(/\s+id=["'][^"']+["']/g, "").trim();
+      const attributes = token
+        .slice(tagMatch[0].length, -1)
+        .replace(/\s+id=["'][^"']+["']/g, "")
+        .trim();
       const opening = closing ? stack.pop() : null;
       const pair = closing ? opening?.pair : String(serial++);
       const identity = closing ? opening?.identity || tag : tag + ":" + (info?.rPrXml || attributes);
@@ -503,7 +560,9 @@
     return { version: 1, codes };
   }
   function metricsForSegment(record = {}, locale = "en") {
-    const source = typeof record.source === "string" ? record.source : record.source?.trim?.() || "";
+    if (typeof record.source !== "string" && typeof record.source?.trim !== "function")
+      return { words: 0, characters: 0, charactersWithoutWhitespace: 0, tags: 0, countingComplete: false };
+    const source = typeof record.source === "string" ? record.source : record.source.trim();
     return sourceMetrics(source, locale, descriptorFor({ ...record, source }));
   }
   function projectionFor(record = {}) {
@@ -563,16 +622,19 @@
     const names = new Set([...(options.tmNames || []), options.tmName].filter(Boolean));
     const byKey = new Map();
     let searchComplete = true;
-    const alternatives = new Map();
-    for (const entry of entries || []) {
-      const pair = entry.languagePair || `${entry.sourceLang}::${entry.targetLang}`;
-      if (options.sourceLang && options.targetLang && pair !== `${options.sourceLang}::${options.targetLang}`) continue;
-      if (!String(entry.target || "").trim()) continue;
-      if (links.size ? !links.has(entry.resourceId || entry.tmName) : names.size && !names.has(entry.tmName)) continue;
-      const key = JSON.stringify([pair, entry.source]);
-      if (!alternatives.has(key)) alternatives.set(key, new Set());
-      alternatives.get(key).add(entry.target);
-    }
+    const alternatives = options.alternatives || new Map();
+    if (!options.alternatives)
+      for (const entry of entries || []) {
+        const pair = entry.languagePair || `${entry.sourceLang}::${entry.targetLang}`;
+        if (options.sourceLang && options.targetLang && pair !== `${options.sourceLang}::${options.targetLang}`)
+          continue;
+        if (!String(entry.target || "").trim()) continue;
+        if (links.size ? !links.has(entry.resourceId || entry.tmName) : names.size && !names.has(entry.tmName))
+          continue;
+        const key = JSON.stringify([pair, entry.source]);
+        if (!alternatives.has(key)) alternatives.set(key, new Set());
+        alternatives.get(key).add(entry.target);
+      }
     const activeContext = {
       ...options.context,
       sourceDescriptor:
@@ -606,14 +668,7 @@
         activeContext.sourceDescriptor,
         entry.targetDescriptor
       );
-      const noCodes =
-        projectSource(entry.source, descriptor).known &&
-        projectSource(source, activeContext.sourceDescriptor).known &&
-        projectSource(entry.target, entry.targetDescriptor ?? descriptor).known &&
-        !projectSource(entry.source, descriptor).codes.length &&
-        !projectSource(source, activeContext.sourceDescriptor).codes.length &&
-        !projectSource(entry.target, descriptor).codes.length;
-      const unsafePenalty = !noCodes && adaptedTarget === undefined && effectiveScore === 100 ? 1 : 0;
+      const unsafePenalty = adaptedTarget === undefined && effectiveScore === 100 ? 1 : 0;
       effectiveScore -= unsafePenalty;
       const scored = {
         ...entry,
@@ -631,7 +686,7 @@
         resourceId: entry.resourceId || "",
         resourceName: entry.tmName || link?.cachedName || "",
         resourcePriority: Number.isFinite(link?.priority) ? link.priority : 999,
-        safeToApply: noCodes || adaptedTarget !== undefined,
+        safeToApply: adaptedTarget !== undefined,
         ...(adaptedTarget !== undefined && adaptedTarget !== entry.target
           ? { adaptedTarget, adaptation: { safe: true, target: adaptedTarget } }
           : {}),
@@ -649,30 +704,18 @@
       };
       const key = JSON.stringify([pair, entry.source, entry.target]);
       const previous = byKey.get(key);
-      const compare = (a, b) =>
-        b.effectiveScore - a.effectiveScore ||
-        a.resourcePriority - b.resourcePriority ||
-        String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) ||
-        String(a.id || "").localeCompare(String(b.id || ""));
       if (previous) {
         const provenance = [...previous.provenance, ...scored.provenance].filter(
           (p, i, all) => all.findIndex((x) => x.resourceId === p.resourceId && x.resourceName === p.resourceName) === i
         );
-        const winner = compare(scored, previous) < 0 ? scored : previous;
+        const winner = rankScoredEntries(scored, previous) < 0 ? scored : previous;
         winner.provenance = provenance;
         byKey.set(key, winner);
       } else byKey.set(key, scored);
     }
     return [...byKey.values()]
       .map((match) => ({ ...match, searchComplete }))
-      .sort(
-        (a, b) =>
-          b.effectiveScore - a.effectiveScore ||
-          Number(b.contextExact) - Number(a.contextExact) ||
-          a.resourcePriority - b.resourcePriority ||
-          String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) ||
-          String(a.id || "").localeCompare(String(b.id || ""))
-      )
+      .sort(rankScoredEntries)
       .slice(0, options.limit ?? 6)
       .map((match) => {
         // Only displayed matches need the word-level diff. Ranking every
@@ -690,6 +733,15 @@
         };
       });
   }
+  function rankScoredEntries(a, b) {
+    return (
+      b.effectiveScore - a.effectiveScore ||
+      Number(b.contextExact) - Number(a.contextExact) ||
+      a.resourcePriority - b.resourcePriority ||
+      String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")) ||
+      String(a.id || "").localeCompare(String(b.id || ""))
+    );
+  }
   function retrievalTokens(source) {
     const key = lexicalKey(source);
     const words = resourceWords(key, "und").map((x) => x.text);
@@ -698,15 +750,26 @@
     return [...new Set(["=" + key, ...words, ...grams])];
   }
   function createSearchIndex(entries) {
-    const byToken = new Map();
+    let byToken;
+    const sameProjection = new Map(),
+      sameSource = new Map();
+    function include(map, key, index) {
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(index);
+    }
     entries.forEach((entry, index) => {
-      for (const token of retrievalTokens(entry.source)) {
-        if (!byToken.has(token)) byToken.set(token, []);
-        byToken.get(token).push(index);
-      }
+      const projection = projectionFor(entry);
+      if (projection.known) include(sameProjection, projection.canonical, index);
+      include(sameSource, entry.source, index);
     });
-    return (source, maximum = 2000) => {
+    const search = (source, maximum = 2000) => {
       if (entries.length <= maximum) return { entries, complete: true };
+      if (!byToken) {
+        byToken = new Map();
+        entries.forEach((entry, index) => {
+          for (const token of retrievalTokens(entry.source)) include(byToken, token, index);
+        });
+      }
       const hits = new Map();
       for (const token of retrievalTokens(source))
         for (const index of byToken.get(token) || [])
@@ -719,8 +782,27 @@
       // from a bounded search as exhaustive; an eligible exact match is decisive.
       return { entries: indices.map((i) => entries[i]), complete: indices.length === entries.length };
     };
+    // Score every entry that can attain 100% and every translation of its raw
+    // source (ambiguity penalty). A safe, unpenalized 100% then wins globally,
+    // including all context and priority ties, without running fuzzy search.
+    search.exactCandidates = (projection) => {
+      const exact = projection.known ? sameProjection.get(projection.canonical) : null;
+      if (!exact) return [];
+      const sourceValues = new Set(exact.map((i) => entries[i].source));
+      return [...sourceValues].flatMap((value) => sameSource.get(value).map((i) => entries[i]));
+    };
+    return search;
   }
+  function isPreservedXliffLayout(segment) {
+    const kind = segment?.structure?.xliffPart?.kind;
+    return (
+      (kind === "blank" || kind === "markup") &&
+      String(segment.source ?? segment.text ?? "").trim() === String(segment.target ?? "").trim()
+    );
+  }
+
   globalThis.LoopCATLinguistics = Object.freeze({
+    isPreservedXliffLayout,
     COUNTING_VERSION,
     MATCHING_VERSION,
     projectSource,
@@ -733,6 +815,7 @@
     contextsFor,
     scoreSource,
     scoreEntries,
+    rankScoredEntries,
     remapTarget,
     resourceWords,
     retrievalTokens,

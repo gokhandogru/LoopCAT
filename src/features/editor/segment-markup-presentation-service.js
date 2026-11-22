@@ -129,6 +129,15 @@ export function createSegmentMarkupPresentationService(options) {
       offset = marker.index + marker.length;
     });
     if (offset < text.length) container.append(ownerDocument.createTextNode(text.slice(offset)));
+    if (segment.structure?.xliffPart?.lineBreakAfter || segment.structure?.xliffPart?.kind === "blank") {
+      const boundary = ownerDocument.createElement("span");
+      boundary.className = "xliff-line-break";
+      boundary.textContent = "↵";
+      boundary.setAttribute("role", "img");
+      boundary.setAttribute("aria-label", source("Line break"));
+      boundary.title = source("Line break");
+      container.append(boundary);
+    }
   }
 
   function renderTagTray(row, segment) {

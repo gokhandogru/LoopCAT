@@ -19,6 +19,7 @@ fs.mkdirSync(output, { recursive: true });
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), "loopcat-arabic-"));
 app.setPath("userData", profile);
 app.disableHardwareAcceleration();
+if (process.platform === "win32") app.commandLine.appendSwitch("in-process-gpu");
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-dev-shm-usage");
 const renderer = path.join(root, ".cache", "renderer", "production");
@@ -48,28 +49,75 @@ async function click(selector) {
   await js(`document.querySelector(${JSON.stringify(selector)}).click()`);
   await settle();
 }
+async function setCaptureWidth(width) {
+  await win.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
+    width,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false
+  });
+  await settle();
+}
+async function showInspector() {
+  if (!(await js("document.querySelector('#editorInspector').checkVisibility()"))) await click("#inspectorToggleBtn");
+  await until("document.querySelector('#editorInspector').checkVisibility()", "visible inspector");
+}
+
+async function auditEditorTheme(theme) {
+  await until(`document.documentElement.dataset.theme === ${JSON.stringify(theme)}`, theme + " theme");
+  await settle();
+  await js(
+    "Promise.allSettled(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished)).then(() => true)"
+  );
+  await win.webContents.capturePage();
+  const findings = await js(`(async () => {
+    const result = await axe.run(document, {
+      resultTypes: ['violations'],
+      runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}
+    });
+    return result.violations.map(v => ({
+      id:v.id, impact:v.impact, nodes:v.nodes.map(n => ({target:n.target, message:n.failureSummary}))
+    }));
+  })()`);
+  report.accessibility ??= [];
+  for (const finding of findings) {
+    report.accessibility.push({ theme, ...finding });
+    if (["serious", "critical"].includes(finding.impact))
+      report.errors.push(`Accessibility (${theme}): ${JSON.stringify(finding)}`);
+  }
+  report.checks.push(`Arabic editor audited with axe WCAG 2.2 AA rules in ${theme} theme`);
+}
+
 async function state(name, widths = [1440, 1024, 768]) {
   for (const width of widths) {
-    await win.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
-      width,
-      height: 900,
-      deviceScaleFactor: 1,
-      mobile: false
-    });
-    await settle();
+    await setCaptureWidth(width);
+    if (["08-quality", "09-review", "10-ai", "11-info"].includes(name)) await showInspector();
     const snapshot = await js(`(() => {
       const visible = el => { const r = el.getBoundingClientRect(); return el.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) && r.width > 0 && r.height > 0; };
+      const screenReaderOnly = el => {
+        const r = el.getBoundingClientRect(), style = getComputedStyle(el);
+        return el.classList.contains('sr-only') && r.width <= 1 && r.height <= 1 &&
+          style.position === 'absolute' && style.clipPath === 'inset(50%)' && style.overflow === 'hidden';
+      };
       const exclude = 'script,style,code,kbd,datalist,option,[contenteditable],textarea,.source-cell,.target-cell,.project-card h3,.project-tile h3,.file-card h3,.resource-card h3,.match-card p,.term-card p,.comment-list,.ai-suggestion-list,.local-ai-provider-summary-head > span';
       const texts = [], clipped = [];
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         const node = walker.currentNode, el = node.parentElement, text = node.textContent.trim();
         if (!text || !el || el.closest(exclude) || !visible(el)) continue;
-        if (/[A-Za-z]{2}/.test(text)) texts.push({text,element:el.id || el.className || el.tagName});
+        if (/[A-Za-z]{2}/.test(text)) {
+          const item = { text, element: el.id || el.className || el.tagName };
+          if (el.matches('#projectInfo > dd') && el.previousElementSibling?.matches('dt')) {
+            const field = el.previousElementSibling.textContent;
+            if (field === window.CatHan.i18n.source('Workspace')) item.fixtureField = 'workspaceId';
+            if (field === window.CatHan.i18n.t('ui.label.linkedTbs')) item.fixtureField = 'linkedTermbases';
+          }
+          texts.push(item);
+        }
       }
       for (const el of document.querySelectorAll('button,summary,label,h1,h2,h3,[role=tab],input,select')) {
         if (!visible(el)) continue;
-        if (!(el.id==='projectTitle' && el.title===el.textContent && getComputedStyle(el).textOverflow==='ellipsis') && !el.matches('input,select') && el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0) clipped.push({element:el.id || el.className || el.tagName,text:el.textContent.trim(),width:el.clientWidth,scroll:el.scrollWidth});
+        if (!screenReaderOnly(el) && !(el.id==='projectTitle' && el.title===el.textContent && getComputedStyle(el).textOverflow==='ellipsis') && !el.matches('input,select') && el.scrollWidth > el.clientWidth + 2 && el.clientWidth > 0) clipped.push({element:el.id || el.className || el.tagName,text:el.textContent.trim(),width:el.clientWidth,scroll:el.scrollWidth});
         for(const attr of ['title','aria-label','placeholder']) {
           const text=el.getAttribute(attr); if(text && /[A-Za-z]{2}/.test(text)) texts.push({text,element:(el.id||el.tagName)+':'+attr});
         }
@@ -79,6 +127,9 @@ async function state(name, widths = [1440, 1024, 768]) {
     report.states.push({ name, ...snapshot });
     fs.writeFileSync(path.join(output, `${name}-${width}.png`), (await win.webContents.capturePage()).toPNG());
   }
+  // The following actions use the docked workspace. Capture widths must not
+  // accidentally leave keyboard tests operating against a closed mobile sheet.
+  await setCaptureWidth(1440);
   console.log(`Arabic UI: ${name}`);
 }
 async function main() {
@@ -106,7 +157,7 @@ async function main() {
     width: 1440,
     height: 900,
     show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
   });
   win.webContents.on("render-process-gone", (_event, details) => report.errors.push(details.reason));
   win.webContents.debugger.attach("1.3");
@@ -163,7 +214,10 @@ async function main() {
   report.checks.push("Arabic locale survives reload");
   await state("04-projects");
   await click("#resourcesViewBtn");
-  await until("document.querySelector('#tmResourceDashboard .resource-card')", "resources");
+  await until(
+    "!document.querySelector('#resourcesView').classList.contains('hidden') && document.querySelector('.resource-library-table tbody tr')",
+    "resource library"
+  );
   await state("05-resources");
   await click("#projectsViewBtn");
   await click(".project-tile button.primary");
@@ -271,6 +325,8 @@ async function main() {
   );
   await state("12-arabic-edited");
   win.webContents.setZoomFactor(2);
+  await setCaptureWidth(1440);
+  await showInspector();
   await state("13-editor-200-percent", [1440]);
   await click("#inspectorCloseBtn");
   if (await js("document.querySelector('#editorInspector').checkVisibility()"))
@@ -289,24 +345,12 @@ async function main() {
     "document.querySelector('#themeSelect').value='dark';document.querySelector('#themeSelect').dispatchEvent(new Event('change',{bubbles:true}))"
   );
   await state("14-editor-dark");
+  await js(require("axe-core").source);
+  await auditEditorTheme("dark");
   await js(
     "document.querySelector('#themeSelect').value='light';document.querySelector('#themeSelect').dispatchEvent(new Event('change',{bubbles:true}))"
   );
-  await pause(500);
-  await settle();
-  await js(require("axe-core").source);
-  const accessibility = await js(
-    "axe.run(document,{resultTypes:['violations'],runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}})"
-  );
-  report.accessibility = accessibility.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    nodes: v.nodes.map((n) => n.target)
-  }));
-  for (const violation of report.accessibility)
-    if (["serious", "critical"].includes(violation.impact))
-      report.errors.push("Accessibility: " + JSON.stringify(violation));
-  report.checks.push("Arabic editor audited with axe WCAG 2.2 AA rules");
+  await auditEditorTheme("light");
   await js(
     "document.querySelector('#uiLocaleSelect').value='en-US';document.querySelector('#uiLocaleSelect').dispatchEvent(new Event('change',{bubbles:true}))"
   );
@@ -321,11 +365,21 @@ async function main() {
   await win.loadURL(guideUrl);
   await state("15-arabic-guide");
   report.checks.push("Arabic Beginner Guide is bundled, selected by the locale, and renders in RTL");
+  const projectInfoValues = {
+    workspaceId: fixture.projects[0].workspaceId,
+    linkedTermbases: fixture.projects[0].resourceLinks
+      .filter((link) => link.type === "termbase")
+      .map((link) => link.name)
+      .join(", ")
+  };
   for (const s of report.states) {
     if (s.lang !== "ar" || s.dir !== "rtl") report.errors.push(`${s.name}: Arabic locale not active`);
     if (s.documentWidth > s.width + 1) report.errors.push(`${s.name} at ${s.width}: page overflow ${s.documentWidth}`);
     for (const item of s.clipped) report.errors.push(`${s.name} at ${s.width}: clipped ${item.element}: ${item.text}`);
     for (const item of s.texts) {
+      // User-owned values may be in any language. The adjacent field labels and all other text still go through the audit.
+      if (Object.hasOwn(projectInfoValues, item.fixtureField) && item.text === projectInfoValues[item.fixtureField])
+        continue;
       // Technical names, protocol syntax, fixture data and shortcuts are intentional.
       const residual = item.text
         .replace(/https?:\/\/\S+|(?:GET|POST)\s+\/\S+|antioch-review\.html|0\.0\.4-dev\.\d+|gpt-[\w.-]+/g, "")

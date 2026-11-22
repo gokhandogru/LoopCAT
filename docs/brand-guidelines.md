@@ -23,13 +23,27 @@ The Loopbird is a right-facing hummingbird drawn as a continuous teal-and-clay s
 
 ## Core Palette
 
+The Loopbird retains its original artwork colors. The workspace uses the following semantic colors for navigation, long reading sessions and editing. Components inherit the matching light or dark values from the [workspace tokens](../src/ui/tokens.css) and [theme definitions](../src/ui/themes.css).
+
+| Workspace role | Light | Dark |
+| --- | --- | --- |
+| Navigation rail | `#133E39` | `#0B221E` |
+| Canvas | `#F7F7F2` | `#15211E` |
+| Reading surface | `#FFFFFF` | `#1C2C27` |
+| Primary text | `#183932` | `#EDF4EB` |
+| Primary action | `#086959` | `#94E5C9` |
+| Selected reading surface | `#F0F8F4` | `#253D34` |
+| Keyboard focus | `#007562` | `#9FF2D4` |
+
+### Identity colors
+
 | Token | Hex | Use |
 | --- | --- | --- |
 | Deep Pine | `#0B3F3A` | Primary text, strong actions, mono mark |
-| Interface Teal | `#0B756D` | Controls and primary product UI |
+| Interface Teal | `#0B756D` | Brand and supporting materials |
 | Bright Teal | `#0B8F83` | Active states and full-colour mark |
 | Seafoam | `#B7E4D8` | Soft highlights and selected states |
-| Warm Ivory | `#FBF7EF` | Main canvas |
+| Warm Ivory | `#FBF7EF` | Brand backgrounds |
 | Clay | `#E66A47` | Small warm accent; use sparingly |
 | Secondary text | `#58716D` | Supporting copy |
 | Divider | `#C9D9D3` | Lines and low-emphasis borders |

@@ -69,6 +69,99 @@
   box-shadow: var(--elevation-none);
 }
 
+/* Give task panels the same edge-to-edge sections as the Matches inspector. */
+.sidebar .inspector-task-panel {
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.sidebar .inspector-task-panel > .panel-header {
+  min-height: 36px;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-block-end: 1px solid var(--color-line);
+  background: transparent;
+}
+
+.sidebar .inspector-task-panel.collapsed > .panel-header {
+  border-block-end-color: transparent;
+}
+
+.sidebar .inspector-task-panel .panel-header h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  line-height: var(--line-height-tight);
+}
+
+.sidebar .inspector-task-panel .panel-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.sidebar .inspector-task-panel .panel-toggle:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.sidebar .inspector-task-panel > .panel-content {
+  min-inline-size: 0;
+  padding: var(--space-3);
+}
+
+.quality-panel > .inspector-disclosure {
+  border-block-start: 1px solid var(--color-line);
+}
+
+#editorInspector .inspector-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: 600 var(--font-size-sm) / var(--line-height-body) var(--font-sans);
+  list-style: none;
+  cursor: pointer;
+}
+
+#editorInspector .inspector-disclosure > summary:hover {
+  background: var(--color-hover);
+}
+
+#editorInspector .inspector-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+#editorInspector .inspector-disclosure > summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-inline: 2px;
+  border: solid var(--color-text-muted);
+  border-width: 0 1.5px 1.5px 0;
+  border-radius: 0;
+  transform: rotate(-45deg);
+}
+
+:dir(rtl) #editorInspector .inspector-disclosure:not([open]) > summary::before {
+  transform: rotate(135deg);
+}
+
+#editorInspector .inspector-disclosure[open] > summary::before {
+  transform: rotate(45deg);
+}
+
 .liquid-glass-edition .save-status {
   position: fixed;
   z-index: 50;
@@ -313,6 +406,44 @@
   background: var(--color-surface-subtle);
 }
 
+.liquid-glass-edition dialog {
+  color: var(--color-text);
+  max-inline-size: calc(100% - var(--space-4));
+}
+
+.liquid-glass-edition .dialog-card {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.liquid-glass-edition .dialog-card :is(h2, h3) {
+  color: var(--color-text);
+  line-height: var(--line-height-tight);
+  text-wrap: pretty;
+}
+
+.liquid-glass-edition .dialog-card :is(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea) {
+  max-inline-size: 100%;
+  border-color: var(--color-control-line);
+}
+
+.liquid-glass-edition .dialog-actions {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.liquid-glass-edition .dialog-card :is(.dialog-actions button, summary) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (pointer: coarse) {
+  .liquid-glass-edition .dialog-actions button,
+  .liquid-glass-edition .dialog-heading-row > button {
+    min-block-size: 44px;
+  }
+}
+
 .liquid-glass-edition .quick-insert-result {
   border-color: var(--color-line);
   border-radius: var(--radius-md);
@@ -391,6 +522,58 @@
   gap: var(--space-3);
   width: 100%;
   text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.liquid-glass-edition .command-palette-overlay {
+  padding-block: min(8dvh, 4rem) var(--space-2);
+}
+
+.liquid-glass-edition .command-palette {
+  inline-size: min(36rem, calc(100% - var(--space-4)));
+  max-block-size: min(40rem, calc(100dvh - min(8dvh, 4rem) - var(--space-2)));
+}
+
+.liquid-glass-edition .command-group {
+  min-inline-size: 0;
+}
+
+.liquid-glass-edition .command-item[aria-selected="true"]:not(:disabled) {
+  border-inline-start: 3px solid var(--color-accent);
+}
+
+.liquid-glass-edition #aboutDialog {
+  inline-size: min(32rem, calc(100% - var(--space-4)));
+}
+
+.liquid-glass-edition #opusCatHelpDialog {
+  inline-size: min(44rem, calc(100% - var(--space-4)));
+}
+
+.liquid-glass-edition :is(.about-card, .opus-cat-help-card) {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.liquid-glass-edition .about-meta > div {
+  grid-template-columns: minmax(6rem, 1fr) minmax(0, 2fr);
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.liquid-glass-edition .opus-cat-help-number {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .liquid-glass-edition .command-item[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .liquid-glass-edition .command-item.active:not(:disabled),
@@ -440,8 +623,12 @@
   color: var(--color-text-muted);
 }
 
+.liquid-glass-edition #diagnosticsDialog {
+  inline-size: min(45rem, calc(100% - var(--space-4)));
+}
+
 .liquid-glass-edition .diagnostics-card {
-  width: min(720px, calc(100vw - var(--space-8)));
+  inline-size: 100%;
 }
 
 .liquid-glass-edition .diagnostics-summary {
@@ -639,7 +826,7 @@
   overflow: auto;
   color: inherit;
   background: var(--color-surface);
-  border: 1px solid var(--color-line, #c9d9d3);
+  border: 1px solid var(--color-line);
   border-radius: 16px;
 }
 
@@ -673,7 +860,7 @@
 }
 .statistics-dialog fieldset {
   margin-block: 16px;
-  border: 1px solid var(--color-line, #c9d9d3);
+  border: 1px solid var(--color-line);
 }
 .statistics-table-wrap {
   max-width: 100%;
@@ -688,7 +875,7 @@
 .statistics-dialog th {
   padding: 10px;
   text-align: start;
-  border-bottom: 1px solid var(--color-line, #c9d9d3);
+  border-bottom: 1px solid var(--color-line);
 }
 .statistics-cards {
   display: flex;

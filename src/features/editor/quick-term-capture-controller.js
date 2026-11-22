@@ -78,7 +78,8 @@ export function createQuickTermCaptureController(options) {
     if (!links.length) {
       const message = ownerDocument.createElement("p");
       message.className = "muted";
-      message.textContent = "No other contribution-enabled termbases.";
+      message.textContent =
+        options.source?.("No other contribution-enabled termbases.") || "No other contribution-enabled termbases.";
       extrasRoot.append(message);
       return;
     }
@@ -138,7 +139,11 @@ export function createQuickTermCaptureController(options) {
     if (captureOptions.termStatus && elements.status) elements.status.value = captureOptions.termStatus;
     sourceInput.value = selectedSource;
     targetInput.value = targetText;
-    if (elements.message) elements.message.textContent = `Active termbase: ${active.cachedName || active.name}`;
+    if (elements.message) {
+      const name = active.cachedName || active.name;
+      elements.message.textContent =
+        options.source?.("Active termbase: {value1}", { value1: name }) || `Active termbase: ${name}`;
+    }
     renderExtras(project);
     if (captureOptions.activeOnly) {
       extrasRoot.querySelectorAll?.("[data-extra-termbase]").forEach((input) => {
@@ -147,7 +152,7 @@ export function createQuickTermCaptureController(options) {
     }
     await options.dialogLifecycle?.open?.("quick-term-capture", {
       initialFocus: captureOptions.sourceText ? targetInput : sourceInput,
-      returnTarget: editor
+      returnTarget: captureOptions.returnTarget || editor
     });
     if (!options.dialogLifecycle?.open) dialog.showModal?.();
     return true;
@@ -228,6 +233,7 @@ export function createQuickTermCaptureController(options) {
   function mount() {
     if (mounted) return false;
     options.dialogLifecycle?.register?.({ id: "quick-term-capture", dialog, initialFocus: sourceInput });
+    listen(elements.openButton, "click", () => void open({ returnTarget: elements.openButton }));
     listen(form, "submit", (event) => {
       event.preventDefault();
       void save();

@@ -104,8 +104,10 @@ export function createTmMatchesController(options) {
       card.className = "match-card compact-match-row";
       card.tabIndex = 0;
       card.setAttribute("data-match-id", String(match.id || ""));
+      card.setAttribute("data-exact-match", String(Number(match.effectiveScore ?? match.score) >= 100));
       card.setAttribute("role", "button");
       card.setAttribute("aria-disabled", String(match.safeToApply === false));
+      card.setAttribute("aria-haspopup", "menu");
       card.title = localization.source(
         match.safeToApply === false ? "Protected codes require manual review." : "Double-click or press Enter to insert"
       );
@@ -131,21 +133,14 @@ export function createTmMatchesController(options) {
         if (element) element.dir = "auto";
       }
       function insert() {
-        if (
-          match.safeToApply === false ||
-          session.getProject()?.id !== projectId ||
-          session.getActiveSegment()?.id !== segmentId
-        )
-          return;
-        return target.insert(translatedTarget, {
-          channel: "match",
-          resourceId: match.id || "",
-          ...(match.adaptedTarget ? { adapted: true } : {})
-        });
+        return insertMatch(match);
       }
       card.addEventListener("dblclick", insert);
+      card.addEventListener("click", (event) => {
+        if (event.detail === 0 && !event.pointerType) insert();
+      });
       card.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && !event.repeat) {
+        if ((event.key === "Enter" || event.key === " ") && !event.repeat) {
           event.preventDefault();
           insert();
         }
@@ -162,5 +157,14 @@ export function createTmMatchesController(options) {
     return currentResults.slice();
   }
 
-  return Object.freeze({ getResults, refresh });
+  function insertMatch(match) {
+    if (match.safeToApply === false || !getResults().includes(match)) return;
+    return target.insert(match.adaptedTarget || match.target, {
+      channel: "match",
+      resourceId: match.id || "",
+      ...(match.adaptedTarget ? { adapted: true } : {})
+    });
+  }
+
+  return Object.freeze({ getResults, refresh, insertMatch });
 }

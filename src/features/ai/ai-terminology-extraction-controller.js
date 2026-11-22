@@ -159,7 +159,7 @@ export function createAiTerminologyExtractionController(options) {
           result.terms?.length
             ? "AI term candidates already exist in the current termbase."
             : "AI did not find reusable term candidates in the active segment.",
-          { muted: false }
+          { uiMessage: true }
         );
         status.set(
           result.terms?.length ? "AI term candidates already exist" : "AI did not find term candidates",

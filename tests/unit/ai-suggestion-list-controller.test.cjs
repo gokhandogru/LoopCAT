@@ -196,11 +196,13 @@ test("AI suggestion list preserves safe provenance, inspection, and ordered expl
   const card = item.root.children[0];
   assert.deepEqual(
     card.children.map((child) => child.tagName),
-    ["HEADER", "P", "DETAILS", "UL", "FOOTER"]
+    ["HEADER", "P", "P", "DETAILS", "UL", "FOOTER"]
   );
   assert.equal(card.children[1].className, "ai-suggestion-provenance muted");
-  assert.equal(card.children[1].textContent, "Origin <img> suggestion · project · date:now");
-  const inspection = card.children[2];
+  assert.equal(card.children[1].textContent, "Origin <img> suggestion · Whole project · date:now");
+  assert.equal(card.children[2].textContent, "Suggested <script>");
+  assert.equal(card.children[2].dir, "auto");
+  const inspection = card.children[3];
   assert.equal(inspection.className, "ai-suggestion-inspection");
   assert.equal(inspection.children[0].textContent, "Inspect proposed change");
   const diff = inspection.children[1];
@@ -214,7 +216,7 @@ test("AI suggestion list preserves safe provenance, inspection, and ordered expl
     ["Suggested target", "Suggested <script>"]
   );
   assert.deepEqual(
-    card.children[3].children.map((entry) => entry.textContent),
+    card.children[4].children.map((entry) => entry.textContent),
     ["First <em>", "Second & final"]
   );
   assert.equal(card.querySelectorAll("SCRIPT").length, 0);

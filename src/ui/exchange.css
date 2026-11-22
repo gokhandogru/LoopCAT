@@ -1,0 +1,300 @@
+.exchange-dialog {
+  inline-size: min(65rem, calc(100% - 2rem));
+  max-block-size: calc(100dvh - 2rem);
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-transient);
+}
+
+.exchange-dialog::backdrop {
+  background: var(--color-overlay);
+}
+
+.exchange-dialog .exchange-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  max-block-size: calc(100dvh - 2rem - 2px);
+  overflow-wrap: anywhere;
+}
+
+#exchangeRoot {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.exchange-heading,
+.exchange-nav,
+#exchangeStatus {
+  padding-inline: clamp(var(--space-3), 3vw, var(--space-6));
+}
+
+.exchange-heading,
+.exchange-actions,
+.exchange-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.exchange-heading {
+  justify-content: space-between;
+  padding-block: var(--space-3);
+  border-block-start: 3px solid var(--color-accent);
+}
+
+.exchange-heading h2,
+.exchange-page :is(h3, h4, h5, p, dl, dd) {
+  margin: 0;
+}
+
+.exchange-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+  background: var(--color-surface-subtle);
+  border-block: 1px solid var(--color-line);
+}
+
+.exchange-nav button {
+  border-color: transparent;
+  background: transparent;
+  text-align: start;
+}
+
+.exchange-dialog .exchange-nav button[aria-current="page"],
+:root[data-theme="dark"] .liquid-glass-edition .exchange-dialog .exchange-nav button[aria-current="page"] {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  font-weight: 650;
+}
+
+.exchange-dialog :is(button, input, textarea, select, summary):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.exchange-page {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) clamp(var(--space-3), 3vw, var(--space-6)) var(--space-6);
+}
+
+.exchange-page > h3 {
+  font-size: var(--font-size-xl);
+}
+
+.exchange-page :is(section, article, .exchange-author) {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.exchange-page .exchange-card-grid,
+.exchange-page .exchange-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.exchange-page .exchange-card-grid > [hidden] {
+  display: none;
+}
+
+.exchange-page :is(.exchange-card, .exchange-panel, fieldset) {
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.exchange-page .exchange-card {
+  background: var(--color-surface-raised);
+}
+
+.exchange-page .exchange-card.is-active {
+  border-inline-start: 3px solid var(--color-accent);
+}
+
+.exchange-page :is(.exchange-panel, .exchange-empty) {
+  background: var(--color-surface-subtle);
+}
+
+.exchange-page .exchange-card > .exchange-actions:last-child {
+  margin-block-start: var(--space-1);
+}
+
+.exchange-page .exchange-card .danger-small {
+  color: var(--color-danger);
+}
+
+.exchange-page .exchange-example-pick {
+  justify-self: start;
+  min-block-size: 2.25rem;
+  padding-inline: var(--space-2);
+  font-weight: 650;
+  text-align: start;
+}
+
+.exchange-chip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+}
+
+.exchange-chip.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.exchange-warning {
+  color: var(--color-warning);
+}
+
+.exchange-page .exchange-field {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  margin-block: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.exchange-field :is(input:not([type="checkbox"]), textarea, select) {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.exchange-field input[type="file"] {
+  display: block;
+}
+
+.exchange-field input[type="file"]::file-selector-button {
+  margin-inline-end: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.exchange-page .exchange-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.exchange-choice input[type="checkbox"] {
+  grid-area: 1 / 1;
+  min-block-size: auto;
+  margin: 0;
+}
+
+.exchange-page :is(.exchange-field[hidden], .exchange-secondary[hidden]) {
+  display: none;
+}
+
+.exchange-secondary {
+  color: var(--color-text-muted);
+}
+
+.exchange-author-entries {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.exchange-author-entries fieldset > div + :is(section, div) {
+  margin-block-start: var(--space-3);
+}
+
+.exchange-rule-example {
+  padding: var(--space-2);
+  background: var(--color-surface-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.exchange-page details > summary {
+  padding: var(--space-2);
+  cursor: pointer;
+}
+
+.exchange-page details[open] > summary {
+  margin-block-end: var(--space-2);
+}
+
+.exchange-page .exchange-preview-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-2) 0;
+  padding-inline-start: var(--space-6);
+}
+
+.exchange-page .exchange-preview-list li > bdi + bdi {
+  margin-inline-start: var(--space-2);
+}
+
+.exchange-digest {
+  display: block;
+  direction: ltr;
+  text-align: start;
+  font: var(--font-size-xs) var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.exchange-storage-note,
+#exchangeStatus {
+  margin: 0;
+  padding-block: var(--space-2);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.exchange-storage-note {
+  padding-inline: clamp(var(--space-3), 3vw, var(--space-6));
+}
+
+#exchangeStatus {
+  border-block-start: 1px solid var(--color-line);
+}
+
+#exchangeStatus:empty {
+  padding-block: 0;
+  border-block-start: 0;
+}
+
+@media (width <= 34rem) {
+  .exchange-dialog {
+    inline-size: calc(100% - 1rem);
+    max-block-size: calc(100dvh - 1rem);
+  }
+
+  .exchange-dialog .exchange-shell {
+    max-block-size: calc(100dvh - 1rem - 2px);
+  }
+
+  .exchange-page > h3 {
+    font-size: var(--font-size-lg);
+  }
+}

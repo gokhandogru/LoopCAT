@@ -1,0 +1,158 @@
+#exchangeRoot .exchange-workflow-area,
+#exchangeRoot .exchange-workflow {
+  min-width: 0;
+}
+
+#exchangeRoot .exchange-workflow-field {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+#exchangeRoot .exchange-workflow-field input,
+#exchangeRoot .exchange-workflow-field select,
+#exchangeRoot .exchange-workflow-field textarea {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+
+#exchangeRoot .exchange-workflow-field textarea {
+  min-height: 7rem;
+  resize: vertical;
+  line-height: var(--line-height-body);
+}
+
+#exchangeRoot .exchange-workflow-field:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  font-weight: 400;
+  line-height: var(--line-height-body);
+}
+
+#exchangeRoot .exchange-workflow-field input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-block-start: 0.15rem;
+  accent-color: var(--color-accent);
+}
+
+#exchangeRoot .exchange-lab-controls,
+#exchangeRoot .exchange-workflow-metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+#exchangeRoot .exchange-lab-controls > p,
+#exchangeRoot .exchange-lab-controls > button {
+  grid-column: 1 / -1;
+}
+
+#exchangeRoot .exchange-lab-source,
+#exchangeRoot .exchange-lab-recorded {
+  padding: var(--space-4);
+  margin-block: var(--space-3);
+  border-inline-start: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#exchangeRoot .exchange-lab-candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+}
+
+#exchangeRoot .exchange-lab-candidate,
+#exchangeRoot .exchange-workflow-result {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  min-width: 0;
+}
+
+#exchangeRoot .exchange-lab-candidate h4,
+#exchangeRoot .exchange-workflow-result h5 {
+  margin-block: 0 var(--space-3);
+  font-size: var(--font-size-md);
+}
+
+#exchangeRoot .exchange-lab-candidate p,
+#exchangeRoot .exchange-workflow-result p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: var(--line-height-body);
+}
+
+#exchangeRoot .exchange-ai-workflow,
+#exchangeRoot .exchange-response-card,
+#exchangeRoot .exchange-lab-live {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+#exchangeRoot .exchange-workflow-disclosure,
+#exchangeRoot .exchange-response-preview {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+#exchangeRoot .exchange-response-preview {
+  white-space: pre-wrap;
+  max-height: 20rem;
+  overflow: auto;
+  font-family: var(--font-mono);
+}
+
+#exchangeRoot .exchange-workflow-outputs {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-3);
+}
+
+#exchangeRoot .exchange-response-delete {
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-line);
+}
+
+#exchangeRoot .exchange-response-delete button,
+#exchangeRoot .exchange-workflow-error {
+  color: var(--color-danger);
+}
+
+#exchangeRoot .exchange-workflow-error {
+  overflow-wrap: anywhere;
+}
+
+#exchangeRoot .exchange-workflow button {
+  min-height: 2.5rem;
+  margin-inline-end: var(--space-2);
+  margin-block: var(--space-1);
+}
+
+#exchangeRoot .exchange-workflow :focus-visible,
+#exchangeRoot .exchange-lab-candidate h4:focus,
+#exchangeRoot .exchange-lab-recorded:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}

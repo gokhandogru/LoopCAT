@@ -544,6 +544,7 @@ function openBundledGuide(url, parent) {
     height: 850,
     parent,
     title: "LoopCAT",
+    backgroundColor: electronRuntime.nativeTheme?.shouldUseDarkColors ? "#15211e" : "#f7f7f2",
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true }
   });
   const openLink = (target) => {
@@ -1101,7 +1102,7 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
         const appShellAssetProbe = {
           index: await fetchAppShellAsset("./index.html", "LoopCAT"),
           liquidGlassCss: await fetchAppShellAsset("./liquid-glass/styles.css", "liquid-glass-edition"),
-          semanticTokens: await fetchAppShellAsset("./src/ui/tokens.css", "--color-accent: #087b71"),
+          semanticTokens: await fetchAppShellAsset("./src/ui/tokens.css", "--color-accent: #086959"),
           liquidGlassIcon: await fetchAppShellAsset("./icons/loopcat-icon.svg"),
           app: await fetchAppShellAsset("./app.js", "cathan-local-cat"),
           serviceWorker: await fetchAppShellAsset("./service-worker.js", "loopcat-offline-"),
@@ -1157,6 +1158,10 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
           collectionViewProbe,
           appShellAssetProbe,
           visualProbe: {
+            brandName: document.querySelector("#brandHomeLink h1")?.textContent?.trim(),
+            workspaceStylesLoaded: ["workspace-shell", "editor-workbench", "workspace-tools"].every(name =>
+              loadedStyleSheets.some(href => href.endsWith("/src/ui/" + name + ".css"))
+            ),
             liquidGlassBodyClass: document.body?.classList.contains("liquid-glass-edition") || false,
             liquidGlassStyleSheetLoaded: loadedStyleSheets.some((href) => href.includes("/liquid-glass/styles.css")),
             canvasColor: getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim(),
@@ -1552,16 +1557,17 @@ function attachDesktopSmokeProbe(mainWindow, _options = {}) {
       }
       if (result?.title !== "LoopCAT") missing.push("document title LoopCAT");
       if (result?.url !== `${APP_SCHEME}://${APP_HOST}/index.html`) missing.push("loopcat app-shell URL");
-      if (!String(result?.bodyText || "").includes("The local-first translation workspace")) missing.push("brand text");
+      if (result?.visualProbe?.brandName !== "LoopCAT") missing.push("workspace brand heading");
+      if (!result?.visualProbe?.workspaceStylesLoaded) missing.push("workspace redesign stylesheets");
       if (!result?.visualProbe?.liquidGlassBodyClass) missing.push("Liquid Glass body class");
       if (!result?.visualProbe?.liquidGlassStyleSheetLoaded) missing.push("Liquid Glass stylesheet application");
-      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#f6f7f6")
+      if (String(result?.visualProbe?.canvasColor || "").toLowerCase() !== "#f7f7f2")
         missing.push("semantic canvas token");
-      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#087b71")
+      if (String(result?.visualProbe?.accentColor || "").toLowerCase() !== "#086959")
         missing.push("semantic accent token");
       if (String(result?.visualProbe?.topbarBackdropFilter || "").toLowerCase() !== "none")
         missing.push("restrained topbar material");
-      if (result?.visualProbe?.newProjectBackground !== "rgb(8, 123, 113)")
+      if (result?.visualProbe?.newProjectBackground !== "rgb(8, 105, 89)")
         missing.push("semantic primary action color");
       if (!result?.visualProbe?.noPageOverflow) missing.push("packaged app page overflow");
       let screenshotFile = "";
@@ -1776,7 +1782,7 @@ function createWindow(resourceHash = "", resourceType = "", initialHash = "") {
     minWidth: resourceHash ? 760 : 1080,
     minHeight: resourceHash ? 540 : 680,
     show: !DESKTOP_SMOKE_MODE,
-    backgroundColor: "#f7f9fb",
+    backgroundColor: electronRuntime.nativeTheme?.shouldUseDarkColors ? "#15211e" : "#f7f7f2",
     title: resourceHash ? `${resourceType === "tm" ? "Translation memory" : "Termbase"} — LoopCAT` : "LoopCAT",
     webPreferences: createRendererWebPreferences({ isPackaged: Boolean(app?.isPackaged) })
   });

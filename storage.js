@@ -479,16 +479,56 @@
     return verified;
   }
 
-  async function migrateCheckpointAssets(checkpointId, projectId) {
-    const checkpoint = await get("checkpoints", checkpointId);
-    if (!checkpoint?.verified || checkpoint.exportErrors?.length) return null;
-    const candidate = checkpoint.assetMigrations?.find((item) => item.projectId === projectId);
-    if (!candidate) return null;
-    const project = await get("projects", projectId);
-    if (!project?.docxStructure || project.storageVersion !== candidate.expectedVersion || !project.docxStructures?.[candidate.documentId]) return null;
-    const value = { ...project, legacyDocxDocumentId: candidate.documentId };
-    delete value.docxStructure;
-    return (await commitMutation(candidate.expectedVersion, null, { changes: [{ store: "projects", value }] })).values[0];
+  function verifiedDocxMigration(checkpoint, projectId) {
+    return checkpoint?.verified && !checkpoint.exportErrors?.length &&
+      checkpoint.assetMigrations?.find((item) => item.projectId === projectId);
+  }
+
+  function migrateCheckpointAssets(checkpointId, projectId) {
+    return serializeMutation(async () => {
+      if (!ownedProjects.has(projectId)) {
+        if (!verifiedDocxMigration(await get("checkpoints", checkpointId), projectId)) return null;
+        if (await acquireProject(projectId) === null) return null;
+      }
+      const db = await openDatabase();
+      const tx = strictTransaction(db, ["checkpoints", "projects", "ownershipLeases"]);
+      const done = txDone(tx);
+      try {
+        await assertMutationOwnership(tx, [projectId]);
+        const checkpoint = await requestToPromise(tx.objectStore("checkpoints").get(checkpointId));
+        const candidate = verifiedDocxMigration(checkpoint, projectId);
+        const store = tx.objectStore("projects");
+        const project = candidate && await requestToPromise(store.get(projectId));
+        if (!project?.docxStructure || project.storageVersion !== candidate.expectedVersion || !project.docxStructures?.[candidate.documentId]) {
+          await done;
+          return null;
+        }
+        // The verified checkpoint established that both fields represent the same source.
+        // This physical compaction must not invalidate pending edits to the logical project.
+        const compacted = { ...project, legacyDocxDocumentId: candidate.documentId };
+        delete compacted.docxStructure;
+        store.put(compacted);
+        await done;
+        return compacted;
+      } catch (error) {
+        try { tx.abort(); } catch { /* Already aborted or completed. */ }
+        await done.catch(() => {});
+        throw error;
+      }
+    });
+  }
+
+  function preserveCompactedDocx(project, previous) {
+    const documentId = previous?.legacyDocxDocumentId;
+    if (!documentId || !previous?.docxStructures?.[documentId] || project.legacyDocxDocumentId ||
+      !project.docxStructure || !project.docxStructures?.[documentId]) return project;
+    // A save prepared before compaction still carries both copies. Keep an independently
+    // edited original or mapping verbatim unless both match the verified source.
+    const verified = JSON.stringify(previous.docxStructures[documentId]);
+    if (JSON.stringify(project.docxStructure) !== verified || JSON.stringify(project.docxStructures[documentId]) !== verified) return project;
+    const compacted = { ...project, legacyDocxDocumentId: documentId };
+    delete compacted.docxStructure;
+    return compacted;
   }
 
   async function* checkpointRows(id) {
@@ -2021,6 +2061,21 @@
     held.releaseLock?.();
   }
 
+  async function assertMutationOwnership(tx, projectIds, fencingToken = null) {
+    const leases = tx.objectStore("ownershipLeases");
+    const workspaceLease = await requestToPromise(leases.get("workspace"));
+    if (workspaceLease?.expiresAt > Date.now() && workspaceLease.owner !== writerId) {
+      throw new Error("Workspace replacement is in progress. Your changes remain pending.");
+    }
+    for (const projectId of projectIds) {
+      const lease = await requestToPromise(leases.get(`project:${projectId}`));
+      const expectedToken = fencingToken ?? ownedProjects.get(projectId)?.token;
+      if (lease?.owner !== writerId || lease.token !== expectedToken || (lease.expiresAt <= Date.now() && !ownedProjects.get(projectId)?.releaseLock)) {
+        throw new Error("Project ownership expired. Your changes remain pending; reopen the project to recover ownership.");
+      }
+    }
+  }
+
   // All record checks, edits, generations, and recovery entries share one commit.
   function commitMutation(expectedVersion, fencingToken, mutation) {
     const snapshot = structuredClone(mutation);
@@ -2044,18 +2099,7 @@
     let generation = 0;
     let touchedResourceIds = [];
     try {
-      const leases = tx.objectStore("ownershipLeases");
-      const workspaceLease = await requestToPromise(leases.get("workspace"));
-      if (workspaceLease?.expiresAt > Date.now() && workspaceLease.owner !== writerId) {
-        throw new Error("Workspace replacement is in progress. Your changes remain pending.");
-      }
-      for (const projectId of projectIds) {
-        const lease = await requestToPromise(leases.get(`project:${projectId}`));
-        const expectedToken = fencingToken ?? ownedProjects.get(projectId)?.token;
-        if (lease?.owner !== writerId || lease.token !== expectedToken || (lease.expiresAt <= Date.now() && !ownedProjects.get(projectId)?.releaseLock)) {
-          throw new Error("Project ownership expired. Your changes remain pending; reopen the project to recover ownership.");
-        }
-      }
+      await assertMutationOwnership(tx, projectIds, fencingToken);
       const meta = tx.objectStore("appMeta");
       const current = await requestToPromise(meta.get("committed-generation"));
       const catalog = await requestToPromise(meta.get(CATALOG_KEY));
@@ -2120,7 +2164,8 @@
         }
         if (change.delete) { store.delete(key); meta.put({ key: `deleted-record:${change.store}:${key}`, value: generation }); values.push(null); }
         else {
-          const next = { ...change.value, storageVersion: generation, storageWriter: writerId, storageGeneration: generation };
+          const value = change.store === "projects" ? preserveCompactedDocx(change.value, previous) : change.value;
+          const next = { ...value, storageVersion: generation, storageWriter: writerId, storageGeneration: generation };
           store.put(next);
           values.push(next);
         }

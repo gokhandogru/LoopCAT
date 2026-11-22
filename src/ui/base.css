@@ -1,10 +1,17 @@
-html,
+html {
+  font-size: 100%;
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   line-height: var(--line-height-body);
+}
+
+.liquid-glass-edition :is(input[type="checkbox"], input[type="radio"], progress) {
+  accent-color: var(--color-accent);
 }
 
 /* Use the app's button/search geometry instead of platform-specific bevels. */

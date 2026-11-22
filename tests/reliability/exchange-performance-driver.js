@@ -17,6 +17,75 @@ async function until(read, label, timeout = 60000) {
   throw new Error("Timed out waiting for " + label);
 }
 const p95 = (a) => [...a].sort((a, b) => a - b)[Math.ceil(a.length * 0.95) - 1];
+async function measureLocalizationScope(win) {
+  const d = win.document,
+    api = win.CatHan.i18n,
+    originalLocale = api.getLocale(),
+    originalWalker = d.createTreeWalker,
+    editor = d.querySelector("#segmentBody tr[data-index='0'] .target-editor"),
+    originalTarget = editor?.value;
+  const host = d.createElement("div"),
+    status = d.createElement("span"),
+    authored = d.createElement("div");
+  let wholeShellPasses = 0,
+    scopedPasses = 0;
+  authored.dataset.i18nSkip = "";
+  authored.textContent = "Synthetic hello";
+  host.append(status, authored);
+  d.body.append(host);
+  const settle = () => new Promise((resolve) => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  try {
+    api.registerSource({ "bench.hello": "Synthetic hello", "bench.save": "Synthetic save" });
+    api.registerLocale({ locale: "ar-x-exchange-bench", messages: { "bench.hello": "مرحبا", "bench.save": "حفظ" } });
+    api.setLocale("ar-x-exchange-bench");
+    await settle();
+    d.createTreeWalker = function (root, ...args) {
+      if (root === d.body || root === d) wholeShellPasses++;
+      else scopedPasses++;
+      return Reflect.apply(originalWalker, this, [root, ...args]);
+    };
+    const button = d.createElement("button");
+    button.dataset.i18n = "bench.hello";
+    button.dataset.i18nTitle = "bench.save";
+    host.append(button);
+    status.textContent = "Synthetic save";
+    await settle();
+    await settle();
+    if (button.textContent !== "مرحبا" || button.title !== "حفظ" || status.textContent !== "حفظ")
+      throw Error("Scoped dynamic localization did not translate inserted keys, attributes, or status text.");
+    button.firstChild.nodeValue = "Synthetic save";
+    await settle();
+    if (button.textContent !== "مرحبا") throw Error("A text mutation bypassed an existing explicit localization key.");
+    if (authored.textContent !== "Synthetic hello" || wholeShellPasses !== 0)
+      throw Error("Dynamic localization changed authored content or rescanned the complete app shell.");
+    const scopedMutationWholeShellPasses = wholeShellPasses;
+    // A translator can replace an imported catalog without changing locale.
+    api.registerLocale({
+      locale: "ar-x-exchange-bench",
+      messages: { "bench.hello": "أهلا", "bench.save": "حفظ جديد" }
+    });
+    api.setLocale("ar-x-exchange-bench");
+    await settle();
+    if (button.textContent !== "أهلا" || button.title !== "حفظ جديد" || status.textContent !== "حفظ جديد")
+      throw Error("Replacement custom locale left stale translations.");
+    if (
+      d.querySelector("#segmentBody tr[data-index='0'] .target-editor")?.value !== originalTarget ||
+      win.CatHan.appRuntime.editorSession.getSegments()[0]?.target !== originalTarget
+    )
+      throw Error("Changing UI locale modified the real translator draft.");
+    return {
+      scopedMutationWholeShellPasses,
+      scopedPasses,
+      authoredContentPreserved: true,
+      catalogReplacementVerified: true
+    };
+  } finally {
+    d.createTreeWalker = originalWalker;
+    host.remove();
+    api.setLocale(originalLocale);
+    await settle();
+  }
+}
 async function measureRemovalCycles(win, repo, heap, workers) {
   const result = [],
     d = win.document,
@@ -267,6 +336,7 @@ export async function runExchangePerformance(config) {
         if (workers.exchangeLive !== 0 || workers.exchangeCreated < 1)
           throw new Error("Manual QA worker was absent or retained after completion.");
       }
+      const localizationProbe = config.lifecycleProbe ? await measureLocalizationScope(fw()) : undefined;
       const removalCycles = config.lifecycleProbe ? await measureRemovalCycles(fw(), repo, heap, workers) : undefined;
       results.push({
         mode,
@@ -280,6 +350,7 @@ export async function runExchangePerformance(config) {
         heapBefore,
         heapAfter,
         removalCycles,
+        localizationProbe,
         exchangeDbOpens: fw().__exchangeDbOpens,
         packMix: { terminology: Math.min(n, 3), qa: n === 5 ? 2 : 0 },
         manualQa,

@@ -101,5 +101,6 @@ export function groupCommandResults(commands, recentIds = [], hasQuery = false) 
     if (!groups.has(group)) groups.set(group, []);
     groups.get(group).push(command);
   }
-  return GROUP_ORDER.filter((group) => groups.has(group)).map((group) => ({ group, commands: groups.get(group) }));
+  const order = hasQuery ? Array.from(groups.keys()) : GROUP_ORDER.filter((group) => groups.has(group));
+  return order.map((group) => ({ group, commands: groups.get(group) }));
 }

@@ -26,7 +26,7 @@
       content="The local-first translation workspace for professional editing, review, resources, and optional AI."
     />
     <meta name="twitter:image" content="__LOOPCAT_ORIGIN__/og.png" />
-    <meta name="theme-color" content="#0B756D" />
+    <meta name="theme-color" content="#f7f7f2" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/loopcat-icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
@@ -36,25 +36,46 @@
     <link rel="stylesheet" href="./src/ui/base.css" />
     <link rel="stylesheet" href="./src/ui/components.css" />
     <link rel="stylesheet" href="./src/ui/layouts.css" />
+    <link rel="stylesheet" href="./src/ui/exchange.css" />
+    <link rel="stylesheet" href="./src/ui/exchange-workflows.css" />
+    <link rel="stylesheet" href="./src/ui/exchange-catalog.css" />
+    <link rel="stylesheet" href="./src/ui/workspace-shell.css" />
+    <link rel="stylesheet" href="./src/ui/editor-workbench.css" />
+    <link rel="stylesheet" href="./src/ui/workspace-tools.css" />
   </head>
   <body class="liquid-glass-edition">
     <div class="app-shell">
-      <header class="topbar">
-        <a id="brandHomeLink" class="brand" href="#projects" aria-label="Projects" title="Projects">
-          <div class="brand-mark"><img src="./icons/loopcat-icon.svg" alt="" /></div>
-          <div>
+      <div id="shellRailSlot">
+        <nav id="shellNavigation" class="shell-navigation" aria-label="Workspace navigation">
+          <a id="brandHomeLink" class="shell-brand" href="#projects" aria-label="Projects" title="Projects">
+            <img src="./icons/loopcat-loopbird-mono.svg" alt="" />
             <h1>LoopCAT</h1>
-            <p>The local-first translation workspace</p>
+          </a>
+          <button id="shellNavClose" type="button" class="shell-nav-close" aria-label="Close navigation" data-shell-icon="close"></button>
+          <div class="shell-nav-group">
+            <button id="projectsViewBtn" data-shell-icon="projects" type="button" aria-current="page">Projects</button>
+            <button id="resourcesViewBtn" data-shell-icon="resources" type="button">Resources</button>
+            <button id="exchangeBtn" data-shell-icon="exchange" type="button" aria-haspopup="dialog">Exchange</button>
           </div>
-        </a>
+          <div class="shell-nav-group" id="shellProjectNavigation" hidden>
+            <button id="shellFilesBtn" data-shell-icon="files" type="button">Files</button>
+            <button id="shellEditorBtn" data-shell-icon="editor" type="button">Editor</button>
+            <button id="shellStatsBtn" data-shell-icon="statistics" type="button" aria-haspopup="dialog">Statistics</button>
+          </div>
+        </nav>
+      </div>
+      <dialog id="shellNavigationDialog" aria-label="Workspace navigation"></dialog>
+      <header class="topbar shell-masthead">
+        <div class="shell-context">
+          <button id="shellNavToggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="shellNavigation" data-shell-icon="menu"></button>
+          <nav id="shellBreadcrumbs" aria-label="Current location"></nav>
+        </div>
         <div class="topbar-actions">
-          <button id="projectsViewBtn">Projects</button>
-          <button id="resourcesViewBtn">Resources</button>
-          <button id="exchangeBtn" type="button" aria-haspopup="dialog">Exchange</button>
-          <button id="trashBtn" type="button">Trash</button>
+          <button id="shellCommandsBtn" type="button" aria-haspopup="dialog" aria-label="Command palette" data-shell-icon="search"><span>Commands</span><kbd>F2</kbd></button>
           <details class="menu workspace-menu">
             <summary id="workspaceMenuSummary">Workspace</summary>
             <div class="menu-panel workspace-menu-panel">
+              <button id="trashBtn" type="button">Trash</button>
               <a
                 class="menu-item workspace-guide-link"
                 href="./docs/beginner-guide/index.html"
@@ -64,6 +85,10 @@
                 >Beginner Guide</a
               >
               <button id="aboutBtn" type="button">About LoopCAT</button>
+              <details class="workspace-submenu">
+                <summary>Projects</summary>
+                <div id="projectList" class="project-list"></div>
+              </details>
               <div id="workspaceHealth" class="workspace-health"></div>
               <p id="protectionStatus" role="status">Local saving · External backup not configured</p>
               <button id="requestEditingBtn" type="button" hidden>Request editing in this window</button>
@@ -168,7 +193,6 @@
               </details>
             </div>
           </details>
-          <button id="newProjectBtn" class="primary">New project</button>
         </div>
       </header>
       <div id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true" hidden><span id="saveStatusMessage" class="save-status-message"></span><button id="dismissSaveStatusBtn" class="save-status-dismiss" type="button" aria-label="Dismiss notification"></button></div>
@@ -185,13 +209,6 @@
       </aside>
 
       <main id="workspace" class="workspace projects-mode">
-        <aside class="project-rail">
-          <div class="panel-header">
-            <h2>Projects</h2>
-          </div>
-          <div id="projectList" class="project-list"></div>
-        </aside>
-
         <section class="editor-area">
           <section id="workspaceRecoveryPanel" class="workspace-recovery hidden" aria-live="polite">
             <div>
@@ -224,6 +241,7 @@
                 <p>Open a project or create one to start translating.</p>
               </div>
               <div class="toolbar-actions">
+                <button id="newProjectBtn" class="primary" type="button">New project</button>
                 <div
                   class="collection-view-switch"
                   role="group"
@@ -448,6 +466,18 @@
             </div>
 
             <div id="projectHomeStats" class="project-home-stats"></div>
+            <div class="file-list-header">
+              <h3>Files</h3>
+              <span id="fileCountText"></span>
+              <div class="collection-view-switch" role="group" aria-label="File view" data-collection-scope="files">
+                <button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectFileList">
+                  Cards</button
+                ><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectFileList">
+                  List
+                </button>
+              </div>
+            </div>
+            <div id="projectFileList" class="project-file-list"></div>
             <section class="analysis-panel" data-collapsible-panel>
               <div class="analysis-header">
                 <div class="analysis-title">
@@ -469,18 +499,6 @@
                 <div id="projectAnalysis" class="analysis-grid"></div>
               </div>
             </section>
-            <div class="file-list-header">
-              <h3>Files</h3>
-              <span id="fileCountText"></span>
-              <div class="collection-view-switch" role="group" aria-label="File view" data-collection-scope="files">
-                <button type="button" data-view-mode="card" aria-pressed="true" aria-controls="projectFileList">
-                  Cards</button
-                ><button type="button" data-view-mode="list" aria-pressed="false" aria-controls="projectFileList">
-                  List
-                </button>
-              </div>
-            </div>
-            <div id="projectFileList" class="project-file-list"></div>
           </div>
 
           <div id="editorView" class="editor-view hidden">
@@ -600,10 +618,10 @@
 
             <div class="progress-wrap">
               <div class="progress-label">
-                <span id="progressText">0 of 0 confirmed</span>
+                <span class="progress-scope"><span id="progressScope">Project</span> · <span id="progressText">0 of 0 confirmed</span></span>
                 <span id="wordCountText">0 words</span>
               </div>
-              <div class="progress-bar"><div id="progressFill"></div></div>
+              <div class="progress-bar" role="progressbar" aria-labelledby="progressScope progressText" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progressFill"></div></div>
             </div>
 
             <div class="segment-controls">
@@ -692,23 +710,27 @@
             </div>
 
             <div class="segment-grid-wrap">
-              <table class="segment-grid">
-                <thead>
-                  <tr>
-                    <th class="num-col">#</th>
-                    <th>Source</th>
-                    <th>Target</th>
-                    <th class="status-col">Status</th>
+              <table class="segment-grid" role="table" aria-label="Segments">
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th scope="col" role="columnheader" class="num-col">#</th>
+                    <th scope="col" role="columnheader" id="editorSourceColumn">Source</th>
+                    <th scope="col" role="columnheader" id="editorTargetColumn">Target</th>
+                    <th scope="col" role="columnheader" id="editorStatusColumn" class="status-col">Status</th>
                   </tr>
                 </thead>
-                <tbody id="segmentBody"></tbody>
+                <tbody id="segmentBody" role="rowgroup"></tbody>
               </table>
             </div>
           </div>
         </section>
 
         <aside id="editorInspector" class="sidebar" aria-label="Translation inspector">
-          <button id="inspectorCloseBtn" class="inspector-close" type="button" aria-controls="editorInspector">Hide inspector</button>
+          <div class="editor-inspector-heading">
+            <h2 id="editorInspectorTitle">Inspector</h2>
+            <span class="inspector-segment-context" hidden><span>Segment</span> <bdi id="inspectorSegmentNumber"></bdi></span>
+            <button id="inspectorCloseBtn" class="inspector-close" type="button" aria-label="Hide inspector" title="Hide inspector" aria-controls="editorInspector"><span aria-hidden="true">×</span></button>
+          </div>
           <div
             id="inspectorResizer"
             class="inspector-resizer"
@@ -733,7 +755,7 @@
               type="button"
               role="tab"
               data-inspector-tab="quality"
-              aria-controls="inspectorQualityPanel inspectorQaPanel"
+              aria-controls="inspectorQualityPanel"
               aria-selected="false"
               tabindex="-1"
             >
@@ -744,7 +766,7 @@
               type="button"
               role="tab"
               data-inspector-tab="review"
-              aria-controls="inspectorReviewPanel inspectorRevisionPanel"
+              aria-controls="inspectorReviewPanel"
               aria-selected="false"
               tabindex="-1"
             >
@@ -793,10 +815,11 @@
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
                 <h2>TM Matches</h2>
-                <span class="match-diff-legend" aria-label="Source differences"><del class="match-diff-removed">TM only</del><ins class="match-diff-added">Current only</ins></span>
               </div>
+              <button id="matchesConcordanceBtn" class="match-panel-action" type="button" aria-haspopup="dialog">Concordance</button>
             </div>
             <div class="panel-content">
+              <div class="match-diff-legend" aria-label="Source differences"><del class="match-diff-removed">TM only</del><ins class="match-diff-added">Current only</ins></div>
               <div id="tmMatches" class="result-list muted">No active segment.</div>
             </div>
           </section>
@@ -822,6 +845,7 @@
                 </button>
                 <h2>Termbases</h2>
               </div>
+              <button id="matchesCaptureTermBtn" class="match-panel-action" type="button" aria-haspopup="dialog">Add terminology</button>
             </div>
             <div class="panel-content">
               <div id="termSuggestions" class="result-list muted">No terms yet.</div>
@@ -830,71 +854,65 @@
 
           <section
             id="inspectorReviewPanel"
-            class="side-panel review-panel"
+            class="side-panel review-panel inspector-task-panel"
             role="tabpanel"
             aria-labelledby="inspectorTabReview"
-            data-collapsible-panel
             data-inspector-section="review"
           >
-            <div class="panel-header">
-              <div class="panel-title">
-                <button
-                  class="panel-toggle"
-                  type="button"
-                  data-panel-toggle data-panel-label="comments"
-                  aria-label="Minimize comments"
-                  aria-expanded="true"
-                >
-                  <span class="toggle-arrow" aria-hidden="true"></span>
-                </button>
-                <h2>Comments</h2>
-              </div>
-            </div>
             <div class="panel-content">
+              <h2>Comments</h2>
+              <div id="reviewCommentsList" class="comment-list muted">No active segment.</div>
               <form id="reviewForm" class="review-form empty-review">
-                <select id="reviewStateSelect" aria-label="Review state">
+                <label for="reviewCommentInput">Add comment</label>
+                <textarea id="reviewCommentInput" rows="2" dir="auto" title="Save comments with Ctrl/Cmd+Enter" aria-keyshortcuts="Control+Enter Meta+Enter"></textarea>
+                <label for="reviewStateSelect">Review state</label>
+                <select id="reviewStateSelect">
                   <option value="">No review state</option>
                   <option value="needs-review">Needs review</option>
                   <option value="reviewed">Reviewed</option>
                   <option value="blocked">Blocked</option>
                 </select>
-                <textarea id="reviewNoteInput" rows="3" placeholder="Review note"></textarea>
-                <textarea
-                  id="reviewCommentInput"
-                  rows="3"
-                  placeholder="Add comment"
-                  title="Save comments with Ctrl/Cmd+Enter"
-                  aria-keyshortcuts="Control+Enter Meta+Enter"
-                ></textarea>
-                <button type="submit" title="Ctrl/Cmd+Enter">Save comments</button>
+                <details id="reviewNoteDetails" class="inspector-disclosure">
+                  <summary id="reviewNoteLabel">Review note</summary>
+                  <textarea id="reviewNoteInput" aria-labelledby="reviewNoteLabel" rows="2" dir="auto"></textarea>
+                </details>
+                <p id="reviewSaveError" class="inspector-save-failure" role="alert" hidden>Review save failed</p>
+                <button type="submit" class="primary" title="Ctrl/Cmd+Enter">Save review</button>
               </form>
-              <div id="reviewCommentsList" class="comment-list muted">No active segment.</div>
             </div>
+            <details id="inspectorRevisionPanel" class="inspector-disclosure">
+              <summary>Revision History</summary>
+              <div id="revisionHistoryList" class="revision-history-list muted">No active segment.</div>
+            </details>
           </section>
 
           <section
             id="inspectorQualityPanel"
-            class="side-panel quality-panel utility-panel collapsed"
+            class="side-panel quality-panel inspector-task-panel"
             role="tabpanel"
             aria-labelledby="inspectorTabQuality"
-            data-collapsible-panel
             data-inspector-section="quality"
           >
-            <div class="panel-header">
-              <div class="panel-title">
-                <button
-                  class="panel-toggle"
-                  type="button"
-                  data-panel-toggle data-panel-label="Quality Workbench"
-                  aria-label="Expand Quality Workbench"
-                  aria-expanded="false"
-                >
-                  <span class="toggle-arrow" aria-hidden="true"></span>
-                </button>
-                <h2>Quality Workbench</h2>
+            <div id="inspectorQaPanel" class="quality-findings">
+              <div class="quality-findings-header">
+                <h2>QA findings</h2>
+                <button id="refreshQualityRiskBtn" class="primary" type="button">Run QA checks</button>
               </div>
+              <div id="qaResults" class="result-list muted">Run QA to check this file.</div>
             </div>
-            <div class="panel-content">
+            <details class="quality-disclosure inspector-disclosure">
+              <summary>Risk Queue</summary>
+              <div class="quality-disclosure-body">
+                <div id="qualitySummary" class="quality-summary muted">No quality profile loaded.</div>
+                <div class="quality-actions">
+                  <button id="nextQualityRiskBtn" type="button">Next risk</button>
+                  <button id="exportQualityPassportBtn" type="button">Export Quality Passport</button>
+                </div>
+                <div id="qualityRiskList" class="quality-risk-list muted">No risk queue yet.</div>
+              </div>
+            </details>
+            <details class="quality-disclosure inspector-disclosure">
+              <summary>Quality profile</summary>
               <form id="qualityForm" class="quality-form">
                 <label>
                   Standard
@@ -937,11 +955,14 @@
                     <option value="client-approved">Client approved</option>
                   </select>
                 </label>
-                <input id="qualityAudienceInput" placeholder="Audience" />
-                <input id="qualityToneInput" placeholder="Tone" />
+                <label>Audience<input id="qualityAudienceInput" /></label>
+                <label>Tone<input id="qualityToneInput" /></label>
                 <button type="submit">Save profile</button>
               </form>
-              <div id="qualitySummary" class="quality-summary muted">No quality profile loaded.</div>
+            </details>
+            <details class="quality-disclosure inspector-disclosure">
+              <summary>Segment review decision</summary>
+              <div class="quality-disclosure-body">
               <div id="qualityActiveEvidence" class="quality-active-evidence muted">No active segment.</div>
               <form id="qualityDecisionForm" class="quality-decision-form">
                 <label>
@@ -966,79 +987,49 @@
                     <option value="critical">Critical</option>
                   </select>
                 </label>
-                <textarea id="qualityDecisionNoteInput" placeholder="Decision note"></textarea>
+                <label class="quality-note-field">Decision note<textarea id="qualityDecisionNoteInput" rows="3"></textarea></label>
                 <button id="saveQualityDecisionBtn" type="submit">Save decision</button>
               </form>
-              <div class="quality-actions">
-                <button id="refreshQualityRiskBtn" type="button">Refresh risks</button>
-                <button id="nextQualityRiskBtn" type="button">Next risk</button>
-                <button id="exportQualityPassportBtn" type="button">Quality Passport</button>
               </div>
-              <div id="qualityRiskList" class="quality-risk-list muted">No risk queue yet.</div>
-            </div>
+            </details>
           </section>
 
           <section
             id="inspectorInfoPanel"
-            class="side-panel project-card utility-panel collapsed"
+            class="side-panel project-card inspector-task-panel"
             role="tabpanel"
             aria-labelledby="inspectorTabInfo"
-            data-collapsible-panel
             data-inspector-section="info"
           >
-            <div class="panel-header">
-              <div class="panel-title">
-                <button
-                  class="panel-toggle"
-                  type="button"
-                  data-panel-toggle data-panel-label="Project Info"
-                  aria-label="Expand Project Info"
-                  aria-expanded="false"
-                >
-                  <span class="toggle-arrow" aria-hidden="true"></span>
-                </button>
-                <h2>Project Info</h2>
-              </div>
-            </div>
             <div class="panel-content">
+              <h2>Segment details</h2>
+              <p id="segmentInfoEmpty" class="muted">No active segment.</p>
+              <dl id="segmentInfo" hidden>
+                <dt>Current file</dt><dd><bdi data-segment-info="file"></bdi></dd>
+                <dt>Translation status</dt><dd><span data-segment-info="status"></span></dd>
+                <dt>Review state</dt><dd data-segment-info="review"></dd>
+                <dt>Review risk</dt><dd data-segment-info="risk"></dd>
+                <dt>Updated</dt><dd><bdi data-segment-info="updated"></bdi></dd>
+              </dl>
+            </div>
+            <details class="inspector-disclosure" open>
+              <summary>Project details</summary>
+              <dl id="projectInfo"></dl>
+            </details>
+            <details class="inspector-disclosure">
+              <summary>Edit domain</summary>
               <form id="domainForm" class="domain-form">
-                <input id="projectDomainEditInput" placeholder="Domain" />
+                <label for="projectDomainEditInput">Domain</label>
+                <input id="projectDomainEditInput" dir="auto" />
+                <p id="domainSaveError" class="inspector-save-failure" role="alert" hidden>Project domain save failed</p>
                 <button type="submit">Save</button>
               </form>
-              <dl id="projectInfo"></dl>
-            </div>
-          </section>
-
-          <section
-            id="inspectorRevisionPanel"
-            class="side-panel revision-panel utility-panel collapsed"
-            role="tabpanel"
-            aria-labelledby="inspectorTabReview"
-            data-collapsible-panel
-            data-inspector-section="review"
-          >
-            <div class="panel-header">
-              <div class="panel-title">
-                <button
-                  class="panel-toggle"
-                  type="button"
-                  data-panel-toggle data-panel-label="Revision History"
-                  aria-label="Expand Revision History"
-                  aria-expanded="false"
-                >
-                  <span class="toggle-arrow" aria-hidden="true"></span>
-                </button>
-                <h2>Revision History</h2>
-              </div>
-            </div>
-            <div class="panel-content">
-              <div id="revisionHistoryList" class="revision-history-list muted">No active segment.</div>
-            </div>
+            </details>
           </section>
 
           <section
             id="inspectorAiPanel"
-            class="side-panel ai-panel utility-panel"
+            class="side-panel ai-panel utility-panel inspector-task-panel"
             role="tabpanel"
             aria-labelledby="inspectorTabAi"
             data-collapsible-panel
@@ -1055,19 +1046,18 @@
                 >
                   <span class="toggle-arrow" aria-hidden="true"></span>
                 </button>
-                <h2>AI</h2>
+                <h2 id="aiContextualTitle">AI tools</h2>
               </div>
+              <button id="openProjectAiSettingsBtn" type="button" aria-haspopup="dialog">Provider settings</button>
             </div>
             <div class="panel-content">
               <section class="ai-contextual-workflow" aria-labelledby="aiContextualTitle">
-                <div class="ai-contextual-heading">
-                  <div>
-                    <h3 id="aiContextualTitle">AI tools</h3>
-                  </div>
-                  <button id="openProjectAiSettingsBtn" type="button">Provider settings</button>
+                <div class="ai-connection">
+                  <span class="ai-field-label">Provider</span>
+                  <p id="contextualAiStatus" role="status" aria-live="polite">Provider not connected</p>
                 </div>
                 <label class="ai-contextual-scope">
-                  Scope
+                  <span class="ai-field-label">Scope</span>
                   <select id="localAiModeSelect">
                     <option value="selected">Selected segment</option>
                     <option value="document">Current document</option>
@@ -1076,13 +1066,7 @@
                     <option value="untranslated">Untranslated in document</option>
                   </select>
                 </label>
-                <p class="ai-contextual-safeguard">
-                  Suggestions stay inspectable. Confirmed and locked text is preserved.
-                </p>
-                <p id="contextualAiStatus" class="ai-privacy-note" role="status" aria-live="polite">
-                  Provider not connected
-                </p>
-                <div class="ai-contextual-actions" aria-label="Contextual AI actions">
+                <div class="ai-contextual-actions" role="group" aria-label="Contextual AI actions">
                   <button id="contextualAiTranslateBtn" class="primary" type="button">Translate selected</button>
                   <button id="contextualAiReviewBtn" type="button">Review</button>
                   <button id="contextualAiRepairBtn" type="button">Suggest tag repair</button>
@@ -1092,7 +1076,12 @@
                   <button id="contextualAiCancelBtn" type="button" disabled>Cancel</button>
                 </div>
                 <div id="contextualAiProgressMount"></div>
-                <div id="contextualAiSuggestionMount" class="ai-contextual-results"></div>
+                <p class="ai-contextual-safeguard">
+                  Suggestions stay inspectable. Confirmed and locked text is preserved.
+                </p>
+                <div id="contextualAiSuggestionMount" class="ai-contextual-results">
+                  <h3>AI suggestions</h3>
+                </div>
                 <div id="contextualAiOutputMount" class="ai-contextual-results"></div>
               </section>
               <section id="aiSettingsForm" class="ai-settings-form">
@@ -1356,10 +1345,9 @@
                       <button id="localAiProjectBriefBtn" type="button">Generate project brief</button>
                     </div>
                   </details>
-                  <details class="local-ai-group local-ai-drawer local-ai-output-drawer" id="localAiOutputDrawer">
+                  <details class="local-ai-group local-ai-drawer local-ai-output-drawer inspector-disclosure" id="localAiOutputDrawer">
                     <summary>
                       <span>Latest AI output</span>
-                      <small>Results from optional tools</small>
                     </summary>
                     <div id="localAiPromptOutput" class="ai-suggestion-list muted">No local AI output yet.</div>
                   </details>
@@ -1405,67 +1393,46 @@
             </div>
           </section>
 
-          <section
-            id="inspectorQaPanel"
-            class="side-panel qa-panel"
-            role="tabpanel"
-            aria-labelledby="inspectorTabQuality"
-            data-collapsible-panel
-            data-inspector-section="quality"
-          >
-            <div class="panel-header">
-              <div class="panel-title">
-                <button
-                  class="panel-toggle"
-                  type="button"
-                  data-panel-toggle data-panel-label="QA Checks"
-                  aria-label="Minimize QA Checks"
-                  aria-expanded="true"
-                >
-                  <span class="toggle-arrow" aria-hidden="true"></span>
-                </button>
-                <h2>QA Checks</h2>
-              </div>
-            </div>
-            <div class="panel-content">
-              <div id="qaResults" class="result-list muted">Run QA to check the project.</div>
-            </div>
-          </section>
         </aside>
+        <dialog id="inspectorSheet" aria-labelledby="editorInspectorTitle"></dialog>
       </main>
     </div>
 
     <button id="exitFocusModeBtn" class="focus-exit-btn hidden" type="button">Exit Focus</button>
 
-    <div id="concordanceOverlay" class="concordance-overlay hidden">
-      <section class="concordance-popover" role="dialog" aria-modal="false" aria-labelledby="concordanceTitle">
+    <dialog id="concordanceOverlay" class="concordance-overlay hidden" aria-labelledby="concordanceTitle">
+      <section class="concordance-popover">
         <header>
           <div>
             <h2 id="concordanceTitle">Concordance</h2>
-            <p id="concordanceMeta"></p>
+            <p id="concordanceMeta" role="status"></p>
           </div>
           <button id="closeConcordanceBtn" type="button" aria-label="Close concordance">Close</button>
         </header>
         <div class="concordance-controls">
-          <input
+          <label class="concordance-query">
+            <span class="sr-only">Concordance search</span>
+            <input
             id="concordanceQueryInput"
             type="search"
+            dir="auto"
             aria-label="Concordance search"
             placeholder="Search translation memories"
-          />
-          <select id="concordanceScopeSelect" aria-label="Search in">
+            />
+          </label>
+          <button id="concordanceSearchBtn" class="primary" type="button">Search</button>
+          <label><span>Search in</span><select id="concordanceScopeSelect">
             <option value="both">Source and target</option>
             <option value="source">Source only</option>
             <option value="target">Target only</option>
-          </select>
-          <select id="concordanceResourceSelect" aria-label="Translation memory">
+          </select></label>
+          <label><span>Translation memory</span><select id="concordanceResourceSelect">
             <option value="">All linked TMs</option>
-          </select>
-          <button id="concordanceSearchBtn" type="button">Search</button>
+          </select></label>
         </div>
         <div id="concordanceResults" class="concordance-results"></div>
       </section>
-    </div>
+    </dialog>
 
     <div id="quickInsertOverlay" class="quick-insert-overlay hidden" aria-hidden="true">
       <section class="quick-insert-popover" role="dialog" aria-modal="true" aria-labelledby="quickInsertTitle">
@@ -1502,8 +1469,8 @@
       <h2 id="termEditTitle">Edit term</h2>
       <form id="termForm" class="term-form">
         <label>Termbase<select id="termBaseSelect" aria-label="Termbase"></select></label>
-        <label>Source term<input id="sourceTermInput" aria-label="Source term" required /></label>
-        <label>Target term<input id="targetTermInput" aria-label="Target term" required /></label>
+        <label>Source term<input id="sourceTermInput" aria-label="Source term" dir="auto" required /></label>
+        <label>Target term<input id="targetTermInput" aria-label="Target term" dir="auto" required /></label>
         <label>Notes<input id="termNotesInput" aria-label="Term notes" /></label>
         <label class="checkbox-row term-forbidden-row">
           <input id="termForbiddenInput" type="checkbox" /> Forbidden target
@@ -1525,8 +1492,8 @@
           <button id="closeQuickTermCaptureBtn" type="button" aria-label="Close term capture">Close</button>
         </div>
         <div class="two-col">
-          <label>Source term <input id="quickTermSourceInput" required autocomplete="off" /></label>
-          <label>Target term <input id="quickTermTargetInput" required autocomplete="off" /></label>
+          <label>Source term <input id="quickTermSourceInput" required dir="auto" autocomplete="off" /></label>
+          <label>Target term <input id="quickTermTargetInput" required dir="auto" autocomplete="off" /></label>
         </div>
         <fieldset id="quickTermDestinations" class="quick-term-destinations">
           <legend>Also save to</legend>
@@ -1599,8 +1566,11 @@
     </div>
 
     <dialog id="exchangeDialog" class="exchange-dialog" aria-labelledby="exchangeTitle">
-      <section class="dialog-card">
-        <div class="exchange-heading"><h2 id="exchangeTitle">LoopCAT Exchange</h2><button id="exchangeClose" type="button">Close</button></div>
+      <section class="dialog-card exchange-shell">
+        <header class="exchange-heading">
+          <h2 id="exchangeTitle">LoopCAT Exchange</h2>
+          <button id="exchangeClose" type="button" autofocus>Close</button>
+        </header>
         <div id="exchangeRoot"></div>
         <p id="exchangeStatus" role="status" aria-live="polite"></p>
       </section>
@@ -1983,14 +1953,14 @@
     <datalist id="languageNameOptions"></datalist>
 
     <template id="segmentRowTemplate">
-      <tr>
-        <td class="num-col"></td>
-        <td class="source-cell"></td>
-        <td class="target-cell">
+      <tr role="row">
+        <td role="cell" class="num-col"></td>
+        <td role="cell" headers="editorSourceColumn" class="source-cell"></td>
+        <td role="cell" headers="editorTargetColumn" class="target-cell">
           <textarea rows="2" spellcheck="true" dir="auto"></textarea>
           <div class="target-tag-preview hidden" aria-label="Target with protected tags"></div>
         </td>
-        <td class="status-col"><span class="status-pill"></span></td>
+        <td role="cell" headers="editorStatusColumn" class="status-col"><span class="status-pill"></span></td>
       </tr>
     </template>
 

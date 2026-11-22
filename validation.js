@@ -1072,7 +1072,7 @@
 
     const segments = Array.isArray(pkg?.segments) ? pkg.segments : [];
     if (!Array.isArray(pkg?.segments)) add(report, "errors", "Segments must be an array.");
-    const emptyTargets = segments.filter((segment) => !String(segment.target || "").trim()).length;
+    const emptyTargets = segments.filter((segment) => !String(segment.target || "").trim() && !globalThis.LoopCATLinguistics?.isPreservedXliffLayout?.(segment)).length;
     if (segments.length)
       add(report, "preserved", `${segments.length} segment${segments.length === 1 ? "" : "s"} included.`);
     if (emptyTargets)
@@ -1648,6 +1648,7 @@
     let draftTargetCount = 0;
     const exportSegments = sourceSegments.map((segment) => {
       const target = String(segment?.target ?? "");
+      if (globalThis.LoopCATLinguistics?.isPreservedXliffLayout?.(segment)) return { ...segment, target };
       const empty = !target.trim();
       if (empty) emptyTargetCount += 1;
       else if (segment?.status !== "confirmed") draftTargetCount += 1;

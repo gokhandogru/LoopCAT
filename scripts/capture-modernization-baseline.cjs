@@ -51,7 +51,7 @@ if (!process.versions.electron) {
     stdio: "inherit"
   });
   if (result.error) console.error(result.error.message);
-  if (verify) fs.rmSync(outputDir, { recursive: true, force: true });
+  if (verify && !requestedOutput) fs.rmSync(outputDir, { recursive: true, force: true });
   process.exit(result.status ?? 1);
 }
 
@@ -60,6 +60,8 @@ const rendererProductionRoot = path.join(root, ".cache", "renderer", "production
 const { offlineAssets } = require(path.join(rendererProductionRoot, "config", "production-assets.js"));
 const outputDir = path.resolve(optionValue(rawArgs, "--output"));
 const verify = rawArgs.includes("--verify");
+const recordReferenceIssues = rawArgs.includes("--record-reference-issues");
+if (recordReferenceIssues && verify) throw new Error("Reference issues cannot be accepted by the verification gate.");
 const userDataDir = path.join(os.tmpdir(), `loopcat-modernization-profile-${process.pid}`);
 const fixture = JSON.parse(
   fs.readFileSync(path.join(root, "tests", "fixtures", "modernization", "baseline-backup.json"), "utf8")
@@ -97,8 +99,10 @@ const pageErrors = [];
 const screenshots = [];
 const editorSpaceMeasurements = {};
 const workspaceLayoutMeasurements = [];
+const referenceIssues = [];
 
 app.disableHardwareAcceleration();
+if (process.platform === "win32") app.commandLine.appendSwitch("in-process-gpu");
 if (process.env.LOOPCAT_BASELINE_NO_SANDBOX === "1") app.commandLine.appendSwitch("no-sandbox");
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-dev-shm-usage");
@@ -154,6 +158,51 @@ async function settle() {
     true
   );
   await new Promise((resolve) => setTimeout(resolve, 80));
+}
+
+async function revealControl(selector) {
+  const parents = await windowRef.webContents.executeJavaScript(`(() => {
+    const node = document.querySelector(${JSON.stringify(selector)});
+    if (!node) throw new Error("Missing capture control: " + ${JSON.stringify(selector)});
+    const list = [];
+    for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+      if (parent.matches("details") && parent.querySelector(":scope > summary") !== node) list.unshift(parent);
+    }
+    return list.length;
+  })()`, true);
+  for (let index = 0; index < parents; index++) {
+    await windowRef.webContents.executeJavaScript(`(() => {
+      const chain = [];
+      const node = document.querySelector(${JSON.stringify(selector)});
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        if (parent.matches("details") && parent.querySelector(":scope > summary") !== node) chain.unshift(parent);
+      }
+      const menu = chain[${index}];
+      if (!menu.open) {
+        const summary = menu.querySelector(":scope > summary");
+        if (!summary.checkVisibility()) throw new Error("Hidden parent disclosure: " + summary.textContent);
+        summary.click();
+      }
+    })()`, true);
+    await settle();
+  }
+  const visible = await windowRef.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).checkVisibility()`, true);
+  if (!visible) {
+    const ancestry = await windowRef.webContents.executeJavaScript(`(() => {
+      const trace = [];
+      for (let p = document.querySelector(${JSON.stringify(selector)}); p; p = p.parentElement) {
+        trace.push([p.tagName, p.id, p.className, p.open, getComputedStyle(p).display]);
+      }
+      return trace;
+    })()`, true);
+    throw new Error(`Capture control ${selector} is hidden: ${JSON.stringify(ancestry)}`);
+  }
+}
+
+async function clickControl(selector) {
+  await revealControl(selector);
+  await windowRef.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).click()`, true);
+  await settle();
 }
 
 async function setExactViewport(viewport) {
@@ -214,6 +263,20 @@ async function captureCollectionMode(number, slug, scope, mode, restoreMode) {
   })()`, true);
 }
 
+async function captureResourceDensity(slug) {
+  async function setDensity(value) {
+    await windowRef.webContents.executeJavaScript(`(() => {
+      const control = document.querySelector('#resourcesView select[aria-label="Row density"]');
+      control.value = ${JSON.stringify(value)};
+      control.dispatchEvent(new Event("change", { bubbles: true }));
+    })()`, true);
+    await waitFor(`document.querySelector('#resourcesView').dataset.density === ${JSON.stringify(value)}`, `resource library density ${value}`);
+  }
+  await setDensity("comfortable");
+  await captureState("02", slug);
+  await setDensity("compact");
+}
+
 async function verifyWorkspaceLayout() {
   const longNotice = "Save could not be completed. Your latest edits are still available in this window. Open Workspace to retry local saving or export a recovery copy. ".repeat(3);
   for (const viewport of [...viewports, { name: "768x768", width: 768, height: 768 }]) {
@@ -222,12 +285,14 @@ async function verifyWorkspaceLayout() {
       `(() => {
         const status = document.querySelector("#saveStatus");
         const header = document.querySelector(".topbar");
-        const original = { text: status.textContent, className: status.className };
-        status.textContent = "";
+        const message = status.querySelector("#saveStatusMessage") || status;
+        const original = { text: message.textContent, className: status.className, hidden: status.hidden };
+        message.textContent = "";
         const headerHeight = header.getBoundingClientRect().height;
         const workspaceBefore = document.querySelector("#workspace").getBoundingClientRect().toJSON();
         status.className = "save-status error";
-        status.textContent = ${JSON.stringify(longNotice)};
+        status.hidden = false;
+        message.textContent = ${JSON.stringify(longNotice)};
         const noticeRect = status.getBoundingClientRect();
         const navItems = [...document.querySelector(".topbar-actions").children].map((element) => element.getBoundingClientRect());
         const workspace = document.querySelector("#workspace").getBoundingClientRect();
@@ -246,13 +311,15 @@ async function verifyWorkspaceLayout() {
           hiddenControlsVisible: [...document.querySelectorAll("[hidden]")].some((element) => getComputedStyle(element).display !== "none"),
           workspaceLabel: document.querySelector("#workspaceMenuSummary").textContent,
           workspaceBottom: workspace.bottom,
+          inspectorVisible: inspector.height > 0 && inspector.width > 0,
           inspectorTop: inspector.top,
           workspaceTop: workspace.top,
           segmentViewportHeight: scroller.height,
           documentWidth: document.documentElement.scrollWidth
         };
-        status.textContent = original.text;
+        message.textContent = original.text;
         status.className = original.className;
+        status.hidden = original.hidden;
         return result;
       })()`,
       true
@@ -268,7 +335,7 @@ async function verifyWorkspaceLayout() {
       measurement.hiddenControlsVisible ||
       measurement.workspaceLabel !== "Workspace" ||
       measurement.workspaceBottom > viewport.height + 1 ||
-      measurement.inspectorTop < measurement.workspaceTop - 1 ||
+      (measurement.inspectorVisible && measurement.inspectorTop < measurement.workspaceTop - 1) ||
       measurement.segmentViewportHeight < 100 ||
       measurement.documentWidth > viewport.width + 1
     ) {
@@ -298,6 +365,8 @@ async function measureEditorWorkspace(state, minimumRatio) {
         inspectorDisplayed: getComputedStyle(inspector).display !== "none",
         workspaceInspectorClosed: workspace.classList.contains("inspector-closed"),
         workspaceWidth: Number(workspaceWidth.toFixed(2)),
+        sourceAndTargetViewportRatio: Number((sourceAndTargetWidth / window.innerWidth).toFixed(4)),
+        navigationWidth: Number((window.innerWidth - workspaceWidth).toFixed(2)),
         sourceWidth: Number(sourceWidth.toFixed(2)),
         targetWidth: Number(targetWidth.toFixed(2)),
         sourceAndTargetWidth: Number(sourceAndTargetWidth.toFixed(2)),
@@ -334,36 +403,48 @@ async function verifyEditorOptionMenus() {
       ["segmentSearchOptionsMenu", "segmentSearchScope", "source"],
       ["segmentFiltersMenu", "reviewStateFilter", "needs-review"]
     ]) {
+      await revealControl("#" + menuId + " > summary");
       const result = await windowRef.webContents.executeJavaScript(
-        `(() => {
+        `(async () => {
           const menu = document.getElementById(${JSON.stringify(menuId)});
           const select = document.getElementById(${JSON.stringify(selectId)});
           const originalValue = select.value;
           select.value = ${JSON.stringify(activeValue)};
-          menu.open = true;
+          if (!menu.open) menu.querySelector(":scope > summary").click();
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           const panel = menu.querySelector(".menu-panel").getBoundingClientRect();
           const editor = document.querySelector(".editor-area").getBoundingClientRect();
           const activeIndicatorVisible = getComputedStyle(menu.querySelector(".control-active-indicator")).display !== "none";
           select.focus();
           select.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+          await new Promise(resolve => requestAnimationFrame(resolve));
           const result = {
             activeIndicatorVisible,
             closedWithEscape: !menu.open,
             focusReturned: document.activeElement === menu.querySelector("summary"),
-            insideEditor: panel.left >= editor.left - 1 && panel.right <= editor.right + 1,
+            insideEditor: panel.width > 0 && panel.left >= editor.left - 1 && panel.right <= editor.right + 1,
             visibleCoreControls: ["documentFilter", "segmentSearchInput", "segmentStatusFilter", "nextOpenBtn"].every((id) => document.getElementById(id).getClientRects().length > 0)
           };
           select.value = originalValue;
-          return result;
+          return { checks: result, bounds: { panel: { left: panel.left, right: panel.right }, editor: { left: editor.left, right: editor.right } } };
         })()`,
         true
       );
-      if (Object.values(result).some((value) => !value)) {
-        throw new Error(`Editor options failed at ${viewport.name} (${menuId}): ${JSON.stringify(result)}`);
+      const failures = Object.keys(result.checks).filter((key) => !result.checks[key]);
+      if (failures.length) {
+        const context = await windowRef.webContents.executeJavaScript(`({ focus: document.activeElement.id || document.activeElement.tagName,
+          menus: Array.from(document.querySelectorAll(".menu[open]"), item => item.id) })`);
+        const detail = { viewport: viewport.name, menu: menuId, failures, ...result, context };
+        if (!recordReferenceIssues || menuId !== "segmentFiltersMenu" || failures.length !== 1 || failures[0] !== "insideEditor")
+          throw new Error(`Editor options failed: ${JSON.stringify(detail)}`);
+        referenceIssues.push(detail);
+        console.log("Pre-change popup bounds:", JSON.stringify(detail));
       }
+      await windowRef.webContents.executeJavaScript("document.body.click()", true);
+      await settle();
     }
   }
-  console.log("Advanced search/filter menus preserve active indicators, core controls, viewport bounds, and Escape focus return.");
+  console.log(referenceIssues.length ? "Advanced search/filter checks finished with recorded reference issues." : "Advanced search/filter menus preserve active indicators, core controls, viewport bounds, and Escape focus return.");
 }
 
 function fileMetrics() {
@@ -466,22 +547,27 @@ app
     );
 
     await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
-    await waitFor("document.querySelector('#tmResourceDashboard .resource-card')", "TM resources dashboard");
+    await waitFor("document.querySelector('#tmResourceDashboard [data-library-id]')", "TM resources dashboard");
     await captureState("02", "resources-translation-memories");
-    await captureCollectionMode("02", "resources-translation-memories-list", "resources", "list", "card");
+    await captureResourceDensity("resources-translation-memories-comfortable");
+    windowRef.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     await windowRef.webContents.executeJavaScript(
       "document.querySelector('#tmResourceDashboard [data-resource-action=\"open\"]').click()",
       true
     );
-    await waitFor("!document.querySelector('#tmResourceDetail').classList.contains('hidden')", "TM resource detail");
+    await waitFor("document.querySelector('#resourceEditor .resource-entry-link')", "Dedicated TM editor");
     await captureState("02", "resource-translation-memory-detail");
-    await captureCollectionMode("02", "resource-translation-memory-entry-cards", "resource-entries", "card", "list");
-    await windowRef.webContents.executeJavaScript(
-      "document.querySelector('#tmResourceDetail [data-resource-action=\"delete-entry\"]').click()",
-      true
-    );
+    await windowRef.webContents.executeJavaScript("document.querySelector('#resourceEditor .resource-entry-link').click()", true);
+    await waitFor("document.querySelector('#resourceEntryForm [name=target]')?.value", "Populated TM entry");
+    await captureState("02", "resource-translation-memory-entry");
+    await windowRef.loadURL(url);
+    await waitFor("document.querySelector('#projectDashboard .project-tile button.primary')", "Main workspace ready after closing the resource editor");
+    await windowRef.webContents.executeJavaScript("document.querySelector('#resourcesViewBtn').click()", true);
+    await waitFor("document.querySelector('#tmResourceDashboard [data-library-id]')?.checkVisibility()", "Visible TM library return");
+    await settle();
+    await clickControl('#tmResourceDashboard [data-resource-action="delete-resource"]');
     await waitFor("document.querySelector('#trashBtn').textContent.includes('Trash (1)')", "Resource in Trash");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#trashBtn').click()", true);
+    await clickControl("#trashBtn");
     await waitFor("document.querySelector('#trashDialog').open", "resource Trash dialog");
     await waitFor("document.querySelector('#trashList .trash-item')", "resource Trash item");
     await captureState("03", "resource-trash-populated");
@@ -496,9 +582,9 @@ app
     await waitFor("!document.querySelector('#trashDialog').open", "closed resource Trash dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#tbResourceTab').click()", true);
     await waitFor("document.querySelector('#tbResourceTab').getAttribute('aria-selected') === 'true'", "Termbase tab");
-    await waitFor("document.querySelector('#tbResourceDashboard .resource-card')", "Termbase resources dashboard");
+    await waitFor("document.querySelector('#tbResourceDashboard [data-library-id]')", "Termbase resources dashboard");
     await captureState("02", "resources-termbases");
-    await captureCollectionMode("02", "resources-termbases-list", "resources", "list", "card");
+    await captureResourceDensity("resources-termbases-comfortable");
     await windowRef.webContents.executeJavaScript("document.querySelector('#projectsViewBtn').click()", true);
     await waitFor("document.querySelector('.project-tile button.primary')", "populated projects return");
 
@@ -512,22 +598,24 @@ app
     );
     await captureState("02", "project-dashboard");
     await captureCollectionMode("02", "project-files-list", "files", "list", "card");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#projectSettingsBtn').click()", true);
+    await clickControl("#projectSettingsBtn");
     await waitFor("document.querySelector('#projectDialog').open", "project settings");
-    await windowRef.webContents.executeJavaScript(`(() => {
-      const button = document.querySelector("#optionalResourceSettingsBtn");
-      button.closest("details").open = true;
-      button.click();
-    })()`, true);
+    await clickControl("#optionalResourceSettingsBtn");
     await waitFor("document.querySelector('#resourceSettingsDialog').open && document.querySelector('#projectTmResourceList .resource-policy-row')", "project resource choices");
     await captureState("02", "project-resource-selection-list");
     await captureCollectionMode("02", "project-resource-selection-cards", "resource-selection", "card", "list");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#cancelResourceSettingsBtn').click(); document.querySelector('#cancelProjectBtn').click()", true);
+    await clickControl("#cancelResourceSettingsBtn");
+    await waitFor("document.querySelector('#projectDialog').open && !document.querySelector('#resourceSettingsDialog').open", "returned project settings dialog");
+    await clickControl("#cancelProjectBtn");
+    await waitFor("!document.querySelector('#projectDialog').open", "dismissed project settings");
 
-    await windowRef.webContents.executeJavaScript("document.querySelector('#newProjectBtn').click()", true);
-    await waitFor("document.querySelector('#projectDialog').open", "new-project dialog");
+    await clickControl("#projectsViewBtn");
+    await clickControl("#newProjectBtn");
+    await waitFor("document.querySelector('#projectDialog').open && document.querySelector('#projectDialogTitle').textContent === 'New project' && !document.querySelector('#projectNameInput').value", "blank new-project dialog");
     await captureState("04", "new-project-dialog");
     await windowRef.webContents.executeJavaScript("document.querySelector('#projectDialog').close()", true);
+    await clickControl(".project-tile button.primary");
+    await waitFor("!document.getElementById('projectHomeView').classList.contains('hidden')", "return to the project files");
 
     await windowRef.webContents.executeJavaScript(
       `(() => {
@@ -562,13 +650,17 @@ app
       "translation editor"
     );
     await measureEditorWorkspace("open", 0.55);
+    await windowRef.webContents.executeJavaScript(`for (const id of ["workspaceRecoveryDismissBtn","backupReminderDismissBtn"]) {
+      const button = document.getElementById(id);
+      if (button?.getClientRects().length) button.click();
+    }`, true);
     await captureState("03", "translation-editor");
     await verifyWorkspaceLayout();
     await verifyEditorOptionMenus();
 
     await windowRef.webContents.executeJavaScript(
       `(() => {
-        const returnTarget = document.querySelector("#focusModeBtn");
+        const returnTarget = document.querySelector("#segmentSearchInput");
         const input = document.querySelector("#projectPackageImportInput");
         returnTarget.focus();
         Object.defineProperty(input, "files", {
@@ -593,18 +685,18 @@ app
       true
     );
     await waitFor(
-      "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#focusModeBtn')",
+      "document.querySelector('#validationReportPanel').classList.contains('hidden') && document.activeElement === document.querySelector('#segmentSearchInput')",
       "editor import validation dismissal"
     );
 
-    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
+    await clickControl("#inspectorToggleBtn");
     await waitFor(
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'false'",
       "closed inspector"
     );
     await measureEditorWorkspace("closed", 0.7);
     await captureState("04", "editor-inspector-closed");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
+    await clickControl("#inspectorToggleBtn");
     await waitFor(
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'true'",
       "open inspector"
@@ -693,12 +785,12 @@ app
     await waitFor("document.documentElement.dataset.density === 'compact'", "Compact editor density");
     await captureState("07", "editor-compact");
 
-    await windowRef.webContents.executeJavaScript("document.querySelector('#focusModeBtn').click()", true);
+    await clickControl("#focusModeBtn");
     await waitFor("document.body.classList.contains('focus-mode')", "Focus mode");
     await captureState("08", "focus-mode");
     await windowRef.webContents.executeJavaScript("document.querySelector('#exitFocusModeBtn').click()", true);
 
-    await windowRef.webContents.executeJavaScript("document.querySelector('#commandPaletteBtn').click()", true);
+    await clickControl("#commandPaletteBtn");
     await waitFor("!document.querySelector('#commandPaletteOverlay').classList.contains('hidden')", "command palette");
     await captureState("09", "command-palette");
     await windowRef.webContents.executeJavaScript("document.querySelector('#closeCommandPaletteBtn').click()", true);
@@ -716,13 +808,13 @@ app
     await captureState("10", "dark-ai-settings");
     await windowRef.webContents.executeJavaScript("document.querySelector('#closeAiProviderDialogBtn').click()", true);
     await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorTabMatches').click()", true);
-    await windowRef.webContents.executeJavaScript("document.querySelector('#inspectorToggleBtn').click()", true);
+    await clickControl("#inspectorToggleBtn");
     await waitFor(
       "document.querySelector('#inspectorToggleBtn').getAttribute('aria-expanded') === 'false'",
       "dark closed inspector"
     );
     await captureState("11", "dark-editor-inspector-closed");
-    await windowRef.webContents.executeJavaScript("document.querySelector('#focusModeBtn').click()", true);
+    await clickControl("#focusModeBtn");
     await waitFor("document.body.classList.contains('focus-mode')", "dark Focus mode");
     await captureState("12", "dark-focus-mode");
 
@@ -740,6 +832,7 @@ app
       },
       viewports,
       screenshots,
+      referenceIssues,
       workspaceLayoutMeasurements,
       measurements: {
         startupMs: Number(startupMs.toFixed(2)),
@@ -752,8 +845,8 @@ app
         "Projects -> Open project -> Open file -> target editor",
         "Alt+Arrow segment navigation",
         "Ctrl/Cmd+Shift+F Focus mode",
-        "Ctrl/Cmd+K command palette",
-        "Ctrl/Cmd/Alt+K concordance"
+        "F2 / Ctrl/Cmd+Shift+P command palette",
+        "Ctrl/Cmd+Shift+K concordance"
       ],
       knownAccessibilityExceptions: [
         "Automated checks do not replace the manual keyboard, 200% zoom, forced-colors, NVDA, and VoiceOver matrix."

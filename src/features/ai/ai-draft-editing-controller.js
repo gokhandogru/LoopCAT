@@ -285,7 +285,7 @@ export function createAiDraftEditingController(options) {
         })
       );
       if (result.suggestedTarget.trim() === String(segment.target || "").trim() && !result.warnings?.length) {
-        presentation.renderOutput(definition.activeUnchangedOutput, { muted: false });
+        presentation.renderOutput(definition.activeUnchangedOutput, { uiMessage: true });
         status.set(definition.activeUnchangedStatus, "saved");
         return true;
       }

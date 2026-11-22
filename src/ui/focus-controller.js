@@ -15,7 +15,10 @@
     if (!container?.querySelectorAll) return [];
     return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
       (element) =>
-        !element.hidden && element.getAttribute("aria-hidden") !== "true" && element.getClientRects().length > 0
+        element.tabIndex >= 0 &&
+        !element.hidden &&
+        element.getAttribute("aria-hidden") !== "true" &&
+        element.getClientRects().length > 0
     );
   }
 

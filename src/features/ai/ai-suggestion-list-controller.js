@@ -1,3 +1,13 @@
+const scopeLabels = {
+  "active segment": "Selected segment",
+  segment: "Selected segment",
+  selected: "Selected segment",
+  document: "Current document",
+  project: "Whole project",
+  visible: "Filtered segments",
+  untranslated: "Untranslated in document"
+};
+
 function requireRoot(value) {
   if (!value?.replaceChildren || !value?.classList) {
     throw new TypeError("AiSuggestionListController requires a suggestion-list root.");
@@ -5,9 +15,10 @@ function requireRoot(value) {
   return value;
 }
 
-function createElement(ownerDocument, tagName, { className = "", text = "" } = {}) {
+function createElement(ownerDocument, tagName, { className = "", text = "", dir = "" } = {}) {
   const element = ownerDocument.createElement(tagName);
   if (className) element.className = className;
+  if (dir) element.dir = dir;
   element.textContent = String(text ?? "");
   return element;
 }
@@ -77,13 +88,19 @@ export function createAiSuggestionListController(options) {
         });
         header.append(provider, model);
 
+        const scope = String(suggestion.scope || "active segment");
         const provenance = createElement(ownerDocument, "p", {
           className: "ai-suggestion-provenance muted",
           text: source("{origin} suggestion · {scope} · {date}", {
             origin: suggestion.origin || suggestion.provider || "AI",
-            scope: suggestion.scope || "active segment",
+            scope: Object.hasOwn(scopeLabels, scope) ? source(scopeLabels[scope]) : scope,
             date: formatDateTime(suggestion.createdAt)
           })
+        });
+        const preview = createElement(ownerDocument, "p", {
+          className: "ai-suggestion-preview",
+          text: suggestion.suggestedTarget || "",
+          dir: "auto"
         });
 
         const inspection = createElement(ownerDocument, "details", {
@@ -94,12 +111,12 @@ export function createAiSuggestionListController(options) {
         const before = createElement(ownerDocument, "div");
         before.append(
           createElement(ownerDocument, "strong", { text: source("Current target") }),
-          createElement(ownerDocument, "p", { text: segment?.target || source("Empty target") })
+          createElement(ownerDocument, "p", { text: segment?.target || source("Empty target"), dir: "auto" })
         );
         const after = createElement(ownerDocument, "div");
         after.append(
           createElement(ownerDocument, "strong", { text: source("Suggested target") }),
-          createElement(ownerDocument, "p", { text: suggestion.suggestedTarget || "" })
+          createElement(ownerDocument, "p", { text: suggestion.suggestedTarget || "", dir: "auto" })
         );
         diff.append(before, after);
         inspection.append(summary, diff);
@@ -120,7 +137,7 @@ export function createAiSuggestionListController(options) {
         applyNextButton.type = "button";
         applyNextButton.addEventListener("click", () => void apply(suggestion.id, { andNext: true }));
         footer.append(applyButton, applyNextButton);
-        card.append(header, provenance, inspection, explanation, footer);
+        card.append(header, provenance, preview, inspection, explanation, footer);
         fragment.append(card);
       });
     root.replaceChildren(fragment);

@@ -71,10 +71,16 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
     role: "status",
     "aria-live": "polite"
   });
-  const draftStatus = node("span", { id: "resourceDraftStatus", className: "resource-save-state" });
+  const draftStatus = node("span", {
+    id: "resourceDraftStatus",
+    className: "resource-save-state",
+    role: "status",
+    "aria-atomic": "true"
+  });
   const recovery = node("div", { className: "resource-recovery", hidden: true });
-  const heading = node("h1", { "data-i18n-skip": true }, safeMetadata(resource.name));
-  const subtitle = node("p", { className: "muted" }, `${resource.sourceLang || "—"} → ${resource.targetLang || "—"}`);
+  const heading = node("h1", { "data-i18n-skip": true, dir: "auto" }, safeMetadata(resource.name));
+  const languagePair = node("bdi", { dir: "ltr" });
+  const subtitle = node("p", { className: "muted" }, languagePair);
   const saveAll = button("Save all", () => run(() => save()), {
     id: "resourceSaveAll",
     className: "primary",
@@ -147,6 +153,9 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
     node(
       "div",
       { className: "resource-filter-fields" },
+      field("Search in", searchField),
+      field("Search mode", searchMode),
+      field("Match case", matchCase),
       type === "tb" ? field("Term status", termStatus) : null,
       field("Domain", domain),
       type === "tm" ? field("Project / provenance", provenance) : null,
@@ -252,9 +261,7 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       "div",
       { className: "resource-editor-toolbar" },
       search,
-      searchField,
-      searchMode,
-      field("Match case", matchCase),
+      filterDetails,
       button("Add entry", addEntry, { id: "resourceAddEntry" }),
       button("Import", () =>
         run(() =>
@@ -276,7 +283,6 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       button("Find and replace", () => run(() => maintenance("replace"))),
       undo
     ),
-    filterDetails,
     filterChips,
     status,
     split
@@ -303,11 +309,9 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
     sessionId,
     onChange: () => {
       const count = session.size();
-      draftStatus.textContent = session.isSaving()
-        ? t("Saving…")
-        : count
-          ? `${count} ${t("unsaved changes")}`
-          : t("Changes saved");
+      draftStatus.dataset.state = session.isSaving() ? "saving" : count ? "draft" : "saved";
+      const label = session.isSaving() ? t("Saving…") : count ? `${count} ${t("unsaved changes")}` : t("Changes saved");
+      if (draftStatus.textContent !== label) draftStatus.textContent = label;
       updateActions();
       for (const row of tableBody.querySelectorAll("tr[data-entry-id]"))
         row.classList.toggle("has-draft", Boolean(session.get(row.dataset.entryId)));
@@ -361,6 +365,8 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       });
       const open = button("", () => selectEntry(record), {
         className: "resource-entry-link",
+        "aria-controls": inspector.id,
+        "aria-current": record.id === selectedId ? "true" : null,
         "aria-label": `${t("Edit entry")}: ${String(values[sourceKey]).slice(0, 120)}`
       });
       open.append(
@@ -398,7 +404,9 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
           type === "tb"
             ? node(
                 "span",
-                { className: `resource-badge status-${values.status || "preferred"}` },
+                {
+                  className: `resource-badge status-${values.isForbidden ? "forbidden" : values.status || "preferred"}`
+                },
                 t(
                   values.status === "forbidden" || values.isForbidden
                     ? "Forbidden"
@@ -417,7 +425,10 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       });
       fragment.append(row);
     }
-    if (!rows.length)
+    if (!rows.length) {
+      const filtered = [search, termStatus, domain, provenance, dateFrom, dateTo, duplicates].some(
+        (item) => item.value
+      );
       fragment.append(
         node(
           "tr",
@@ -425,12 +436,20 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
           node(
             "td",
             { colspan: "4", className: "resource-empty" },
-            t("No matching entries. Adjust the filters or add an entry.")
+            filtered
+              ? t("No matching entries. Adjust the filters or add an entry.")
+              : node(
+                  "div",
+                  {},
+                  node("h3", {}, t(type === "tm" ? "No translation units yet." : "No terms yet.")),
+                  resource.archived ? null : node("p", {}, t("Add the first entry or import a file."))
+                )
           )
         )
       );
+    }
     tableBody.replaceChildren(fragment);
-    resultsCount.textContent = `${result.total} ${t("matching entries")} · ${t("Page")} ${result.pageIndex + 1}`;
+    resultsCount.textContent = `${t("Search results")} · ${result.total.toLocaleString(locale)} · ${t("Page")} ${(result.pageIndex + 1).toLocaleString(locale)}`;
     prev.disabled = !result.previousCursor;
     next.disabled = !result.nextCursor;
     updateSelection();
@@ -494,7 +513,9 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       cursor = response.cursor;
       renderRows();
       renderChips();
-      subtitle.textContent = `${resource.sourceLang || "—"} → ${resource.targetLang || "—"} · ${result.total} ${t("matching entries")}${resource.archived ? ` · ${t("Archived")}` : ""}`;
+      languagePair.textContent = `${resource.sourceLang || "—"} → ${resource.targetLang || "—"}`;
+      subtitle.replaceChildren(languagePair);
+      if (resource.archived) subtitle.append(node("span", { className: "resource-badge" }, t("Archived")));
     } finally {
       if (epoch === queryEpoch) table.removeAttribute("aria-busy");
     }
@@ -529,8 +550,12 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
     activeRecord = record;
     root.classList.add("entry-selected");
     renderInspector();
-    for (const row of tableBody.querySelectorAll("tr[data-entry-id]"))
-      row.classList.toggle("selected", row.dataset.entryId === selectedId);
+    for (const row of tableBody.querySelectorAll("tr[data-entry-id]")) {
+      const current = row.dataset.entryId === selectedId;
+      row.classList.toggle("selected", current);
+      row.querySelector(".resource-entry-link")?.setAttribute("aria-current", String(current));
+    }
+    if (window.matchMedia("(width < 900px)").matches) inspector.querySelector("h2")?.focus();
   }
   function renderInspector() {
     if (!activeRecord) {
@@ -550,18 +575,18 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       className: "resource-entry-fields",
       disabled: busy || session.isSaving() || resource.archived
     });
-    const title = node("h2", {}, activeRecord._new ? t("New entry") : t("Edit entry"));
+    const title = node("h2", { tabindex: "-1" }, activeRecord._new ? t("New entry") : t("Edit entry"));
     const addField = (key, label, multiline = false, choices = null) => {
       const control = choices
         ? select(label, choices, String(values[key] ?? ""))
         : node(multiline ? "textarea" : "input", {
             value: values[key] || "",
-            rows: multiline ? (key === sourceKey || key === targetKey ? 5 : 3) : undefined
+            rows: multiline ? (type === "tm" ? 3 : 2) : undefined
           });
       control.name = key;
+      if (!choices && key !== "fuzzyThreshold") control.dir = "auto";
       if ([sourceKey, targetKey].includes(key)) {
         control.required = true;
-        control.dir = "auto";
         control.lang = key === sourceKey ? resource.sourceLang : resource.targetLang;
       }
       control.addEventListener(choices ? "change" : "input", () => {
@@ -582,14 +607,14 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
           ["admitted", "Admitted"],
           ["forbidden", "Forbidden"]
         ]),
-        addField("definition", "Definition", true),
-        addField("usageExample", "Usage example", true),
-        addField("notes", "Notes", true)
+        addField("definition", "Definition", true)
       );
       const advanced = node(
         "details",
         {},
         node("summary", {}, t("Terminology details")),
+        addField("usageExample", "Usage example", true),
+        addField("notes", "Notes", true),
         addField("domain", "Domain"),
         addField("subject", "Subject"),
         addField("partOfSpeech", "Part of speech"),
@@ -672,7 +697,11 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
         "Back to results",
         () => {
           root.classList.remove("entry-selected");
-          tableBody.querySelector("button")?.focus();
+          (
+            tableBody.querySelector("tr.selected .resource-entry-link") ||
+            tableBody.querySelector("button") ||
+            search
+          ).focus();
         },
         { className: "resource-back-results" }
       ),
@@ -725,7 +754,7 @@ export async function installResourceEditorComposition({ appRuntime, compatibili
       if (saved.failed?.length) {
         message(t("Some changes could not be saved. Your drafts are preserved."), true);
         await showConflict(saved.failed[0]);
-      } else message(t("Changes saved"));
+      } else message("");
       if (selectedId) activeRecord = (await storage.get(store, selectedId)) || activeRecord;
       const preservedEntry = ids ? selectedId : rows[0]?.id || selectedId;
       await load({ anchorId: (!saved.failed?.length && advance ? nextId : preservedEntry) || preservedEntry });

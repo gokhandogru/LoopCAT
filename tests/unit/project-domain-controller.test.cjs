@@ -204,13 +204,12 @@ test("ProjectDomainController preserves exact update, selected-list synchronizat
       "replaceProjects",
       "refreshSummaries",
       "renderAll",
-      "getProject",
       "toggleClass",
       "markDirty",
       "status"
     ]
   );
-  assert.deepEqual(harness.classToggles, [["hidden", true]]);
+  assert.deepEqual(harness.classToggles, [["clean", true]]);
   assert.deepEqual(harness.calls.at(-1), ["status", "Project domain saved", "saved"]);
 });
 
@@ -281,7 +280,7 @@ test("ProjectDomainController preserves completed effects and exact rollback aft
   const workspaceFailure = createHarness(createProjectDomainController, { workspaceError });
   assert.equal(await workspaceFailure.controller.save(), false);
   assert.deepEqual(workspaceFailure.classToggles, [
-    ["hidden", true],
+    ["clean", true],
     ["clean", false]
   ]);
   assert.equal(

@@ -25,15 +25,16 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("in-process-gpu");
 app.commandLine.appendSwitch("force-device-scale-factor", "1");
-let server, win;
+let server, win, resourceEditor;
 const errors = [];
 const results = [];
 const evaluate = (source) => win.webContents.executeJavaScript(source, true);
 const run = (fn, ...args) => evaluate(`(${fn.toString()})(...${JSON.stringify(args)})`);
-async function wait(expression, label) {
+async function wait(expression, label, target = () => win) {
   const until = Date.now() + 15000;
   while (Date.now() < until) {
-    if (await evaluate(expression)) return;
+    const current = target();
+    if (current && !current.isDestroyed() && (await current.webContents.executeJavaScript(expression, true))) return;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw Error("Timed out: " + label);
@@ -63,10 +64,39 @@ async function menuAction(pattern) {
     item.click();
   }, pattern);
 }
-async function capture(name) {
-  await evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+async function capture(name, target = win) {
+  await target.webContents.executeJavaScript(
+    "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+    true
+  );
   await new Promise((resolve) => setTimeout(resolve, 150));
-  fs.writeFileSync(path.join(output, name + ".png"), (await win.webContents.capturePage()).toPNG());
+  fs.writeFileSync(path.join(output, name + ".png"), (await target.webContents.capturePage()).toPNG());
+}
+async function editSidebarTerm(changes, screenshot = "") {
+  await menuAction("^Edit term$");
+  await wait(
+    "document.querySelector('#resourceEntryForm [name=sourceTerm]')?.value === 'friend'",
+    "selected term in dedicated editor",
+    () => resourceEditor
+  );
+  if (screenshot) await capture(screenshot, resourceEditor);
+  await resourceEditor.webContents.executeJavaScript(
+    `((changes)=>{
+    const form = document.querySelector('#resourceEntryForm');
+    for (const [key, value] of Object.entries(changes)) {
+      const field = form.elements.namedItem(key);
+      field.value = value;
+      field.dispatchEvent(new Event(key === 'status' ? 'change' : 'input', { bubbles: true }));
+    }
+    form.requestSubmit();
+  })(${JSON.stringify(changes)})`,
+    true
+  );
+  await wait(
+    `window.CatHan.resourceEditor.session.size() === 0 && window.CatHan.storage.get('terms','qa-term-0').then(term=>term && Object.entries(${JSON.stringify(changes)}).every(([key,value])=>term[key]===value))`,
+    "dedicated editor saved the original term",
+    () => resourceEditor
+  );
 }
 function fixture() {
   const data = JSON.parse(
@@ -210,6 +240,15 @@ app.whenReady().then(async () => {
     win.webContents.on("console-message", (details) => {
       if (details.level === "error") errors.push(details.message);
     });
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      const route = new URL(url);
+      if (route.origin !== origin || !route.hash.startsWith("#resource/tb/")) return { action: "deny" };
+      return { action: "allow", overrideBrowserWindowOptions: { show: false } };
+    });
+    win.webContents.on("did-create-window", (child) => {
+      resourceEditor = child;
+    });
     await win.loadURL(`http://127.0.0.1:${server.address().port}/index.html`);
     await wait("!!window.CatHan?.storage?.importAllData", "startup storage");
     await run((data) => window.CatHan.storage.importAllData(data), fixture());
@@ -293,7 +332,9 @@ app.whenReady().then(async () => {
               const context = canvas.getContext("2d");
               context.font = style.font;
               const textWidth = context.measureText(select.selectedOptions[0].textContent.trim()).width;
-              return textWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 16 <= select.clientWidth;
+              return (
+                textWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 16 <= select.clientWidth
+              );
             })(),
             search: document.querySelector("#segmentSearchInput").getAttribute("placeholder")
           };
@@ -450,16 +491,10 @@ app.whenReady().then(async () => {
       (await window.CatHan.storage.getAll("terms")).find((term) => term.id === "qa-term-0")
     );
     await clickPoint("[data-qa-term=editable]", "right");
-    await menuAction("Edit");
-    await wait("document.querySelector('#termEditDialog').open", "edit term dialog");
-    await capture("term-edit-dialog");
-    await run(() => {
-      if (document.querySelector("#sourceTermInput").value !== "friend") throw Error("Wrong term opened for editing");
-      document.querySelector("#targetTermInput").value = "arkadaşlık";
-      document.querySelector("#termNotesInput").value = "Edited through sidebar context menu";
-      document.querySelector("#termForm").requestSubmit();
-    });
-    await wait("!document.querySelector('#termEditDialog').open", "term saved");
+    await editSidebarTerm(
+      { targetTerm: "arkadaşlık", notes: "Edited through sidebar context menu" },
+      "term-resource-editor"
+    );
     const afterTerm = await run(async () =>
       (await window.CatHan.storage.getAll("terms")).find((term) => term.id === "qa-term-0")
     );
@@ -478,13 +513,7 @@ app.whenReady().then(async () => {
     await wait("document.querySelector('#termSuggestions').textContent.includes('arkadaşlık')", "edited match refresh");
     for (const forbidden of [true, false]) {
       await clickPoint('#termSuggestions [data-term-id="qa-term-0"]', "right");
-      await menuAction("Edit");
-      await wait("document.querySelector('#termEditDialog').open", "forbidden status dialog");
-      await run((forbidden) => {
-        document.querySelector("#termForbiddenInput").checked = forbidden;
-        document.querySelector("#termForm").requestSubmit();
-      }, forbidden);
-      await wait("!document.querySelector('#termEditDialog').open", "forbidden status saved");
+      await editSidebarTerm({ status: forbidden ? "forbidden" : "preferred" });
       await wait(
         `document.querySelector('#termSuggestions [data-term-id="qa-term-0"]').classList.contains('forbidden-term-card') === ${forbidden}`,
         "forbidden row presentation"
@@ -501,6 +530,7 @@ app.whenReady().then(async () => {
           throw Error("Edited forbidden term remains insertable");
       }
     }
+    resourceEditor.close();
     results.push({ check: "Forbidden flag and status round-trip through editor, blocking insertion", passed: true });
     await run(() => {
       [...document.querySelectorAll("#termSuggestions .term-card")].find((card) =>
