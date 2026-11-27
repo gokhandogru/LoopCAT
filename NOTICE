@@ -8,5 +8,11 @@ Includes @zip.js/zip.js 2.11.4, Copyright (c) 2023 Gildas Lormeau,
 licensed under the BSD 3-Clause License. The full license is reproduced
 in docs/zip-js-LICENSE.txt in source and distributed builds.
 
+Includes Mediabunny 1.66.2 by Vanilagy, licensed under the Mozilla Public
+License 2.0. The full license is reproduced in docs/mediabunny-LICENSE.txt.
+The unmodified library source is available at
+https://github.com/Vanilagy/mediabunny/tree/v1.66.2 and in the published
+mediabunny@1.66.2 npm package.
+
 Author profile:
 https://www.linkedin.com/in/gokhan-dogru-localization/

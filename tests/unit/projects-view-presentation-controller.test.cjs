@@ -166,6 +166,9 @@ function createHarness(createProjectsViewPresentationController, overrides = {})
       fail("localization.source");
       return replacements ? `source:${value}:${JSON.stringify(replacements)}` : `source:${value}`;
     },
+    sourceHtml(value, replacements) {
+      return `source-html:${value}:${JSON.stringify(replacements)}`;
+    },
     label(key, replacements) {
       calls.push(["localization.label", key, replacements]);
       fail("localization.label");
@@ -181,7 +184,7 @@ function createHarness(createProjectsViewPresentationController, overrides = {})
     format(value) {
       calls.push(["date.format", value]);
       fail("date.format");
-      return `date:${value}`;
+      return value ? value.toISOString().slice(0, 10) : "Never";
     }
   };
   const dom = { createElement };
@@ -376,7 +379,7 @@ test("ProjectsViewPresentationController preserves safe tile markup progress act
     sourceFileName: "source <file>.docx",
     progress: { percent: 37, total: 8 },
     wordCount: 123,
-    updatedAt: "updated-value"
+    updatedAt: "2025-05-04"
   });
   const deleteResult = { deleted: true };
   const openResult = { opened: true };
@@ -396,7 +399,7 @@ test("ProjectsViewPresentationController preserves safe tile markup progress act
   assert.match(tile.html, /<strong>37%<\/strong>/);
   assert.match(tile.html, /<strong>8<\/strong>/);
   assert.match(tile.html, /<strong>123<\/strong>/);
-  assert.match(tile.html, /date:updated-value/);
+  assert.match(tile.html, /label-html:updatedAt:{"date":"2025-05-04"}/);
   assert.equal(tile.progressStyle.width, "37%");
   assert.equal(buttons[0].className, "danger-small");
   assert.equal(buttons[0].type, "button");
@@ -415,6 +418,34 @@ test("ProjectsViewPresentationController preserves safe tile markup progress act
       ["actions.open", "tile-id"]
     ]
   );
+});
+
+test("project tiles show creation and distinct update days with a fallback for legacy records", async () => {
+  const { createProjectsViewPresentationController } = await loadFactory();
+  const summaries = [
+    project("edited", { createdAt: "2025-01-01", updatedAt: "2025-04-01" }),
+    project("same-day", { createdAt: "2025-04-01T07:00:00Z", updatedAt: "2025-04-01T16:00:00Z" }),
+    project("legacy", { createdAt: "unknown", updatedAt: "2025-04-01" }),
+    project("no-update", { createdAt: "2025-01-01", updatedAt: null }),
+    project("undated", { updatedAt: "unknown" })
+  ];
+  const harness = createHarness(createProjectsViewPresentationController, { summaries });
+  harness.controller.render();
+  const labels = harness.dashboardChildren.map((tile) =>
+    Array.from(
+      tile.html.matchAll(/<span>((?:source-html:Created|label-html:updatedAt)[^<]+)<\/span>/g),
+      (match) => match[1]
+    )
+  );
+  const created = (day) => `source-html:Created {value1}:{"value1":"${day}"}`;
+  const updated = (day) => `label-html:updatedAt:{"date":"${day}"}`;
+  assert.deepEqual(labels, [
+    [created("2025-01-01"), updated("2025-04-01")],
+    [created("2025-04-01")],
+    [updated("2025-04-01")],
+    [created("2025-01-01")],
+    [updated("Never")]
+  ]);
 });
 
 test("ProjectsViewPresentationController preserves source metadata fallback branches", async () => {

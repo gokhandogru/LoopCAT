@@ -9,6 +9,7 @@ const presentationActions = [
   "renderFocusMode",
   "renderWorkspaceStatus",
   "renderProjectStorageStatus",
+  "renderProjectList",
   "renderProjectsView",
   "renderResourcesView",
   "renderProjectHome",
@@ -257,6 +258,7 @@ test("UiLocaleOrchestrationController preserves no-project localized refresh ord
     ["presentation.renderFocusMode"],
     ["presentation.renderWorkspaceStatus"],
     ["presentation.renderProjectStorageStatus"],
+    ["presentation.renderProjectList"],
     ["application.getView", "projects"],
     ["presentation.renderProjectsView"],
     ["application.getView", "other"],
@@ -276,6 +278,7 @@ test("UiLocaleOrchestrationController preserves no-project localized refresh ord
     ["presentation.renderFocusMode"],
     ["presentation.renderWorkspaceStatus"],
     ["presentation.renderProjectStorageStatus"],
+    ["presentation.renderProjectList"],
     ["application.getView", "other"],
     ["application.getView", "resources"],
     ["presentation.renderResourcesView"],
@@ -295,6 +298,7 @@ test("UiLocaleOrchestrationController preserves project refresh order and unawai
   });
   assert.equal(harness.controller.refresh(), undefined);
   assert.deepEqual(harness.calls.slice(7), [
+    ["presentation.renderProjectList"],
     ["application.getView", "other"],
     ["application.getView", "other"],
     ["session.getProject", project],
@@ -360,6 +364,7 @@ test("UiLocaleOrchestrationController preserves custom-catalog import guards and
     ["presentation.renderFocusMode"],
     ["presentation.renderWorkspaceStatus"],
     ["presentation.renderProjectStorageStatus"],
+    ["presentation.renderProjectList"],
     ["application.getView", "other"],
     ["application.getView", "other"],
     ["session.getProject", null],

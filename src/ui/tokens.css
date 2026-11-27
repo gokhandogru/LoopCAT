@@ -1,4 +1,7 @@
 :root {
+  --subtitle-video-background: #111111;
+  --subtitle-caption-text: #ffffff;
+  --subtitle-caption-background: rgb(0 0 0 / 70%);
   --color-canvas: #f7f7f2;
   --color-surface: #ffffff;
   --color-surface-subtle: #f2f5f2;

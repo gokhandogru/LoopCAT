@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://localhost:8500 http://127.0.0.1:8500 http://localhost:8502 http://127.0.0.1:8502; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; trusted-types loopcat-bootstrap loopcat-sanitized-ui; require-trusted-types-for 'script'"
+      content="default-src 'self'; media-src 'self' blob:; script-src 'self'; worker-src 'self'; connect-src 'self' https://api.openai.com/v1/responses https://api.openai.com/v1/models https://generativelanguage.googleapis.com https://api.anthropic.com https://api.cohere.com https://*.openai.azure.com https://*.services.ai.azure.com https://ollama.com https://api.deepseek.com https://api.mistral.ai https://api.x.ai https://api.perplexity.ai https://api.groq.com https://api.together.ai https://openrouter.ai https://router.huggingface.co https://api.deepinfra.com https://api.fireworks.ai http://localhost:11434 http://127.0.0.1:11434 http://localhost:1234 http://127.0.0.1:1234 http://localhost:8500 http://127.0.0.1:8500 http://localhost:8502 http://127.0.0.1:8502; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; trusted-types loopcat-bootstrap loopcat-sanitized-ui; require-trusted-types-for 'script'"
     />
     <title>LoopCAT</title>
     <meta
@@ -263,6 +263,21 @@
               <select id="languagePairFilter" aria-label="Filter projects by language pair">
                 <option value="">All language pairs</option>
               </select>
+              <div class="project-sort">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+                  <path d="M4 6h16M4 12h11M4 18h6" />
+                </svg>
+                <select id="projectSortOrder" aria-label="Sort projects" aria-controls="projectDashboard projectList" autocomplete="off">
+                  <optgroup label="Date created">
+                    <option value="newest" selected>Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                  </optgroup>
+                  <optgroup label="Project name">
+                    <option value="name-asc">Name (A–Z)</option>
+                    <option value="name-desc">Name (Z–A)</option>
+                  </optgroup>
+                </select>
+              </div>
             </div>
 
             <div id="projectDashboard" class="project-dashboard"></div>

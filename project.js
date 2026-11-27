@@ -467,6 +467,7 @@ function projectReadRecord(project) {
     ...normalized,
     ...(!normalized.docxStructure && normalized.docxStructures?.[normalized.legacyDocxDocumentId] ? { docxStructure: normalized.docxStructures[normalized.legacyDocxDocumentId] } : {}),
     updatedBy: project.updatedBy || normalized.updatedBy,
+    createdAt: project.createdAt,
     updatedAt: project.updatedAt || normalized.updatedAt
   };
 }

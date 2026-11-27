@@ -102,6 +102,39 @@ test("reviewed update archives complete old rows, retains logical identity and r
   assert.equal(restored.versionSegments.length, 2);
   (await api.openDatabase()).close();
 });
+
+test("subtitle source updates retain local timing and expose a changed source time for review", async () => {
+  const { api, service } = await setup({
+    prepare: () => ({
+      documentType: "srt",
+      structure: { format: "srt", source: "new timing" },
+      segments: [
+        {
+          source: "Hello world",
+          target: "",
+          structure: { format: "srt", cueIndex: "1", timing: "00:00:02,000 --> 00:00:05,000" }
+        }
+      ]
+    })
+  });
+  const project = await api.get("projects", "p");
+  project.documents[0].type = "srt";
+  project.localizationStructures.d = { format: "srt", source: "old timing" };
+  await api.put("projects", project);
+  const segment = await api.get("segments", "a");
+  segment.structure = { format: "srt", cueIndex: "1", timing: "00:00:01,000 --> 00:00:04,000" };
+  segment.subtitle = { version: 1, timing: { startMs: 1200, endMs: 4200 } };
+  await api.put("segments", segment);
+  const preview = await service.preview("p", "d", {});
+  await service.commit(preview.id);
+  const rows = await api.getAllByIndex("segments", "projectId", "p");
+  const updated = rows.find((row) => row.source === "Hello world");
+  assert.equal(updated.subtitle.timing.startMs, 1200);
+  assert.equal(updated.subtitle.sourceTimingConflict.startMs, 2000);
+  assert.equal(updated.reviewState, "needs-review");
+  assert.equal((await api.get("versionSegments", "a")).subtitle.timing.startMs, 1200);
+  (await api.openDatabase()).close();
+});
 test("resegmenting a stored bilingual file versions live edits, comments and review state atomically", async () => {
   const { api, service } = await setup({
     resegment: ({ segments }) => ({

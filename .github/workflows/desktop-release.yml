@@ -168,6 +168,14 @@ jobs:
       - name: Run browser test suite
         run: ${{ matrix.browserCommand }}
 
+      - name: Verify subtitle video and timing workflow
+        if: runner.os != 'Linux'
+        run: pnpm run verify:subtitles
+
+      - name: Verify subtitle video and timing workflow (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm run verify:subtitles
+
       - name: Verify Resources editors on native desktop runtime
         if: runner.os != 'Linux'
         run: pnpm run verify:resources

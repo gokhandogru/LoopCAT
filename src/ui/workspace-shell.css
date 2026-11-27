@@ -204,6 +204,23 @@ body.liquid-glass-edition {
   background: transparent;
   box-shadow: none;
 }
+.project-sort {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-inline-size: 0;
+}
+.project-sort svg {
+  position: absolute;
+  inset-inline-start: var(--space-3);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.liquid-glass-edition .project-sort select {
+  min-inline-size: 0;
+  padding-inline-start: calc(var(--space-3) + 1.6rem);
+  cursor: pointer;
+}
 .liquid-glass-edition #projectHomeStats > div {
   background: var(--color-surface);
   border-color: var(--color-line);

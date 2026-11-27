@@ -189,7 +189,16 @@ async function main() {
     splitting: false,
     minify: true
   });
+  const subtitleWorkerMeta = await buildVariant({
+    entry: "src/features/editor/subtitle-media-worker.js",
+    outdir: productionDir,
+    entryNames: "subtitle-media-worker",
+    format: "iife",
+    splitting: false,
+    minify: true
+  });
   const fileWorkerSources = {
+    "./subtitle-media-worker.js": fs.readFileSync(path.join(productionDir, "subtitle-media-worker.js"), "utf8"),
     "./resource-query-worker.js": fs.readFileSync(path.join(productionDir, "resource-query-worker.js"), "utf8"),
     "./exchange-worker.js": fs.readFileSync(path.join(productionDir, "exchange-worker.js"), "utf8"),
     "./cat-worker.js":
@@ -254,7 +263,8 @@ async function main() {
         ...(bootstrapMeta.outputs || {}),
         ...(archiveWorkerMeta.outputs || {}),
         ...(exchangeWorkerMeta.outputs || {}),
-        ...(resourceQueryWorkerMeta.outputs || {})
+        ...(resourceQueryWorkerMeta.outputs || {}),
+        ...(subtitleWorkerMeta.outputs || {})
       }
     },
     productionDir

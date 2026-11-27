@@ -1572,7 +1572,8 @@ for (const snippet of [
   'tile.className = "project-tile";',
   "text.displaySafeHtml(project.name)",
   "text.escapeHtml(language.display(project))",
-  'localization.labelHtml("updatedAt", { date: date.format(project.updatedAt) })',
+  'localization.sourceHtml("Created {value1}", { value1: created })',
+  'localization.labelHtml("updatedAt", { date: updated ?? date.format(null) })',
   'tile.querySelector(".progress-bar > div").style.width = `${project.progress.percent || 0}%`;',
   'const projectLabel = text.displaySafeText(project.name, localization.source("project"));',
   'deleteButton.addEventListener("click", () => actions.deleteProject(project.id));',
@@ -1609,7 +1610,7 @@ for (const boundary of [
   "dashboard: els.projectDashboard",
   "searchInput: els.projectSearchInput",
   "languagePairFilter: els.languagePairFilter",
-  "session: { getProjectSummaries: editorSessionStore.getProjectSummaries }",
+  "getProjectSummaries: () => orderProjectsForDisplay(editorSessionStore.getProjectSummaries())",
   "search: { build: projectSearchTextService.build }",
   "key: projectLanguageContextController.key",
   "display: projectLanguageContextController.display",
@@ -1628,7 +1629,7 @@ for (const boundary of [
   "importPackage: (...args) => els.projectPackageImportInput.click(...args)",
   "renderProjects: projectsViewPresentationController.render",
   "renderProjectsView: projectsViewPresentationController.render",
-  "presentation: { render: projectsViewPresentationController.render }"
+  "render: projectsViewPresentationController.render,"
 ]) {
   assertIncludes(
     appJs,
@@ -1637,9 +1638,9 @@ for (const boundary of [
   );
 }
 assert(
-  (appJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 3 &&
-    (appWorkflowDriverJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 2,
-  "ProjectSummaryController, UiLocaleOrchestrationController, ProjectFilterControlsController, and both workflow consumers must call ProjectsViewPresentationController directly."
+  (appJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 4 &&
+    (appWorkflowDriverJs.match(/\bprojectsViewPresentationController\.render\b/g) || []).length === 3,
+  "Project summaries, locale changes, filters, sorting, and workflow consumers must call ProjectsViewPresentationController directly."
 );
 for (const removedHelper of ["createProjectTile", "projectEmptyState", "renderProjectsView"]) {
   assert(
@@ -1691,7 +1692,7 @@ for (const forbiddenOwner of [
   "els."
 ]) {
   assert(
-    !projectsViewPresentationControllerJs.includes(forbiddenOwner),
+    !new RegExp("\\b" + forbiddenOwner.replaceAll(".", "\\.")).test(projectsViewPresentationControllerJs),
     `ProjectsViewPresentationController must use injected boundaries rather than own ${forbiddenOwner}.`
   );
 }
@@ -2267,7 +2268,7 @@ for (const boundary of [
 }
 assert(
   (appJs.match(/createProjectDocumentOpenController\(/g) || []).length === 1 &&
-    (appJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 4 &&
+    (appJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 5 &&
     (appWorkflowDriverJs.match(/\bprojectDocumentOpenController\.open\b/g) || []).length === 13,
   "app.js must compose one project-document-open controller and the application and all thirteen workflow consumers must call it directly."
 );
@@ -2720,7 +2721,7 @@ for (const boundary of [
 }
 assertIncludes(
   projectsViewPresentationControllerJs,
-  "date.format(project.updatedAt)",
+  "date.format(parsed)",
   "ProjectsViewPresentationController must use the injected shared application date policy."
 );
 assertCompositionReferences("applicationDateTimeService.dateTime", [
@@ -2849,7 +2850,7 @@ for (const [method, appCount, workflowCount] of [
   ["clearMemory", 0, 1],
   ["hasUnsaved", 1, 0],
   ["ids", 2, 0],
-  ["mark", 43, 6],
+  ["mark", 44, 6],
   ["markProjects", 3, 0],
   ["markProjectsUsingResource", 6, 1],
   ["prune", 1, 1],
@@ -5801,7 +5802,7 @@ for (const boundary of [
   "appRuntime.featureFactories.createProjectListPresentationController({",
   "root: els.projectList",
   "getProject: editorSessionStore.getProject",
-  "getProjects: editorSessionStore.getProjects",
+  "getProjects: () => orderProjectsForDisplay(editorSessionStore.getProjects())",
   "createElement: (tagName) => document.createElement(tagName)",
   "createDocumentFragment: () => document.createDocumentFragment()",
   "displaySafeHtml: applicationTextSafetyService.displaySafeHtml",
@@ -5819,12 +5820,12 @@ for (const boundary of [
   );
 }
 assert(
-  (appJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 2,
-  "project loading and aggregate rendering must call ProjectListPresentationController.render directly."
+  (appJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 4,
+  "Project loading, aggregate rendering, locale changes, and sorting must call ProjectListPresentationController.render directly."
 );
 assert(
-  (appWorkflowDriverJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 0,
-  "workflow characterization must not require a project-list presentation compatibility facade."
+  (appWorkflowDriverJs.match(/\bprojectListPresentationController\.render\b/g) || []).length === 1,
+  "The project sorting workflow must render its initial project list directly."
 );
 assert(
   !/function\s+renderProjectList\b/.test(appJs) && !/function\s+renderProjectList\b/.test(appWorkflowDriverJs),
@@ -8904,7 +8905,9 @@ for (const boundary of [
   "appRuntime.featureFactories.createProjectFilterControlsController({",
   "searchInput: els.projectSearchInput",
   "languagePairFilter: els.languagePairFilter",
-  "presentation: { render: projectsViewPresentationController.render }",
+  "sortOrder: els.projectSortOrder",
+  "render: projectsViewPresentationController.render,",
+  "renderSortedProjects() {",
   "projectFilterControls: projectFilterControlsController"
 ]) {
   assertIncludes(appJs, boundary, `project-filter composition must retain the checked ${boundary} boundary.`);
@@ -8929,7 +8932,7 @@ for (const forbiddenOwner of ["document.", "els.", "renderProjectsView", "editor
   );
 }
 for (const testName of [
-  "ProjectFilterControlsController binds both native render events to the exact injected callback",
+  "ProjectFilterControlsController binds filters and sorting to their respective render callbacks",
   "ProjectFilterControlsController clears, renders, and focuses in exact order while ignoring the click event",
   "ProjectFilterControlsController owns exact idempotent listener lifecycle and immutable API",
   "ProjectFilterControlsController preserves every clear failure boundary",
@@ -22206,6 +22209,7 @@ assertCompositionReferences("applicationAggregatePresentationController.render",
   "const reliabilityControls =",
   "const refreshFileLifecycle =",
   "const fileManagementController =",
+  "const subtitleController =",
   "installWorkspaceShell({"
 ]);
 assert(

@@ -1,5 +1,6 @@
 import "../linguistics/core.js";
 import "../../../source-update-core.js";
+import { originalCueTiming, SUBTITLE_FORMATS } from "../editor/subtitle-model.js";
 
 const id = (prefix) => `${prefix}-${crypto.randomUUID()}`;
 const plain = (value) => {
@@ -257,6 +258,20 @@ export function createFileLifecycleService({
         throw Error("Resolve every incoming translation conflict before applying the update.");
       const useIncoming = row.conflict && choice === "incoming";
       const target = useIncoming ? row.incomingTarget : row.target;
+      const previousSubtitle = segments.find((segment) => segment.id === row.previousSegmentId);
+      let subtitle;
+      if (previousSubtitle?.subtitle && SUBTITLE_FORMATS.has(incoming.structure?.format)) {
+        subtitle = structuredClone(previousSubtitle.subtitle);
+        const oldTiming = originalCueTiming(previousSubtitle, project.localizationStructures?.[document.id]);
+        const incomingTiming = originalCueTiming(incoming, p.prepared.structure);
+        if (
+          JSON.stringify(oldTiming) !== JSON.stringify(incomingTiming) ||
+          previousSubtitle.source !== incoming.source
+        ) {
+          subtitle.sourceTimingConflict = incomingTiming;
+        }
+        if (target !== previousSubtitle.target) subtitle.needsBoundaries = true;
+      }
       return {
         ...incoming,
         id: id("segment"),
@@ -283,6 +298,16 @@ export function createFileLifecycleService({
         reviewNote: "",
         previousTranslation: null,
         sourceCarryover: null,
+        ...(subtitle
+          ? {
+              subtitle,
+              reviewState: subtitle.sourceTimingConflict
+                ? "needs-review"
+                : row.status === "confirmed"
+                  ? ""
+                  : "needs-review"
+            }
+          : {}),
         ...(row.previousSegmentId
           ? {
               sourceCarryover: {

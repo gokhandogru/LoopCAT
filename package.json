@@ -1,6 +1,6 @@
 {
   "name": "loopcat",
-  "version": "0.0.4-dev.20261122.1",
+  "version": "0.0.4-dev.20261127.1",
   "description": "The local-first translation workspace for professional editing, review, resources, and optional AI.",
   "homepage": "https://github.com/gokhandogru/LoopCAT",
   "private": true,
@@ -27,6 +27,7 @@
     "verify:statistics": "node scripts/build-renderer.cjs && node scripts/verify-statistics-workflow.cjs",
     "verify:tmx": "node scripts/build-renderer.cjs && node scripts/verify-tmx-workflow.cjs",
     "verify:file-formats": "node scripts/verify-file-formats.cjs",
+    "verify:subtitles": "node scripts/build-renderer.cjs && node scripts/verify-subtitles.cjs",
     "verify:office-formatting": "node scripts/verify-office-formatting.cjs",
     "verify:office-formatting:native": "node scripts/verify-office-formatting.cjs --native",
     "verify:multilingual-excel": "node scripts/build-renderer.cjs && node scripts/verify-multilingual-excel-parser.cjs && node scripts/verify-multilingual-excel-workflow.cjs",
@@ -151,6 +152,7 @@
       "archive-worker.js",
       "exchange-worker.js",
       "resource-query-worker.js",
+      "subtitle-media-worker.js",
       "config/production-assets.js",
       "src/ui/tokens.css",
       "src/ui/themes.css",
@@ -198,6 +200,7 @@
     }
   },
   "dependencies": {
-    "@zip.js/zip.js": "2.11.4"
+    "@zip.js/zip.js": "2.11.4",
+    "mediabunny": "1.66.2"
   }
 }

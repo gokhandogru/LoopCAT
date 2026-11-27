@@ -33,7 +33,7 @@ function localScriptUrl(value) {
   if (currentOrigin && url.origin !== currentOrigin)
     throw new TypeError("LoopCAT script URLs must stay on the app origin.");
   if (
-    !/\/(?:service-worker|cat-worker|regex-worker|archive-worker|exchange-worker|resource-query-worker)\.js$/i.test(
+    !/\/(?:service-worker|cat-worker|regex-worker|archive-worker|exchange-worker|resource-query-worker|subtitle-media-worker)\.js$/i.test(
       url.pathname
     )
   ) {

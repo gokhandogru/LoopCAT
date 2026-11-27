@@ -20,6 +20,92 @@ function parse(localization, extension, source) {
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+test("legacy subtitle delivery rejects reversed or zero-length cue ranges", async () => {
+  const localization = api();
+  for (const format of ["srt", "vtt", "sbv"]) {
+    const source =
+      format === "srt"
+        ? "1\n00:00:03,000 --> 00:00:02,000\nHello\n"
+        : format === "vtt"
+          ? "WEBVTT\n\n00:03.000 --> 00:02.000\nHello\n"
+          : "0:00:03.000,0:00:02.000\nHello\n";
+    const imported = await parse(localization, format, source);
+    imported.segments[0].target = "Merhaba";
+    await assert.rejects(
+      async () => await localization.buildLocalizationFile(format, imported.segments, imported.structure),
+      /invalid timing/
+    );
+  }
+});
+
+test("split subtitle targets round-trip with source metadata and explicit boundary review", async () => {
+  const localization = api();
+  for (const format of ["srt", "vtt", "sbv"]) {
+    const source =
+      format === "srt"
+        ? "1\n00:00:00,000 --> 00:00:04,000\nHello world\n"
+        : format === "vtt"
+          ? "WEBVTT\n\nNOTE retained\n\nid\n00:00.000 --> 00:04.000 align:start\nHello world\n"
+          : "0:00:00.000,0:00:04.000\nHello world\n";
+    const imported = await parse(localization, format, source);
+    const segment = imported.segments[0];
+    segment.target = "Merhaba dünya";
+    segment.subtitle = {
+      version: 1,
+      cues: [
+        { startMs: 0, endMs: 2000, from: 0, to: 8 },
+        { startMs: 2000, endMs: 4000, from: 8, to: 13 }
+      ]
+    };
+    const output = await localization.buildLocalizationFile(format, imported.segments, imported.structure);
+    const reopened = await parse(localization, format, output);
+    assert.deepEqual(plain(reopened.segments.map((cue) => cue.text.trim())), ["Merhaba", "dünya"]);
+    segment.subtitle.needsBoundaries = true;
+    await assert.rejects(
+      async () => await localization.buildLocalizationFile(format, imported.segments, imported.structure),
+      /boundaries/
+    );
+  }
+});
+
+test("subtitle timing overrides export safely without rewriting imported metadata", async () => {
+  const localization = api();
+  const fixtures = [
+    ["srt", "1\n00:00:01,000 --> 00:00:03,000 X1:1\nHello\n", "00:00:02,250 --> 00:00:04,500 X1:1"],
+    [
+      "vtt",
+      "WEBVTT\n\nNOTE Keep me\n\ncue-1\n00:01.000 --> 00:03.000 align:start\nHello\n",
+      "00:00:02.250 --> 00:00:04.500 align:start"
+    ],
+    ["sbv", "0:00:01.000,0:00:03.000\nHello\n", "00:00:02.250,00:00:04.500"]
+  ];
+  for (const [format, source, expected] of fixtures) {
+    const imported = await parse(localization, format, source);
+    const baseline = JSON.stringify(imported.structure);
+    const segment = imported.segments[0];
+    segment.target = "Merhaba\ndünya";
+    segment.subtitle = { version: 1, timing: { startMs: 2250, endMs: 4500 } };
+    const output = await localization.buildLocalizationFile(format, imported.segments, imported.structure);
+    assert.ok(output.includes(expected), output);
+    assert.equal((await parse(localization, format, output)).segments[0].text, "Merhaba\ndünya");
+    assert.equal(JSON.stringify(imported.structure), baseline);
+    if (format === "vtt") assert.ok(output.includes("NOTE Keep me\n\ncue-1"));
+    for (const [startMs, endMs] of [
+      [-1, 2],
+      [2, 2],
+      [3, 2],
+      [0.5, 3],
+      [0, Infinity]
+    ]) {
+      segment.subtitle.timing = { startMs, endMs };
+      await assert.rejects(
+        async () => await localization.buildLocalizationFile(format, imported.segments, imported.structure),
+        /invalid edited timing/
+      );
+    }
+  }
+});
+
 test("Java properties preserves escaped keys, joins continuations, and round-trips Unicode and leading spaces", async () => {
   const localization = api();
   const source = [

@@ -514,7 +514,7 @@ input[type="file"] {
 
 .project-filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 220px;
+  grid-template-columns: minmax(10rem, 1fr) minmax(9rem, 13.75rem) auto;
   gap: 10px;
   margin-bottom: 16px;
 }

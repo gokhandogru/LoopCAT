@@ -35,7 +35,7 @@
     "regex-worker.js",
     "app.js"
   ]);
-  const offlineAssets = Object.freeze([...runtimeAssets, "LICENSE", "NOTICE"]);
+  const offlineAssets = Object.freeze([...runtimeAssets, "LICENSE", "NOTICE", "docs/mediabunny-LICENSE.txt"]);
   const webDistributionAssets = Object.freeze([
     ...offlineAssets,
     "docs/beginner-guide/LoopCAT-Beginners-Guide.docx",
@@ -46,7 +46,7 @@
   ]);
 
   return Object.freeze({
-    appVersion: "0.0.4-dev.20261122.1",
+    appVersion: "0.0.4-dev.20261127.1",
     contractVersion: 1,
     runtimeAssets,
     offlineAssets,

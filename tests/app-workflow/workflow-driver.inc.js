@@ -284,6 +284,52 @@ const runAppWorkflowTest = LOOPCAT_TEST_BUILD ? async function runAppWorkflowTes
     els.closeTrashBtn.click();
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
+    {
+      const savedProjects = editorSessionStore.getProjects();
+      const savedSummaries = editorSessionStore.getProjectSummaries();
+      const projects = [
+        { id: "sort-b", name: "Bravo", createdAt: "2025-03-01", updatedAt: "2025-03-01" },
+        { id: "sort-c", name: "Charlie", createdAt: "2025-01-01", updatedAt: "2025-04-01" },
+        { id: "sort-a", name: "Alpha", createdAt: "2025-02-01", updatedAt: "2025-02-01" }
+      ].map((item) => ({ ...item, sourceLang: "en", targetLang: "tr" }));
+      const names = (selector) => Array.from(document.querySelectorAll(selector), (node) => node.textContent).join(", ");
+      const dashboard = "#projectDashboard .project-tile h3";
+      const picker = "#projectList .project-item strong";
+      const sort = document.querySelector("#projectSortOrder");
+      try {
+        editorSessionStore.replaceProjects(projects);
+        editorSessionStore.replaceProjectSummaries(projects.map((item) => projectSummaryController.build(item, [])));
+        projectsViewPresentationController.render();
+        projectListPresentationController.render();
+        assert(
+          sort.value === "newest" && names(dashboard) === "Bravo, Alpha, Charlie" && names(picker) === names(dashboard),
+          "Projects opens with the most recently created project first, even after an older project was updated"
+        );
+        for (const [order, expected] of [
+          ["oldest", "Charlie, Alpha, Bravo"],
+          ["name-asc", "Alpha, Bravo, Charlie"],
+          ["name-desc", "Charlie, Bravo, Alpha"]
+        ]) {
+          sort.value = order;
+          sort.dispatchEvent(new Event("change", { bubbles: true }));
+          assert(names(dashboard) === expected && names(picker) === expected, `project order ${order} updates both lists`);
+        }
+        els.projectSearchInput.value = "missing project name";
+        els.projectSearchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        els.projectDashboard.querySelector(".actionable-empty-state button").click();
+        assert(
+          sort.value === "name-desc" && names(dashboard) === "Charlie, Bravo, Alpha",
+          "clearing a project search restores all results in the chosen order"
+        );
+      } finally {
+        sort.value = "newest";
+        els.projectSearchInput.value = "";
+        editorSessionStore.replaceProjects(savedProjects);
+        editorSessionStore.replaceProjectSummaries(savedSummaries);
+        sort.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+
     const project = await createProject({
       name: `Workflow ${Date.now()}`,
       domain: "Regression",
