@@ -1,3 +1,5 @@
+import { adjustSubtitleBoundaries } from "./subtitle-model.js";
+
 const SEGMENT_HISTORY_LIMIT = 25;
 const SEGMENT_TYPING_HISTORY_WINDOW_MS = 30000;
 
@@ -105,6 +107,7 @@ export function createSegmentTargetStateService(options) {
     const nextTarget = String(target || "");
     const nextStatus = status || (nextTarget.trim() ? "draft" : "empty");
     recordHistory(segment, nextTarget, nextStatus, reason);
+    adjustSubtitleBoundaries(segment, String(segment.target || ""), nextTarget);
     segment.target = nextTarget;
     segment.status = nextStatus;
     if (reason !== "pretranslate") delete segment.tmPretranslation;
@@ -125,7 +128,8 @@ export function createSegmentTargetStateService(options) {
       tmPretranslation: optionalField(segment, "tmPretranslation"),
       aiPretranslation: optionalField(segment, "aiPretranslation"),
       reviewState: optionalField(segment, "reviewState"),
-      aiApplication: optionalField(segment, "aiApplication")
+      aiApplication: optionalField(segment, "aiApplication"),
+      ...(segment?.subtitle ? { subtitle: optionalField(segment, "subtitle") } : {})
     };
   }
 
@@ -144,6 +148,21 @@ export function createSegmentTargetStateService(options) {
     applyOptionalField(segment, "aiPretranslation", patch?.aiPretranslation);
     applyOptionalField(segment, "reviewState", patch?.reviewState);
     applyOptionalField(segment, "aiApplication", patch?.aiApplication);
+    if (
+      patch?.subtitle?.present &&
+      segment.subtitle?.cues &&
+      patch.subtitle.value?.cues?.length === segment.subtitle.cues.length
+    ) {
+      segment.subtitle = {
+        ...segment.subtitle,
+        needsBoundaries: patch.subtitle.value.needsBoundaries,
+        cues: segment.subtitle.cues.map((cue, index) => ({
+          ...cue,
+          from: patch.subtitle.value.cues[index].from,
+          to: patch.subtitle.value.cues[index].to
+        }))
+      };
+    }
     setHiddenField(segment, "__historyTarget", segment.target);
     setHiddenField(segment, "__historyStatus", segment.status);
     return segment;

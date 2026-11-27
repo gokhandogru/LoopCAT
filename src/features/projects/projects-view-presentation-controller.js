@@ -45,6 +45,7 @@ export function createProjectsViewPresentationController(options) {
   }
   if (
     typeof localization?.source !== "function" ||
+    typeof localization.sourceHtml !== "function" ||
     typeof localization.label !== "function" ||
     typeof localization.labelHtml !== "function"
   ) {
@@ -68,6 +69,23 @@ export function createProjectsViewPresentationController(options) {
     throw new TypeError("ProjectsViewPresentationController requires action boundaries.");
   }
 
+  function formattedDay(value) {
+    if (typeof value !== "number" && typeof value !== "string") return null;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? date.format(parsed) : null;
+  }
+
+  function projectDates(project) {
+    const created = formattedDay(project.createdAt);
+    const updated = formattedDay(project.updatedAt);
+    const labels = [];
+    if (created) labels.push(localization.sourceHtml("Created {value1}", { value1: created }));
+    if (!created || (updated && updated !== created)) {
+      labels.push(localization.labelHtml("updatedAt", { date: updated ?? date.format(null) }));
+    }
+    return labels.map((label) => `<span>${label}</span>`).join(" ");
+  }
+
   function createProjectTile(project) {
     const tile = dom.createElement("article");
     tile.className = "project-tile";
@@ -88,7 +106,7 @@ export function createProjectsViewPresentationController(options) {
     </div>
     <div class="progress-bar"><div style="width:${project.progress.percent || 0}%"></div></div>
     <footer>
-      <span>${localization.labelHtml("updatedAt", { date: date.format(project.updatedAt) })}</span>
+      <span class="project-dates">${projectDates(project)}</span>
     </footer>
   `
     );

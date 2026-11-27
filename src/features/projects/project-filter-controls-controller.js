@@ -1,18 +1,23 @@
 export function createProjectFilterControlsController({ elements, presentation }) {
   const searchInput = elements?.searchInput;
   const languagePairFilter = elements?.languagePairFilter;
+  const sortOrder = elements?.sortOrder;
   if (!searchInput?.addEventListener || !searchInput?.removeEventListener || !searchInput?.focus) {
     throw new TypeError("ProjectFilterControlsController requires a checked search input.");
   }
   if (!languagePairFilter?.addEventListener || !languagePairFilter?.removeEventListener) {
     throw new TypeError("ProjectFilterControlsController requires a checked language-pair filter.");
   }
-  if (!presentation?.render) {
+  if (!sortOrder?.addEventListener || !sortOrder?.removeEventListener) {
+    throw new TypeError("ProjectFilterControlsController requires a checked sort-order select.");
+  }
+  if (!presentation?.render || !presentation.renderSortedProjects) {
     throw new TypeError("ProjectFilterControlsController requires a Projects-view presentation boundary.");
   }
 
   let mounted = false;
   const renderListener = presentation.render;
+  const sortListener = presentation.renderSortedProjects;
 
   function clear() {
     searchInput.value = "";
@@ -25,6 +30,7 @@ export function createProjectFilterControlsController({ elements, presentation }
     if (mounted) return false;
     searchInput.addEventListener("input", renderListener);
     languagePairFilter.addEventListener("change", renderListener);
+    sortOrder.addEventListener("change", sortListener);
     mounted = true;
     return true;
   }
@@ -33,6 +39,7 @@ export function createProjectFilterControlsController({ elements, presentation }
     if (!mounted) return false;
     searchInput.removeEventListener("input", renderListener);
     languagePairFilter.removeEventListener("change", renderListener);
+    sortOrder.removeEventListener("change", sortListener);
     mounted = false;
     return true;
   }

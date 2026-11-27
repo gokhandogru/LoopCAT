@@ -62,56 +62,56 @@ function createHarness(createProjectFilterControlsController, overrides = {}) {
     removeError: overrides.pairRemoveError,
     valueError: overrides.pairValueError
   });
+  const sortOrder = createElement(calls, "sort", { value: "name-asc" });
   const renderResult = overrides.renderResult || { rendered: true };
   const presentation = {
     render(...args) {
       calls.push(["presentation", "render", args, this]);
       if (overrides.renderError) throw overrides.renderError;
       return renderResult;
+    },
+    renderSortedProjects(...args) {
+      calls.push(["presentation", "renderSortedProjects", args, this]);
     }
   };
   return {
     calls,
     controller: createProjectFilterControlsController({
-      elements: { searchInput, languagePairFilter },
+      elements: { searchInput, languagePairFilter, sortOrder },
       presentation
     }),
     languagePairFilter,
     presentation,
     renderResult,
-    searchInput
+    searchInput,
+    sortOrder
   };
 }
 
-test("ProjectFilterControlsController binds both native render events to the exact injected callback", async () => {
+test("ProjectFilterControlsController binds filters and sorting to their respective render callbacks", async () => {
   const { createProjectFilterControlsController } = await loadFactory();
   const harness = createHarness(createProjectFilterControlsController);
 
   assert.equal(harness.controller.mount(), true);
   const addCalls = harness.calls.filter(([, operation]) => operation === "addEventListener");
-  assert.deepEqual(
-    addCalls.map(([owner, operation, type, listener]) => [
-      owner,
-      operation,
-      type,
-      listener === harness.presentation.render
-    ]),
-    [
-      ["search", "addEventListener", "input", true],
-      ["pair", "addEventListener", "change", true]
-    ]
-  );
+  assert.deepEqual(addCalls, [
+    ["search", "addEventListener", "input", harness.presentation.render],
+    ["pair", "addEventListener", "change", harness.presentation.render],
+    ["sort", "addEventListener", "change", harness.presentation.renderSortedProjects]
+  ]);
 
   harness.calls.length = 0;
   const inputEvent = { type: "input" };
   const changeEvent = { type: "change" };
   assert.equal(harness.searchInput.dispatch("input", inputEvent), harness.renderResult);
   assert.equal(harness.languagePairFilter.dispatch("change", changeEvent), harness.renderResult);
+  harness.sortOrder.dispatch("change", changeEvent);
   assert.deepEqual(
     harness.calls.map(([owner, operation, args, receiver]) => [owner, operation, args, receiver]),
     [
       ["presentation", "render", [inputEvent], harness.searchInput],
-      ["presentation", "render", [changeEvent], harness.languagePairFilter]
+      ["presentation", "render", [changeEvent], harness.languagePairFilter],
+      ["presentation", "renderSortedProjects", [changeEvent], harness.sortOrder]
     ]
   );
 });
@@ -134,6 +134,7 @@ test("ProjectFilterControlsController clears, renders, and focuses in exact orde
   assert.equal(harness.controller.clear(clickEvent), undefined);
   assert.equal(harness.searchInput.value, "");
   assert.equal(harness.languagePairFilter.value, "");
+  assert.equal(harness.sortOrder.value, "name-asc");
   assert.deepEqual(
     harness.calls.map((call) => call.slice(0, 3)),
     [
@@ -159,8 +160,10 @@ test("ProjectFilterControlsController owns exact idempotent listener lifecycle a
     [
       ["search", "addEventListener", "input", harness.presentation.render],
       ["pair", "addEventListener", "change", harness.presentation.render],
+      ["sort", "addEventListener", "change", harness.presentation.renderSortedProjects],
       ["search", "removeEventListener", "input", true],
-      ["pair", "removeEventListener", "change", true]
+      ["pair", "removeEventListener", "change", true],
+      ["sort", "removeEventListener", "change", true]
     ]
   );
 });
@@ -237,7 +240,8 @@ test("ProjectFilterControlsController validates required elements and presentati
         createProjectFilterControlsController({
           elements: {
             searchInput: { ...valid.searchInput, [missing]: null },
-            languagePairFilter: valid.languagePairFilter
+            languagePairFilter: valid.languagePairFilter,
+            sortOrder: valid.sortOrder
           },
           presentation: valid.presentation
         }),
@@ -250,11 +254,24 @@ test("ProjectFilterControlsController validates required elements and presentati
         createProjectFilterControlsController({
           elements: {
             searchInput: valid.searchInput,
-            languagePairFilter: { ...valid.languagePairFilter, [missing]: null }
+            languagePairFilter: { ...valid.languagePairFilter, [missing]: null },
+            sortOrder: valid.sortOrder
           },
           presentation: valid.presentation
         }),
       /ProjectFilterControlsController requires a checked language-pair filter\./
+    );
+    assert.throws(
+      () =>
+        createProjectFilterControlsController({
+          elements: {
+            searchInput: valid.searchInput,
+            languagePairFilter: valid.languagePairFilter,
+            sortOrder: { ...valid.sortOrder, [missing]: null }
+          },
+          presentation: valid.presentation
+        }),
+      /ProjectFilterControlsController requires a checked sort-order select\./
     );
   }
   assert.throws(
@@ -262,7 +279,8 @@ test("ProjectFilterControlsController validates required elements and presentati
       createProjectFilterControlsController({
         elements: {
           searchInput: valid.searchInput,
-          languagePairFilter: valid.languagePairFilter
+          languagePairFilter: valid.languagePairFilter,
+          sortOrder: valid.sortOrder
         },
         presentation: {}
       }),

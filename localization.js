@@ -810,15 +810,46 @@ function parseSrt(text) {
   return segments;
 }
 
+function editedSubtitleTiming(segment, original, format) {
+  if (segment.subtitle?.sourceTimingConflict) throw new Error("Review the incoming subtitle timing before exporting.");
+  const timing = segment.subtitle?.timing;
+  if (!timing) {
+    const stamps = [...String(original).matchAll(/(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})/g)];
+    const values = stamps.map((stamp) => ((Number(stamp[1] || 0) * 60 + Number(stamp[2])) * 60 + Number(stamp[3])) * 1000 + Number(stamp[4]));
+    if (stamps.length !== 2 || stamps.some((stamp) => Number(stamp[2]) > 59 || Number(stamp[3]) > 59) ||
+        values.some((value) => !Number.isSafeInteger(value)) || values[1] <= values[0]) {
+      throw new Error("Subtitle cue has invalid timing data.");
+    }
+    return original;
+  }
+  if (segment.subtitle.version !== 1 || !Number.isSafeInteger(timing.startMs) ||
+      !Number.isSafeInteger(timing.endMs) || timing.startMs < 0 || timing.endMs <= timing.startMs) {
+    throw new Error("Subtitle cue has invalid edited timing data.");
+  }
+  const timestamp = (milliseconds) => {
+    const hours = Math.floor(milliseconds / 3600000);
+    const minutes = Math.floor(milliseconds / 60000) % 60;
+    const seconds = Math.floor(milliseconds / 1000) % 60;
+    const separator = format === "srt" ? "," : ".";
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}${separator}${String(milliseconds % 1000).padStart(3, "0")}`;
+  };
+  const suffix = format === "sbv" ? "" : (String(original).match(/-->\s*\S+(.*)$/)?.[1] || "");
+  const separator = format === "sbv" ? "," : " --> ";
+  return `${timestamp(timing.startMs)}${separator}${timestamp(timing.endMs)}${suffix}`;
+}
+
 function buildSrt(segments, structure = null) {
+  const edited = segments.some((segment) => segment.subtitle?.cues || segment.subtitle?.timing);
+  if (edited) segments = expandSubtitleSegments(segments);
+  if (edited) segments.sort((a, b) => subtitleStartTime(editedSubtitleTiming(a, a.structure?.timing, "srt")) - subtitleStartTime(editedSubtitleTiming(b, b.structure?.timing, "srt")));
   if (structure?.source) {
     const missingTiming = segments.filter((segment) => !String(segment.structure?.timing || "").trim()).length;
     if (missingTiming) throw new Error(`${missingTiming} SRT segment${missingTiming === 1 ? "" : "s"} missing cue timing data.`);
   }
   const content = segments
     .map((segment, index) => {
-      const cueIndex = String(segment.structure?.cueIndex || index + 1).trim() || String(index + 1);
-      const timing = String(segment.structure?.timing || "00:00:00,000 --> 00:00:01,000").trim();
+      const cueIndex = edited ? String(index + 1) : String(segment.structure?.cueIndex || index + 1).trim() || String(index + 1);
+      const timing = editedSubtitleTiming(segment, String(segment.structure?.timing || "00:00:00,000 --> 00:00:01,000").trim(), "srt");
       if (!SRT_TIMING_PATTERN.test(timing)) throw new Error(`SRT cue ${cueIndex} has invalid timing data.`);
       return `${cueIndex}\n${timing}\n${cleanSrtCueText(segment.target || "")}`;
     })
@@ -2935,18 +2966,59 @@ function parseSubtitleText(text, format) {
   return { structure: { format, blocks: rawBlocks, sourceEndedWithNewline: /\n$/.test(source) }, segments };
 }
 
+function expandSubtitleSegments(segments) {
+  return segments.flatMap((segment) => {
+    if (!segment.subtitle?.cues) return [segment];
+    if (segment.subtitle.version !== 1 || segment.subtitle.needsBoundaries || segment.subtitle.sourceTimingConflict) throw new Error("Review the subtitle timing and text boundaries before exporting.");
+    const target = String(segment.target || "");
+    let boundary = 0;
+    const expanded = segment.subtitle.cues.map((cue) => {
+      if (cue.from !== boundary || !Number.isInteger(cue.to) || cue.to < cue.from || cue.to > target.length) throw new Error("Invalid subtitle text boundary.");
+      boundary = cue.to;
+      return { ...segment, target: target.slice(cue.from, cue.to), subtitle: { version: 1, timing: cue } };
+    });
+    if (!expanded.length || boundary !== target.length) throw new Error("Invalid subtitle text boundary.");
+    return expanded;
+  });
+}
+
+function subtitleStartTime(line) {
+  const match = /^(?:(\d+):)?(\d{2}):(\d{2})[,.](\d{3})/.exec(String(line).trim());
+  return match ? ((Number(match[1] || 0) * 60 + Number(match[2])) * 60 + Number(match[3])) * 1000 + Number(match[4]) : 0;
+}
+
 function buildSubtitleText(segments, structure = null, _format = "vtt") {
   const blocks = (structure?.blocks || []).map((block) => [...block]);
+  const removedBlocks = new Set(segments.flatMap((segment) => segment.subtitle?.removedBlocks || []));
+  const replacements = new Map();
   segments.forEach((segment) => {
     const item = segment.structure || {};
     if (!Number.isFinite(item.blockIndex) || !blocks[item.blockIndex]) return;
     const block = blocks[item.blockIndex];
+    if (segment.subtitle?.cues) {
+      const cues = expandSubtitleSegments([segment]);
+      replacements.set(item.blockIndex, cues.map((cue, index) => {
+        const prefix = block.slice(0, item.textStart);
+        prefix[item.timingIndex || 0] = editedSubtitleTiming(cue, block[item.timingIndex || 0], _format);
+        if (index && item.timingIndex > 0) prefix[item.timingIndex - 1] = `${item.cueId || "cue"}-split-${index + 1}`;
+        return [...prefix, ...cleanSrtCueText(cue.target).split("\n")];
+      }));
+      return;
+    }
+    block[item.timingIndex || 0] = editedSubtitleTiming(segment, block[item.timingIndex || 0], _format);
     const textStart = Number.isFinite(item.textStart) ? item.textStart : (item.timingIndex || 0) + 1;
     const oldCount = Number.isFinite(item.textLineCount) ? item.textLineCount : Math.max(0, block.length - textStart);
     const replacement = cleanSrtCueText(targetText(segment)).split("\n").filter((line) => line.trim());
     block.splice(textStart, oldCount, ...replacement);
   });
-  const output = blocks.map((block) => block.join("\n")).join("\n\n");
+  let outputBlocks = blocks.flatMap((block, index) => removedBlocks.has(index) ? [] : replacements.get(index) || [block]);
+  if (segments.some((segment) => segment.subtitle)) {
+    const cueLine = (block) => /^(WEBVTT|NOTE|STYLE|REGION)(?:\s|$)/.test(block[0]) ? null : block.find((line) => subtitleTimingPattern(_format).test(line));
+    const sorted = outputBlocks.filter((block) => cueLine(block)).sort((a, b) => subtitleStartTime(cueLine(a)) - subtitleStartTime(cueLine(b)));
+    let index = 0;
+    outputBlocks = outputBlocks.map((block) => cueLine(block) ? sorted[index++] : block);
+  }
+  const output = outputBlocks.map((block) => block.join("\n")).join("\n\n");
   return structure?.sourceEndedWithNewline ? `${output}\n` : output;
 }
 

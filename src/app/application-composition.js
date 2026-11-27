@@ -26,6 +26,8 @@ import { createReliabilityControls } from "./reliability-controls.js";
 import { createVerifiedOutputService } from "../features/import-export/verified-output-service.js";
 import { createCommandPersistenceService } from "../features/editor/command-persistence-service.js";
 import { createRecentProjectCache } from "../features/projects/recent-project-cache.js";
+import { sortProjects } from "../features/projects/project-order.js";
+import { installSubtitleController } from "../features/editor/subtitle-controller.js";
 
 function tmDocumentContextKey(segment, documentIndex = -1) {
   const explicit = String(segment?.contextKey || "").trim();
@@ -674,6 +676,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     cancelQuickTermCaptureBtn: document.querySelector("#cancelQuickTermCaptureBtn"),
     projectDashboard: document.querySelector("#projectDashboard"),
     projectSearchInput: document.querySelector("#projectSearchInput"),
+    projectSortOrder: document.querySelector("#projectSortOrder"),
     projectsImportProjectBtn: document.querySelector("#projectsImportProjectBtn"),
     languagePairFilter: document.querySelector("#languagePairFilter"),
     emptyState: document.querySelector("#emptyState"),
@@ -1261,13 +1264,17 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     logger: console
   });
 
+  function orderProjectsForDisplay(projects) {
+    return sortProjects(projects, els.projectSortOrder.value, uiLocalizationService.locale());
+  }
+
   const projectsViewPresentationController = appRuntime.featureFactories.createProjectsViewPresentationController({
     elements: {
       dashboard: els.projectDashboard,
       searchInput: els.projectSearchInput,
       languagePairFilter: els.languagePairFilter
     },
-    session: { getProjectSummaries: editorSessionStore.getProjectSummaries },
+    session: { getProjectSummaries: () => orderProjectsForDisplay(editorSessionStore.getProjectSummaries()) },
     search: { build: projectSearchTextService.build },
     language: {
       key: projectLanguageContextController.key,
@@ -1581,7 +1588,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
     root: els.projectList,
     session: {
       getProject: editorSessionStore.getProject,
-      getProjects: editorSessionStore.getProjects
+      getProjects: () => orderProjectsForDisplay(editorSessionStore.getProjects())
     },
     dom: {
       createElement: (tagName) => document.createElement(tagName),
@@ -4555,6 +4562,7 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       renderFocusMode: () => focusModeController.render(),
       renderWorkspaceStatus: () => workspaceRecoveryPresentationService.renderStatus(),
       renderProjectStorageStatus: workspaceRecoveryPresentationService.renderProjectStorage,
+      renderProjectList: projectListPresentationController.render,
       renderProjectsView: projectsViewPresentationController.render,
       renderResourcesView: () => resourcesController?.render?.(),
       renderProjectHome: projectHomePresentationController.render,
@@ -4602,9 +4610,16 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
   const projectFilterControlsController = appRuntime.featureFactories.createProjectFilterControlsController({
     elements: {
       searchInput: els.projectSearchInput,
-      languagePairFilter: els.languagePairFilter
+      languagePairFilter: els.languagePairFilter,
+      sortOrder: els.projectSortOrder
     },
-    presentation: { render: projectsViewPresentationController.render }
+    presentation: {
+      render: projectsViewPresentationController.render,
+      renderSortedProjects() {
+        projectsViewPresentationController.render();
+        projectListPresentationController.render();
+      }
+    }
   });
   const focusModeController = appRuntime.featureFactories.createFocusModeController({
     elements: {
@@ -6447,6 +6462,23 @@ export function installApplicationComposition({ appRuntime, browserGlobals, comp
       });
     },
     restoreMany: (ids) => fileLifecycleService.restoreTrash(ids)
+  });
+  const subtitleController = installSubtitleController({
+    session: editorSessionStore,
+    application: applicationStore,
+    host: els.segmentGridWrap,
+    bus: appRuntime.commands.bus,
+    flush: autosaveService.flush,
+    save: saveSegment,
+    saveStructure: saveSegmentStructure,
+    render: applicationAggregatePresentationController.render,
+    invalidate: segmentFilterService.invalidate,
+    detectTags: detectProtectedTags,
+    retry: autosaveService.debounce,
+    saveProject: updateProject,
+    dirty: workspaceDirtyStateController.mark,
+    openDocument: (id) => projectDocumentOpenController.open(id),
+    translate: uiLocalizationService.source
   });
   editorSessionStore.subscribe(() => fileManagementController.refresh());
   applicationStore.subscribe(() => {

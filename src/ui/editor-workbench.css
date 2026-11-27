@@ -968,3 +968,176 @@ html[data-density="compact"] #inspectorAiPanel .ai-contextual-workflow {
   font-size: 0.85em;
   user-select: none;
 }
+
+/* Contextual subtitle workspace. */
+.subtitle-panel {
+  margin: 8px 12px;
+  padding: 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.subtitle-panel[hidden] {
+  display: none;
+}
+.subtitle-panel > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 4px;
+}
+.subtitle-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(260px, 1fr);
+  gap: 16px;
+  padding-top: 10px;
+}
+.subtitle-body[hidden] {
+  display: none;
+}
+.subtitle-picture {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--subtitle-video-background);
+  overflow: hidden;
+  border-radius: 6px;
+}
+.subtitle-picture video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.subtitle-captions {
+  position: absolute;
+  inset: auto 7% 7%;
+  text-align: center;
+  white-space: pre-wrap;
+  color: var(--subtitle-caption-text);
+  background: var(--subtitle-caption-background);
+  font-size: clamp(16px, 1.4vw, 24px);
+  pointer-events: none;
+}
+.subtitle-captions:empty {
+  display: none;
+}
+.subtitle-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: end;
+  margin-block: 8px;
+}
+.subtitle-panel label {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  margin: 3px;
+}
+.subtitle-panel input {
+  width: 130px;
+}
+.subtitle-panel input[type="checkbox"] {
+  width: auto;
+}
+.subtitle-panel input[type="number"] {
+  width: 80px;
+}
+.subtitle-panel button {
+  min-height: 32px;
+}
+.subtitle-qa {
+  padding: 8px;
+  color: var(--color-warning);
+}
+@media (max-width: 1000px) {
+  .subtitle-body {
+    grid-template-columns: 1fr;
+  }
+}
+.subtitle-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.subtitle-still[hidden] {
+  display: none;
+}
+.subtitle-waveform {
+  width: 100%;
+  height: 140px;
+  cursor: ew-resize;
+  touch-action: none;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+.subtitle-picture {
+  max-height: 230px;
+  margin-inline: auto;
+  width: 100%;
+}
+.subtitle-panel {
+  flex: 0 0 auto;
+}
+.subtitle-panel input {
+  min-height: 30px;
+  padding: 4px 6px;
+}
+.subtitle-panel button {
+  padding: 5px 8px;
+  min-height: 30px;
+  font-size: 12px;
+}
+.subtitle-timing > p {
+  margin-block: 6px;
+  font-size: 12px;
+}
+.subtitle-controls {
+  margin-block: 4px;
+}
+.subtitle-playing {
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+.subtitle-cue-list {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  padding-block: 4px;
+  font-variant-numeric: tabular-nums;
+}
+#editorView .subtitle-panel button,
+#editorView .subtitle-panel input {
+  min-height: 28px;
+  height: 32px;
+  padding: 4px 6px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+#editorView .subtitle-panel input[type="checkbox"] {
+  height: 18px;
+  min-height: 18px;
+}
+#editorView .subtitle-panel label {
+  font-size: 11px;
+}
+#editorView .subtitle-panel summary {
+  min-height: 28px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+#editorView .subtitle-picture {
+  max-height: 200px;
+}
+#editorView .subtitle-waveform {
+  height: 100px;
+}
+.subtitle-captions {
+  inset: 0;
+  background: transparent;
+}
+.subtitle-captions > div {
+  position: absolute;
+  inset: auto 7% 7%;
+  background: var(--subtitle-caption-background);
+}

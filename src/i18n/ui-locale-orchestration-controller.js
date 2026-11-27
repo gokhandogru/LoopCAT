@@ -21,6 +21,7 @@ export function createUiLocaleOrchestrationController({
     "renderFocusMode",
     "renderWorkspaceStatus",
     "renderProjectStorageStatus",
+    "renderProjectList",
     "renderProjectsView",
     "renderResourcesView",
     "renderProjectHome",
@@ -80,6 +81,7 @@ export function createUiLocaleOrchestrationController({
     presentation.renderFocusMode();
     presentation.renderWorkspaceStatus();
     presentation.renderProjectStorageStatus();
+    presentation.renderProjectList();
     if (application.getView() === "projects") presentation.renderProjectsView();
     if (application.getView() === "resources") presentation.renderResourcesView();
     if (session.getProject()) {
