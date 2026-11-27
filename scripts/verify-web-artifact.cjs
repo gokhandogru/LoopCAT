@@ -166,6 +166,7 @@ for (const marker of ["runAppWorkflowTest", "app-workflow-test", "_TEST_FLAG", "
 for (const entry of entries.keys()) {
   const allowedScript = entry === "scripts/opus-cat-web-bridge.cjs";
   const allowedGuide = [
+    "docs/mediabunny-LICENSE.txt",
     "docs/beginner-guide/index.html",
     "docs/beginner-guide/ar.html",
     "docs/beginner-guide/guide.css",
