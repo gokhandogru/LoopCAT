@@ -346,7 +346,7 @@ async function verifyEditors(url, resources) {
   await input('#resourceEntryForm [name="status"]', "admitted", "change");
   await evaluate("document.querySelector('#resourceEntryForm').requestSubmit()");
   await wait(
-    "window.CatHan.resourceEditor.session.size()===0 && window.CatHan.storage.get('terms','fixture-term-0').then(row=>row.targetTerm==='arkadaşım' && row.definition==='A trusted person' && row.status==='admitted')",
+    "!document.querySelector('#resourceAddEntry').disabled && window.CatHan.resourceEditor.session.size()===0 && window.CatHan.storage.get('terms','fixture-term-0').then(row=>row.targetTerm==='arkadaşım' && row.definition==='A trusted person' && row.status==='admitted')",
     "term text, definition and status save"
   );
   await evaluate("document.querySelector('#resourceAddEntry').click()");
@@ -354,7 +354,7 @@ async function verifyEditors(url, resources) {
   await input('#resourceEntryForm [name="targetTerm"]', "çevirmen");
   await evaluate("document.querySelector('#resourceSaveAll').click()");
   await wait(
-    "window.CatHan.resourceEditor.session.size()===0 && document.querySelectorAll('tr[data-entry-id]').length===5",
+    "!document.querySelector('#resourceAddEntry').disabled && window.CatHan.resourceEditor.session.size()===0 && document.querySelectorAll('tr[data-entry-id]').length===5",
     "new term saved"
   );
   await capture("tb-editor.png");
