@@ -1,4 +1,35 @@
-# LoopCAT 0.0.4-dev.20261122.1 release verification
+# LoopCAT 0.0.4-dev.20261127.1 release verification
+
+Verified and published on 27 November 2026.
+
+- [GitHub prerelease and all eleven files](https://github.com/gokhandogru/LoopCAT/releases/tag/preview-0.0.4-dev.20261127.1)
+- [Successful all-platform workflow](https://github.com/gokhandogru/LoopCAT/actions/runs/46014416062)
+- [Release manifest with sizes and SHA-256 hashes](latest-release.json)
+- [Public downloads website](https://loopcat-downloads.gokhan-dogru.chatgpt.site/)
+
+## Source and download verification
+
+The release tag and all nine application packages use source commit `5942ea519e235a86ed854cdd0ead0c506a281c08`, with source fingerprint `77b78b75fb3a275df633151d1150b449bb57933a1c036c310aa10182e39db941`. Later download-only commits do not change packaged application code.
+
+Windows installer and portable EXE/ZIP, universal macOS DMG/ZIP, Linux x64 AppImage/DEB and the web ZIP are published, alongside the Mac installation guide and combined checksums. All eleven public assets were downloaded in full and independently checked against their expected SHA-256 hashes and byte sizes. Repository ZIP mirrors and their receipts pass `verify-repository-downloads.cjs`.
+
+## Platform and workflow verification
+
+All seven jobs passed: Windows, macOS, Linux, static web, Apple Silicon launch, Intel Mac launch and the combined release bundle. Quality checks include 1,771 tests, browser and file-format workflows, Exchange, accessibility, Resources, native lifecycle, packaged launch, artifact integrity, Electron fuses and checksums. Both Mac architectures and universal signatures were verified.
+
+The release adds project sorting and audiovisual translation for SRT, WebVTT and SBV. Browser coverage exercises local video, live translation captions and subtitle timing. The release checks also corrected the offline test server's asset list and synchronized a Resources test with the save-completion state before opening the add-entry dialog.
+
+## Website verification
+
+The website update was built from Sites source commit `3302ffe00c09aa3ded81d62f6e96d46c322b6a35`. Its bundled release feed contains all current downloads; the page describes project sorting and subtitle editing and announces Gokhan Dogru's GenAI in Localization presentation. Existing public access, download counters and manuals are preserved.
+
+Desktop and 390-pixel mobile checks passed for all nine package choices, both Mac chip options, the guide dialog and the fallback release feed with GitHub unavailable. No page errors, serious/critical automated accessibility violations or horizontal overflow were found. Desktop and mobile screenshots were inspected.
+
+This remains a development preview: Windows is unsigned and macOS is ad-hoc signed without notarization. Passing automated checks does not establish that every workflow is bug-free.
+
+---
+
+# Historical verification: 0.0.4-dev.20261122.1
 
 Verified and published on 22 November 2026.
 
