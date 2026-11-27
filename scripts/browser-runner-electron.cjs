@@ -9,7 +9,7 @@ const timeoutMs = Number(process.env.LOOPCAT_BROWSER_TEST_TIMEOUT_MS || 10 * 60 
 const runnerUserDataDir = path.join(os.tmpdir(), `loopcat-browser-runner-${process.pid}-${Date.now()}`);
 const productionRendererRoot = path.join(root, ".cache", "renderer", "production");
 const testRendererRoot = path.join(root, ".cache", "renderer", "test");
-const { runtimeAssets } = require(path.join(productionRendererRoot, "config", "production-assets.js"));
+const { offlineAssets } = require(path.join(productionRendererRoot, "config", "production-assets.js"));
 const generatedFiles = new Map([
   ["index.html", path.join(productionRendererRoot, "index.html")],
   ["desktop-index.html", path.join(productionRendererRoot, "desktop-index.html")],
@@ -71,7 +71,7 @@ const mimeTypes = new Map([
   [".ico", "image/x-icon"]
 ]);
 const allowedFiles = new Set([
-  ...runtimeAssets,
+  ...offlineAssets,
   ...standaloneTestDependencies,
   "LICENSE",
   "NOTICE",
